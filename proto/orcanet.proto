@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package orcanet;
+
+service MarketService {
+    rpc AddProducer (FileProducer) returns (google.protobuf.Empty) {};
+    rpc GetProducers (FileHash) returns (FileProducerList) {};
+}
+
+message FileProducer {
+    string hash = 1;
+    string link = 2;
+    float price = 3;
+    string payment_address = 4;
+}
+
+message FileHash {
+    string hash = 1;
+}
+
+message FileProducerList {
+    repeated FileProducer producers = 1;
+}
