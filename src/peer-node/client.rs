@@ -3,7 +3,7 @@ mod producer;
 mod grpc;
 
 use clap::Parser;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -16,6 +16,11 @@ struct Args {
     /// Whether to run as a producer
     #[arg(short, long, default_value = "false")]
     producer: bool,
+
+    /// File hash
+    /// Only used when running as a consumer
+    #[arg(short, long)]
+    file_hash: Option<String>,
 }
 
 #[tokio::main]
@@ -24,7 +29,10 @@ async fn main() -> Result<()> {
 
     match args.producer {
         true => producer::run(args.market).await?,
-        false => consumer::run(args.market).await?,
+        false => match args.file_hash {
+            Some(file_hash) => consumer::run(args.market, file_hash).await?,
+            None => return Err(anyhow!("No file hash provided")),
+        },
     }
 
     Ok(())

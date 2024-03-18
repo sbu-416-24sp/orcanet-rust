@@ -25,8 +25,8 @@ impl Consumers {
         }
     }
 
-    pub fn add_consumer(&mut self, consumer_address: String, consumer: Consumer) {
-        self.consumers.insert(consumer_address, consumer);
+    pub fn add_consumer(&mut self, consumer_ip: String, consumer: Consumer) {
+        self.consumers.insert(consumer_ip, consumer);
     }
 
     pub fn get_consumer(&mut self, consumer_address: &str) -> Option<&mut Consumer> {

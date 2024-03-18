@@ -1,20 +1,11 @@
-use crate::grpc::orcanet::FileProducer;
+use anyhow::{Result, anyhow};
 
-use anyhow::Result;
+use crate::grpc::orcanet::User;
 
-pub async fn get_file(producer: FileProducer) -> Result<()> {
-    // Check that a valid link is given
-    let link = producer.link;
-    if link.is_empty() {
-        return Err(anyhow::anyhow!("No link provided"));
-    }
-
-    // Check if the link contains a protocol, and if not, add one
-    let link = if link.starts_with("http://") || link.starts_with("https://") {
-        link
-    } else {
-        format!("http://{}", link)
-    };
+pub async fn get_file(producer: User, file_hash: String) -> Result<()> {
+    // Get the link to the file
+    let link = format!("http://{}:{}/file/{}", producer.ip, producer.port, file_hash);
+    println!("HTTP: Fetching file from {}", link);
 
     // Fetch the file from the producer
     let client = reqwest::Client::new();
@@ -25,11 +16,23 @@ pub async fn get_file(producer: FileProducer) -> Result<()> {
 
     // Check if the request was successful
     if !res.status().is_success() {
-        return Err(anyhow::anyhow!("Request failed with status code: {}", res.status()));
+        return Err(anyhow!("Request failed with status code: {}", res.status()));
     }
+
+    // Get the file name from the Content-Disposition header
+    let headers = res.headers().clone();
+    let content_disposition = headers.get("Content-Disposition")
+        .ok_or(anyhow!("No Content-Disposition header"))?
+        .to_str()?;
+    let file_name = match content_disposition.split("filename=").last() {
+        Some(name) => name,
+        None => return Err(anyhow!("No filename in Content-Disposition header")),
+    };
+    let file_name = file_name.trim_matches(|c| c == '"'); // Remove quotes
     
     // Save the file to disk
     let file = res.bytes().await?;
-    tokio::fs::write("giraffe_download.jpg", file).await?;
+    tokio::fs::write(format!("download/{}", file_name), file).await?;
+    println!("HTTP: File saved as {}", file_name);
     Ok(())
 }

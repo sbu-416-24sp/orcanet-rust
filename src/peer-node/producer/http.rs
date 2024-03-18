@@ -17,9 +17,12 @@ use tokio_util::io::ReaderStream;
 
 use crate::producer::db;
 
+use super::files::AsyncFileMap;
+
 #[derive(Clone)]
 struct AppState {
     consumers: Arc<Mutex<db::Consumers>>,
+    files: AsyncFileMap,
 }
 
 #[derive(Deserialize, Debug)]
@@ -41,6 +44,7 @@ async fn handle_file_request(
     let address = connect_info.0.ip().to_string();
 
     // Lock the consumers map
+    // TODO: Optimize this by finding a way to lock only the consumer that is being accessed
     let mut consumers = state.consumers.lock().await;
 
     // Parse the Authorization header
@@ -56,7 +60,7 @@ async fn handle_file_request(
     }
 
     // Get the consumer
-    let consumer = match consumers.get_consumer(&hash) {
+    let consumer = match consumers.get_consumer(&address) {
         Some(consumer) => consumer,
         None => {
             // Create a new consumer
@@ -65,13 +69,13 @@ async fn handle_file_request(
                 requests: HashMap::new(),
             };
 
-            consumers.add_consumer(hash.clone(), consumer);
-            consumers.get_consumer(&hash).unwrap()
+            consumers.add_consumer(address.clone(), consumer);
+            consumers.get_consumer(&address).unwrap()
         }
     };
 
     // Get the consumer request
-    let request = match consumer.requests.get_mut(&address) {
+    let request = match consumer.requests.get_mut(&hash) {
         Some(request) => request,
         None => {
             // Create a new consumer request
@@ -80,8 +84,8 @@ async fn handle_file_request(
                 access_token: "".to_string(),
             };
 
-            consumer.requests.insert(address.clone(), request);
-            consumer.requests.get_mut(&address).unwrap()
+            consumer.requests.insert(hash.clone(), request);
+            consumer.requests.get_mut(&hash).unwrap()
         }
     };
 
@@ -92,8 +96,26 @@ async fn handle_file_request(
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
 
-    // Send the file chunk (not implemented, send the full file instead)
-    let file = match tokio::fs::File::open("giraffe.jpg").await {
+    // Get the file path from the file map
+    let file_map = state.files.lock().await;
+    let file_path = match file_map.get_file_path(&hash) {
+        Some(path) => path,
+        None => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
+        }
+    };
+    //drop(file_map);
+    // Get the file name
+    let file_name = match file_path.file_name() {
+        Some(name) => name.to_string_lossy().to_string(),
+        None => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
+        }
+    };
+
+    // Open the full file and read it into the response body
+    // TODO: Send the file in chunks instead of the full file
+    let file = match tokio::fs::File::open(file_path).await {
         Ok(file) => file,
         Err(_) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
@@ -101,6 +123,9 @@ async fn handle_file_request(
     };
     let stream = ReaderStream::new(file);
     let body = Body::from_stream(stream);
+    
+    // Get the content type using mime_guess
+    let mime = mime_guess::from_path(&file_name).first_or_octet_stream();
 
     // Increment the chunks sent
     request.chunks_sent += 1;
@@ -109,25 +134,26 @@ async fn handle_file_request(
 
     Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "image/jpeg")
+        .header(header::CONTENT_TYPE, mime.to_string())
         .header(
             header::CONTENT_DISPOSITION,
-            "inline; filename=\"giraffe.jpg\"",
+            format!("attachment; filename=\"{}\"", file_name),
         )
         .header("X-Access-Token", request.access_token.as_str())
         .body(body)
         .unwrap()
 }
 
-pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(files: AsyncFileMap) -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/file/:file_hash", get(handle_file_request))
         .with_state(AppState {
             consumers: Arc::new(Mutex::new(db::Consumers::new())),
+            files,
         });
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
-    println!("Listening on {}", listener.local_addr()?);
+    println!("HTTP: Listening on {}", listener.local_addr()?);
 
     axum::serve(
         listener,
