@@ -4,7 +4,12 @@ use crate::grpc::orcanet::User;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 
-pub async fn get_file(producer: User, file_hash: String, token: String, chunk: u64) -> Result<String> {
+pub async fn get_file(
+    producer: User,
+    file_hash: String,
+    token: String,
+    chunk: u64,
+) -> Result<String> {
     // Get the link to the file
     let link = format!(
         "http://{}:{}/file/{}",
@@ -26,7 +31,13 @@ pub async fn get_file(producer: User, file_hash: String, token: String, chunk: u
     }
 
     // get auth token header from response
-    let auth_token = res.headers().get("X-Access-Token").unwrap().to_str().unwrap().to_owned();
+    let auth_token = res
+        .headers()
+        .get("X-Access-Token")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
 
     // Get the file name from the Content-Disposition header
     let headers = res.headers().clone();
@@ -44,10 +55,10 @@ pub async fn get_file(producer: User, file_hash: String, token: String, chunk: u
     let file = res.bytes().await?;
     let file_path = format!("download/{}", file_name);
     let mut download = OpenOptions::new()
-      .create(true)
-      .append(true)
-      .open(file_path)
-      .await?;
+        .create(true)
+        .append(true)
+        .open(file_path)
+        .await?;
 
     download.write_all(&file).await?;
     println!("HTTP: File saved as {}", file_name);
