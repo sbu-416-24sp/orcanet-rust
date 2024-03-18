@@ -70,3 +70,27 @@ impl FileMap {
         Ok(hash)
     }
 }
+
+// chunk size = 4mb
+const CHUNK_SIZE: usize = 4 * 1024 * 1024;
+
+fn chunk_file(&self, file: &mut File) -> Result<Vec<u8>> {
+  // create a vector to hold the chunks
+  let mut chunks = Vec::new();
+
+  // create a buffer to hold the file data
+  let mut buffer = vec![0; CHUNK_SIZE];
+  loop {
+    match file.read(&mut buffer) {
+      Ok(0) => break, // reached end of file
+      Ok(bytes_read) => {
+        // push the buffer into the chunks vector
+        chunks.push(buffer[..bytes_read].to_vec());
+      }
+      Err(err) => {
+        eprintln!("Failed to read file: {}", err);
+        break;
+      }
+    }
+  }
+}
