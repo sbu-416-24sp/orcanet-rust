@@ -1,9 +1,11 @@
-use std::collections::HashMap;
 use rand::Rng;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::{Mutex, RwLock};
 
-#[derive(Clone)]
+type AsyncConsumer = Arc<Mutex<Consumer>>;
+
 pub struct Consumers {
-    consumers: HashMap<String, Consumer>,
+    consumers: RwLock<HashMap<String, AsyncConsumer>>,
 }
 
 #[derive(Clone)]
@@ -21,16 +23,26 @@ pub struct Consumer {
 impl Consumers {
     pub fn new() -> Self {
         Consumers {
-            consumers: HashMap::new(),
+            consumers: RwLock::new(HashMap::new()),
         }
     }
 
-    pub fn add_consumer(&mut self, consumer_ip: String, consumer: Consumer) {
-        self.consumers.insert(consumer_ip, consumer);
+    pub async fn add_consumer(&self, consumer_ip: String, consumer: Consumer) -> AsyncConsumer {
+        // Get a write lock on the consumers map
+        let mut consumers = self.consumers.write().await;
+
+        // Add the consumer to the map
+        let async_consumer = Arc::new(Mutex::new(consumer));
+        consumers.insert(consumer_ip, async_consumer.clone());
+        async_consumer
     }
 
-    pub fn get_consumer(&mut self, consumer_address: &str) -> Option<&mut Consumer> {
-        self.consumers.get_mut(consumer_address)
+    pub async fn get_consumer(&self, consumer_address: &str) -> Option<AsyncConsumer> {
+        // Get a read lock on the consumers map
+        let consumers = self.consumers.read().await;
+
+        // Get the consumer
+        consumers.get(consumer_address).cloned()
     }
 }
 

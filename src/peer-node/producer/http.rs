@@ -7,7 +7,6 @@ use axum::{
     Router,
 };
 use serde::Deserialize;
-use tokio::sync::Mutex;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -21,7 +20,7 @@ use super::files::AsyncFileMap;
 
 #[derive(Clone)]
 struct AppState {
-    consumers: Arc<Mutex<db::Consumers>>,
+    consumers: Arc<db::Consumers>,
     files: AsyncFileMap,
 }
 
@@ -42,25 +41,21 @@ async fn handle_file_request(
     let hash = params.0;
     let chunk = query.chunk.unwrap_or(0);
     let address = connect_info.0.ip().to_string();
-
-    // Lock the consumers map
-    // TODO: Optimize this by finding a way to lock only the consumer that is being accessed
-    let mut consumers = state.consumers.lock().await;
-
+    
     // Parse the Authorization header
     let mut auth_token = if let Some(auth) = headers.get("Authorization") {
         auth.to_str().unwrap_or_default()
     } else {
         ""
     };
-
+    
     // Remove the "Bearer " prefix
     if !auth_token.is_empty() && auth_token.starts_with("Bearer ") {
         auth_token = &auth_token[7..];
     }
 
     // Get the consumer
-    let consumer = match consumers.get_consumer(&address) {
+    let consumer = match state.consumers.get_consumer(&address).await {
         Some(consumer) => consumer,
         None => {
             // Create a new consumer
@@ -69,10 +64,10 @@ async fn handle_file_request(
                 requests: HashMap::new(),
             };
 
-            consumers.add_consumer(address.clone(), consumer);
-            consumers.get_consumer(&address).unwrap()
+            state.consumers.add_consumer(address.clone(), consumer).await
         }
     };
+    let mut consumer = consumer.lock().await;
 
     // Get the consumer request
     let request = match consumer.requests.get_mut(&hash) {
@@ -97,14 +92,12 @@ async fn handle_file_request(
     }
 
     // Get the file path from the file map
-    let file_map = state.files.lock().await;
-    let file_path = match file_map.get_file_path(&hash) {
+    let file_path = match state.files.get_file_path(&hash).await {
         Some(path) => path,
         None => {
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
-    //drop(file_map);
     // Get the file name
     let file_name = match file_path.file_name() {
         Some(name) => name.to_string_lossy().to_string(),
@@ -148,7 +141,7 @@ pub async fn run(files: AsyncFileMap) -> Result<(), Box<dyn std::error::Error>> 
     let app = Router::new()
         .route("/file/:file_hash", get(handle_file_request))
         .with_state(AppState {
-            consumers: Arc::new(Mutex::new(db::Consumers::new())),
+            consumers: Arc::new(db::Consumers::new()),
             files,
         });
 

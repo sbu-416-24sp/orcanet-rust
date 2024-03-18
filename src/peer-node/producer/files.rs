@@ -5,33 +5,35 @@ use std::sync::Arc;
 use glob::glob;
 use sha2::Sha256;
 use sha2::Digest;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use std::fs::File;
 use anyhow::Result;
 use std::io;
 
 pub struct FileMap {
-    files: HashMap<String, PathBuf>,
+    files: RwLock<HashMap<String, PathBuf>>,
 }
 
-pub type AsyncFileMap = Arc<Mutex<FileMap>>;
+pub type AsyncFileMap = Arc<FileMap>;
 
 impl FileMap {
     pub fn new() -> Self {
         FileMap {
-            files: HashMap::new(),
+            files: RwLock::new(HashMap::new()),
         }
     }
 
     // Add all the files in a Unix-style glob to the map
-    pub fn add_all(&mut self, file_path: &str) -> Result<()> {
+    pub async fn add_all(&self, file_path: &str) -> Result<()> {
+        // Get a write lock on the files map
+        let mut files = self.files.write().await;
         for entry in glob(file_path)? {
             let path = entry?;
             let file = File::open(path.clone());
             match file {
                 Ok(mut file) => {
                     let hash = self.hash_file(&mut file)?;
-                    self.files.insert(hash, path);
+                    files.insert(hash, path);
                 }
                 Err(_) => {
                     println!("Failed to open file {:?}", path);
@@ -43,14 +45,20 @@ impl FileMap {
     }
 
     // Get a file path by its hash
-    pub fn get_file_path(&self, hash: &str) -> Option<PathBuf> {
-        let path = self.files.get(hash)?;
+    pub async fn get_file_path(&self, hash: &str) -> Option<PathBuf> {
+        // Get a read lock on the files map
+        let files = self.files.read().await;
+
+        let path = files.get(hash)?;
         Some(path.clone())
     }
 
     // Get a vector of all the hashes in the map
-    pub fn get_hashes(&self) -> Vec<String> {
-        self.files.keys().cloned().collect()
+    pub async fn get_hashes(&self) -> Vec<String> {
+        // Get a read lock on the files map
+        let files = self.files.read().await;
+
+        files.keys().cloned().collect()
     }
 
     // Get the hash of a file
