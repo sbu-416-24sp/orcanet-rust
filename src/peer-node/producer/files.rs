@@ -2,15 +2,15 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::Ok;
-use anyhow::Result;
+use anyhow::{anyhow,Result};
 use glob::glob;
 use sha2::Digest;
 use sha2::Sha256;
 use std::fs::File;
 use std::io;
 use tokio::sync::RwLock;
-
+use tokio::io::{AsyncSeekExt, AsyncReadExt};
+use tokio::io::SeekFrom;
 pub struct FileMap {
     files: RwLock<HashMap<String, PathBuf>>,
 }
@@ -72,36 +72,40 @@ impl FileMap {
     }
 }
 
+pub struct FileAccessType {
+    file_path: String,
+}
+
 impl FileAccessType {
     // chunk size = 4mb
-    const CHUNK_SIZE: usize = 4 * 1024 * 1024;
+    const CHUNK_SIZE: u64 = 4 * 1024 * 1024;
 
-    pub fn new(file: String) -> Result<Self> {
-      // Rest of the code...
-      let file_path = file;
-      Ok(this)
+    pub fn new(file: &str) -> Result<Self> {
+        Ok(FileAccessType {
+            file_path: file.to_string(),
+        })      
     }
 
-    pub fn get_chunk(&self, desired_chunk: isize) -> Result<Vec<u8>> {
-      // open the file
-      let file = File::open(&self.file_path)?;
-    
-      // create a buffer to hold the file data
-      let mut buffer = vec![0; CHUNK_SIZE];
+    pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Vec<u8>> {
+        // open the file
+        let mut file = tokio::fs::File::open(&self.file_path).await?;
+      
+        // create a buffer to hold the file data
+        let mut buffer = vec![0; Self::CHUNK_SIZE as usize];
 
-      // check if the desired chunk is within the file size
-      if desired_chunk < 0 {
-        return Err(anyhow!("Invalid chunk number"));
+        // check if the desired chunk is within the file size
+        if desired_chunk < 0 {
+          return Err(anyhow!("Invalid chunk number"));
+        }
+
+        // seek to the desired chunk
+        file.seek(SeekFrom::Start(desired_chunk * Self::CHUNK_SIZE)).await?;
+
+        // read the chunk into the buffer
+        let n = file.read(&mut buffer).await?;
+
+        // return the buffer
+        Ok(buffer)
       }
-
-      // seek to the desired chunk
-      file.seek(SeekFrom::Start((desired_chunk * CHUNK_SIZE) as u64))?;
-
-      // read the chunk into the buffer
-      let n = file.read(&mut buffer)?;
-
-      // return the buffer
-      Ok(buffer)
-    }
 }
 

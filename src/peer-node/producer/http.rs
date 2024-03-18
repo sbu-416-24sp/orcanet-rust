@@ -8,11 +8,11 @@ use axum::{
 };
 use serde::Deserialize;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tokio_util::io::ReaderStream;
 
 use crate::producer::db;
 
 use super::files::AsyncFileMap;
+use super::files::FileAccessType;
 
 #[derive(Clone)]
 struct AppState {
@@ -105,16 +105,26 @@ async fn handle_file_request(
         }
     };
 
-    // Open the full file and read it into the response body
-    // TODO: Send the file in chunks instead of the full file
-    let file = match tokio::fs::File::open(file_path).await {
+    // Create a new FileAccessType, which will open the file and allow us to read chunks
+    let file = match FileAccessType::new(&file_name) {
         Ok(file) => file,
         Err(_) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
-    let stream = ReaderStream::new(file);
-    let body = Body::from_stream(stream);
+
+    // Get the desired chunk
+    let file_chunk: Vec<u8> = match file.get_chunk(chunk).await {
+        Ok(file_chunk) => file_chunk,
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
+        }
+    };
+
+    // Create a stream from the file chunk
+    // let stream = ReaderStream::new(file);
+    // let body = Body::from_stream(stream);
+    let body = Body::from(file_chunk);
 
     // Get the content type using mime_guess
     let mime = mime_guess::from_path(&file_name).first_or_octet_stream();
