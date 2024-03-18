@@ -22,8 +22,8 @@ cargo run -- -f <file_hash>
 - [x] Authorization tokens
 - [x] Basic CLI for testing
 - [x] Automatic file hashing and registration for Producer
+- [x] File chunking and reassembly
 - [ ] Extend CLI to allow producer and consumer to be utilized simultaneously
-- [ ] File chunking and reassembly
 - [ ] Automatic IP address discovery
 - [ ] Producer selection algorithm
 - [ ] Payment verification
