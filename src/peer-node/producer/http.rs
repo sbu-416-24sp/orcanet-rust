@@ -118,10 +118,10 @@ async fn handle_file_request(
     // Get the desired chunk
     let file_chunk: Vec<u8> = match file.get_chunk(chunk).await {
         Ok(file_chunk) => file_chunk,
-        Err(e) => {
+        Err(_) => {
             eprintln!("Failed to get chunk {} from {:?}", chunk, file_path);
-            eprintln!("{:?}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
+            // eprintln!("{:?}", e);
+            return (StatusCode::NOT_FOUND, format!("Failed to get chunk {}",chunk)).into_response();
         }
     };
 

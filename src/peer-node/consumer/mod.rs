@@ -32,6 +32,11 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
                 chunk += 1;
             }
             Err(e) => {
+                if (e.to_string() == "Request failed with status code: 404 Not Found") {
+                    println!("File downloaded successfully");
+                    break;
+                }
+
                 eprintln!("Error downloading chunk {}: {}", chunk, e);
                 break;
             }
