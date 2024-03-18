@@ -101,14 +101,16 @@ async fn handle_file_request(
     let file_name = match file_path.file_name() {
         Some(name) => name.to_string_lossy().to_string(),
         None => {
+            eprintln!("Failed to get file name from {:?}", file_path);
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
 
     // Create a new FileAccessType, which will open the file and allow us to read chunks
-    let file = match FileAccessType::new(&file_name) {
+    let file = match FileAccessType::new(&file_path.to_string_lossy().to_string()) {
         Ok(file) => file,
         Err(_) => {
+            eprintln!("Failed to open file {:?}", file_path);
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
@@ -116,14 +118,14 @@ async fn handle_file_request(
     // Get the desired chunk
     let file_chunk: Vec<u8> = match file.get_chunk(chunk).await {
         Ok(file_chunk) => file_chunk,
-        Err(_) => {
+        Err(e) => {
+            eprintln!("Failed to get chunk {} from {:?}", chunk, file_path);
+            eprintln!("{:?}", e);
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
 
     // Create a stream from the file chunk
-    // let stream = ReaderStream::new(file);
-    // let body = Body::from_stream(stream);
     let body = Body::from(file_chunk);
 
     // Get the content type using mime_guess

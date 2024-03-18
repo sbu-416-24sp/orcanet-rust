@@ -1,8 +1,10 @@
 use anyhow::{anyhow, Result};
 
 use crate::grpc::orcanet::User;
+use tokio::fs::OpenOptions;
+use tokio::io::AsyncWriteExt;
 
-pub async fn get_file(producer: User, file_hash: String) -> Result<()> {
+pub async fn get_file(producer: User, file_hash: String, token: String, chunk: u64) -> Result<String> {
     // Get the link to the file
     let link = format!(
         "http://{}:{}/file/{}",
@@ -13,8 +15,8 @@ pub async fn get_file(producer: User, file_hash: String) -> Result<()> {
     // Fetch the file from the producer
     let client = reqwest::Client::new();
     let res = client
-        .get(format!("{}?chunk=0", link))
-        .header("Authorization", format!("Bearer {}", "token"))
+        .get(format!("{}?chunk={}", link, chunk))
+        .header("Authorization", format!("Bearer {}", token))
         .send()
         .await?;
 
@@ -22,6 +24,9 @@ pub async fn get_file(producer: User, file_hash: String) -> Result<()> {
     if !res.status().is_success() {
         return Err(anyhow!("Request failed with status code: {}", res.status()));
     }
+
+    // get auth token header from response
+    let auth_token = res.headers().get("X-Access-Token").unwrap().to_str().unwrap().to_owned();
 
     // Get the file name from the Content-Disposition header
     let headers = res.headers().clone();
@@ -37,7 +42,14 @@ pub async fn get_file(producer: User, file_hash: String) -> Result<()> {
 
     // Save the file to disk
     let file = res.bytes().await?;
-    tokio::fs::write(format!("download/{}", file_name), file).await?;
+    let file_path = format!("download/{}", file_name);
+    let mut download = OpenOptions::new()
+      .create(true)
+      .append(true)
+      .open(file_path)
+      .await?;
+
+    download.write_all(&file).await?;
     println!("HTTP: File saved as {}", file_name);
-    Ok(())
+    Ok(auth_token)
 }
