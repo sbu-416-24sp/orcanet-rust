@@ -13,8 +13,14 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
 
     // For now, use the first producer
     // TODO: Pick the least expensive producer
-    let producer = producers.holders.get(0).ok_or(anyhow::anyhow!("No producers found"))?;
-    println!("Consumer: Found producer at {}:{}", producer.ip, producer.port);
+    let producer = producers
+        .holders
+        .get(0)
+        .ok_or(anyhow::anyhow!("No producers found"))?;
+    println!(
+        "Consumer: Found producer at {}:{}",
+        producer.ip, producer.port
+    );
 
     // Fetch the file from the producer
     match http::get_file(producer.clone(), file_hash).await {

@@ -7,11 +7,7 @@ use axum::{
     Router,
 };
 use serde::Deserialize;
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio_util::io::ReaderStream;
 
 use crate::producer::db;
@@ -41,14 +37,14 @@ async fn handle_file_request(
     let hash = params.0;
     let chunk = query.chunk.unwrap_or(0);
     let address = connect_info.0.ip().to_string();
-    
+
     // Parse the Authorization header
     let mut auth_token = if let Some(auth) = headers.get("Authorization") {
         auth.to_str().unwrap_or_default()
     } else {
         ""
     };
-    
+
     // Remove the "Bearer " prefix
     if !auth_token.is_empty() && auth_token.starts_with("Bearer ") {
         auth_token = &auth_token[7..];
@@ -64,7 +60,10 @@ async fn handle_file_request(
                 requests: HashMap::new(),
             };
 
-            state.consumers.add_consumer(address.clone(), consumer).await
+            state
+                .consumers
+                .add_consumer(address.clone(), consumer)
+                .await
         }
     };
     let mut consumer = consumer.lock().await;
@@ -116,14 +115,17 @@ async fn handle_file_request(
     };
     let stream = ReaderStream::new(file);
     let body = Body::from_stream(stream);
-    
+
     // Get the content type using mime_guess
     let mime = mime_guess::from_path(&file_name).first_or_octet_stream();
 
     // Increment the chunks sent
     request.chunks_sent += 1;
 
-    println!("Sending file chunk {} for {} to consumer {}", chunk, hash, address);
+    println!(
+        "Sending file chunk {} for {} to consumer {}",
+        chunk, hash, address
+    );
 
     Response::builder()
         .status(StatusCode::OK)

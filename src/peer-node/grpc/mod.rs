@@ -1,7 +1,7 @@
 use tonic::transport::Channel;
 
 use orcanet::market_client::MarketClient as MarketServiceClient;
-use orcanet::{RegisterFileRequest, User, CheckHoldersRequest, HoldersResponse};
+use orcanet::{CheckHoldersRequest, HoldersResponse, RegisterFileRequest, User};
 
 use anyhow::Result;
 
@@ -25,9 +25,7 @@ impl MarketClient {
     // Get a list of producers for a given file hash
     pub async fn check_holders(&mut self, file_hash: String) -> Result<HoldersResponse> {
         println!("gRPC: Checking holders for file hash {}", file_hash);
-        let request = CheckHoldersRequest {
-            file_hash,
-        };
+        let request = CheckHoldersRequest { file_hash };
 
         let response = self.client.check_holders(request).await?.into_inner();
 
@@ -35,13 +33,21 @@ impl MarketClient {
     }
 
     // Register a new producer
-    pub async fn register_file(&mut self, id: String, name: String, ip: String, port: i32, price: i64, file_hash: String) -> Result<()> {
+    pub async fn register_file(
+        &mut self,
+        id: String,
+        name: String,
+        ip: String,
+        port: i32,
+        price: i64,
+        file_hash: String,
+    ) -> Result<()> {
         let user = User {
             id,
             name,
             ip,
             port,
-            price
+            price,
         };
         let file = RegisterFileRequest {
             user: Some(user),

@@ -1,9 +1,9 @@
 mod consumer;
-mod producer;
 mod grpc;
+mod producer;
 
+use anyhow::{anyhow, Result};
 use clap::Parser;
-use anyhow::{Result, anyhow};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

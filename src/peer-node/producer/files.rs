@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use glob::glob;
-use sha2::Sha256;
-use sha2::Digest;
-use tokio::sync::RwLock;
-use std::fs::File;
 use anyhow::Result;
+use glob::glob;
+use sha2::Digest;
+use sha2::Sha256;
+use std::fs::File;
 use std::io;
+use tokio::sync::RwLock;
 
 pub struct FileMap {
     files: RwLock<HashMap<String, PathBuf>>,
