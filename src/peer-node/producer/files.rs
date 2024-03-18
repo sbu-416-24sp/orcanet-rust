@@ -37,7 +37,7 @@ impl FileMap {
                     files.insert(hash, path);
                 }
                 Err(_) => {
-                    println!("Failed to open file {:?}", path);
+                    eprintln!("Failed to open file {:?}", path);
                 }
             }
         }
@@ -88,14 +88,13 @@ impl FileAccessType {
 
     pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Vec<u8>> {
         // open the file
-        println!("file path: {:?}", &self.file_path);
         let mut file = tokio::fs::File::open(&self.file_path).await?;
 
         // get total chunk number (file size / chunk size)
         let metadata = file.metadata().await?;
         let total_chunks = metadata.len() / Self::CHUNK_SIZE;
-        println!("metadata.len(): {:?}", metadata.len());
-        println!("total_chunks: {:?}", total_chunks);
+        // println!("metadata.len(): {:?}", metadata.len());
+        // println!("total_chunks: {:?}", total_chunks);
 
         // create a buffer to hold the file data
         let mut buffer = vec![0; Self::CHUNK_SIZE as usize];
