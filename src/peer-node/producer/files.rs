@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use glob::glob;
 use sha2::Digest;
 use sha2::Sha256;
@@ -89,7 +89,7 @@ impl FileAccessType {
         })
     }
 
-    pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Option<Vec<u8>>> {
+    pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Vec<u8>> {
         // open the file
         let mut file = tokio::fs::File::open(&self.file_path).await?;
 
@@ -105,7 +105,7 @@ impl FileAccessType {
         // check if the desired chunk is within the file size
         if desired_chunk > total_chunks {
             eprintln!("Failed to get chunk number: Out of range");
-            return ChunkOutOfBoundsError;
+            return Err(anyhow!(ChunkOutOfBoundsError));
         }
 
         // seek to the desired chunk

@@ -1,4 +1,5 @@
 use std::fmt;
+use std::error;
 
 #[derive(Debug, Clone)]
 pub struct ChunkOutOfBoundsError;

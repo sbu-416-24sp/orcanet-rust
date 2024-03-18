@@ -8,6 +8,7 @@ use axum::{
 };
 use serde::Deserialize;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use anyhow::{Result, anyhow};
 
 use crate::producer::db;
 
@@ -122,9 +123,9 @@ async fn handle_file_request(
         Ok(file_chunk) => file_chunk,
         Err(e) => {
             match e {
-                ChunkOutOfBoundsError => {
+                Error(ChunkOutOfBoundsError) => {
                     eprintln!("HTTP: Chunk [{}] from {:?} out of range, sending 404", chunk, file_path);
-                    return (StatusCode::NOT_FOUND, format!("HTTP: Chunk [{}] out of range, sending 404}",chunk)).into_response();
+                    return (StatusCode::NOT_FOUND, format!("HTTP: Chunk [{}] out of range, sending 404",chunk)).into_response();
                 }
                 _ => {
                     eprintln!("Failed to get chunk {}: {}", chunk, e);
