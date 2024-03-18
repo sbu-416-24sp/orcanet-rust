@@ -101,8 +101,8 @@ impl FileAccessType {
 
         // check if the desired chunk is within the file size
         if desired_chunk > total_chunks {
-            eprintln!("Chunk number out of range");
-            return Err(anyhow!("Chunk number out of range"));
+            eprintln!("Failed to get chunk number: Out of range");
+            return Err(anyhow!("Failed to get chunk number: Out of range"));
         }
 
         // seek to the desired chunk

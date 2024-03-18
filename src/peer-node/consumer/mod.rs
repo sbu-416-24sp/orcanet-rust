@@ -28,16 +28,15 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
         match http::get_file(producer.clone(), file_hash.clone(), token, chunk).await {
             Ok(auth_token) => {
                 token = auth_token;
-                println!("Chunk {} downloaded successfully", chunk);
+                println!("HTTP: Chunk {} downloaded successfully", chunk);
                 chunk += 1;
             }
             Err(e) => {
                 if (e.to_string() == "Request failed with status code: 404 Not Found") {
-                    println!("File downloaded successfully");
+                    println!("HTTP: File downloaded successfully");
                     break;
                 }
-
-                eprintln!("Error downloading chunk {}: {}", chunk, e);
+                eprintln!("Failed to download chunk {}: {}", chunk, e);
                 break;
             }
         }
