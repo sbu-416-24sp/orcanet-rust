@@ -1,6 +1,7 @@
 mod db;
 mod files;
 mod http;
+mod error;
 
 use std::sync::Arc;
 

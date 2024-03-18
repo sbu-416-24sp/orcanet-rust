@@ -14,6 +14,8 @@ use crate::producer::db;
 use super::files::AsyncFileMap;
 use super::files::FileAccessType;
 
+use super::error::ChunkOutOfBoundsError;
+
 #[derive(Clone)]
 struct AppState {
     consumers: Arc<db::Consumers>,
@@ -118,10 +120,17 @@ async fn handle_file_request(
     // Get the desired chunk
     let file_chunk: Vec<u8> = match file.get_chunk(chunk).await {
         Ok(file_chunk) => file_chunk,
-        Err(_) => {
-            eprintln!("HTTP: Chunk [{}] from {:?} out of range, sending 404", chunk, file_path);
-            // eprintln!("{:?}", e);
-            return (StatusCode::NOT_FOUND, format!("HTTP: Chunk [{}] out of range, sending 404}",chunk)).into_response();
+        Err(e) => {
+            match e {
+                ChunkOutOfBoundsError => {
+                    eprintln!("HTTP: Chunk [{}] from {:?} out of range, sending 404", chunk, file_path);
+                    return (StatusCode::NOT_FOUND, format!("HTTP: Chunk [{}] out of range, sending 404}",chunk)).into_response();
+                }
+                _ => {
+                    eprintln!("Failed to get chunk {}: {}", chunk, e);
+                    return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
+                }
+            }
         }
     };
 

@@ -11,6 +11,9 @@ use std::io;
 use tokio::io::SeekFrom;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::RwLock;
+
+use super::error::ChunkOutOfBoundsError;
+
 pub struct FileMap {
     files: RwLock<HashMap<String, PathBuf>>,
 }
@@ -86,7 +89,7 @@ impl FileAccessType {
         })
     }
 
-    pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Vec<u8>> {
+    pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Option<Vec<u8>>> {
         // open the file
         let mut file = tokio::fs::File::open(&self.file_path).await?;
 
@@ -102,7 +105,7 @@ impl FileAccessType {
         // check if the desired chunk is within the file size
         if desired_chunk > total_chunks {
             eprintln!("Failed to get chunk number: Out of range");
-            return Err(anyhow!("Failed to get chunk number: Out of range"));
+            return ChunkOutOfBoundsError;
         }
 
         // seek to the desired chunk
