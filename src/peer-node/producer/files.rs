@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use anyhow::Ok;
 use anyhow::Result;
 use glob::glob;
 use sha2::Digest;
@@ -71,26 +72,36 @@ impl FileMap {
     }
 }
 
-// chunk size = 4mb
-const CHUNK_SIZE: usize = 4 * 1024 * 1024;
+impl FileAccessType {
+    // chunk size = 4mb
+    const CHUNK_SIZE: usize = 4 * 1024 * 1024;
 
-fn chunk_file(&self, file: &mut File) -> Result<Vec<u8>> {
-  // create a vector to hold the chunks
-  let mut chunks = Vec::new();
-
-  // create a buffer to hold the file data
-  let mut buffer = vec![0; CHUNK_SIZE];
-  loop {
-    match file.read(&mut buffer) {
-      Ok(0) => break, // reached end of file
-      Ok(bytes_read) => {
-        // push the buffer into the chunks vector
-        chunks.push(buffer[..bytes_read].to_vec());
-      }
-      Err(err) => {
-        eprintln!("Failed to read file: {}", err);
-        break;
-      }
+    pub fn new(file: String) -> Result<Self> {
+      // Rest of the code...
+      let file_path = file;
+      Ok(this)
     }
-  }
+
+    pub fn get_chunk(&self, desired_chunk: isize) -> Result<Vec<u8>> {
+      // open the file
+      let file = File::open(&self.file_path)?;
+    
+      // create a buffer to hold the file data
+      let mut buffer = vec![0; CHUNK_SIZE];
+
+      // check if the desired chunk is within the file size
+      if desired_chunk < 0 {
+        return Err(anyhow!("Invalid chunk number"));
+      }
+
+      // seek to the desired chunk
+      file.seek(SeekFrom::Start((desired_chunk * CHUNK_SIZE) as u64))?;
+
+      // read the chunk into the buffer
+      let n = file.read(&mut buffer)?;
+
+      // return the buffer
+      Ok(buffer)
+    }
 }
+
