@@ -22,11 +22,34 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
         producer.ip, producer.port
     );
 
-    // Fetch the file from the producer
-    match http::get_file(producer.clone(), file_hash).await {
-        Ok(_) => println!("File downloaded successfully"),
-        Err(e) => eprintln!("Error downloading file: {}", e),
+    let mut chunk = 0;
+    let mut token = String::from("token");
+    loop {
+        match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
+            Ok(response) => {
+                match response {
+                    http::GetFileResponse::Token(new_token) => {
+                        token = new_token;
+                    }
+                    http::GetFileResponse::Done => {
+                        println!("Consumer: File downloaded successfully");
+                        break;
+                    }
+                }
+                chunk += 1;
+            }
+            Err(e) => {
+                eprintln!("Failed to download chunk {}: {}", chunk, e);
+                break;
+            }
+        }
     }
+
+    // // Fetch the file from the producer
+    // match http::get_file(producer.clone(), file_hash, chunk).await {
+    //     Ok(_) => println!("File downloaded successfully"),
+    //     Err(e) => eprintln!("Error downloading file: {}", e),
+    // }
 
     Ok(())
 }

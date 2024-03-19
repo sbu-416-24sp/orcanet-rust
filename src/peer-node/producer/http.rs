@@ -8,11 +8,11 @@ use axum::{
 };
 use serde::Deserialize;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tokio_util::io::ReaderStream;
 
 use crate::producer::db;
 
 use super::files::AsyncFileMap;
+use super::files::FileAccessType;
 
 #[derive(Clone)]
 struct AppState {
@@ -94,27 +94,54 @@ async fn handle_file_request(
     let file_path = match state.files.get_file_path(&hash).await {
         Some(path) => path,
         None => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
+            return (StatusCode::NOT_FOUND, "File not found").into_response();
         }
     };
     // Get the file name
     let file_name = match file_path.file_name() {
         Some(name) => name.to_string_lossy().to_string(),
         None => {
+            eprintln!("Failed to get file name from {:?}", file_path);
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
 
-    // Open the full file and read it into the response body
-    // TODO: Send the file in chunks instead of the full file
-    let file = match tokio::fs::File::open(file_path).await {
+    // Create a new FileAccessType, which will open the file and allow us to read chunks
+    let file = match FileAccessType::new(&file_path.to_string_lossy().to_string()) {
         Ok(file) => file,
         Err(_) => {
+            eprintln!("Failed to open file {:?}", file_path);
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
-    let stream = ReaderStream::new(file);
-    let body = Body::from_stream(stream);
+
+    // Get the desired chunk
+    let file_chunk: Vec<u8> = match file.get_chunk(chunk).await {
+        Ok(file_chunk) => match file_chunk {
+            Some(file_chunk) => file_chunk,
+            None => {
+                println!(
+                    "HTTP: Chunk [{}] from {:?} out of range, sending 404",
+                    chunk, file_path
+                );
+                return (
+                    StatusCode::NOT_FOUND,
+                    format!("Chunk [{}] not found", chunk),
+                )
+                    .into_response();
+            }
+        },
+        Err(e) => {
+            eprintln!(
+                "Failed to get chunk {} from {:?}: {:?}",
+                chunk, file_path, e
+            );
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
+        }
+    };
+
+    // Create a stream from the file chunk
+    let body = Body::from(file_chunk);
 
     // Get the content type using mime_guess
     let mime = mime_guess::from_path(&file_name).first_or_octet_stream();
@@ -123,8 +150,8 @@ async fn handle_file_request(
     request.chunks_sent += 1;
 
     println!(
-        "Sending file chunk {} for {} to consumer {}",
-        chunk, hash, address
+        "HTTP: Sending Chunk [{}] for file {:?} to consumer {}",
+        chunk, file_path, address
     );
 
     Response::builder()

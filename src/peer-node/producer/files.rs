@@ -8,6 +8,8 @@ use sha2::Digest;
 use sha2::Sha256;
 use std::fs::File;
 use std::io;
+use tokio::io::SeekFrom;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::RwLock;
 
 pub struct FileMap {
@@ -36,7 +38,7 @@ impl FileMap {
                     files.insert(hash, path);
                 }
                 Err(_) => {
-                    println!("Failed to open file {:?}", path);
+                    eprintln!("Failed to open file {:?}", path);
                 }
             }
         }
@@ -68,5 +70,47 @@ impl FileMap {
         let hash = sha256.finalize();
         let hash = format!("{:x}", hash);
         Ok(hash)
+    }
+}
+
+pub struct FileAccessType {
+    file_path: String,
+}
+
+impl FileAccessType {
+    // chunk size = 4mb
+    const CHUNK_SIZE: u64 = 4 * 1024 * 1024;
+
+    pub fn new(file: &str) -> Result<Self> {
+        Ok(FileAccessType {
+            file_path: file.to_string(),
+        })
+    }
+
+    pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Option<Vec<u8>>> {
+        // open the file
+        let mut file = tokio::fs::File::open(&self.file_path).await?;
+
+        // get total chunk number (file size / chunk size)
+        let metadata = file.metadata().await?;
+        let total_chunks = metadata.len() / Self::CHUNK_SIZE;
+
+        // create a buffer to hold the file data
+        let mut buffer = vec![0; Self::CHUNK_SIZE as usize];
+
+        // check if the desired chunk is within the file size
+        if desired_chunk > total_chunks {
+            return Ok(None);
+        }
+
+        // seek to the desired chunk
+        file.seek(SeekFrom::Start(desired_chunk * Self::CHUNK_SIZE))
+            .await?;
+
+        // read the chunk into the buffer
+        file.read(&mut buffer).await?;
+
+        // return the buffer
+        Ok(Some(buffer))
     }
 }
