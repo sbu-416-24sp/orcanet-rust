@@ -17,15 +17,15 @@ pub async fn get_file_chunk(
 ) -> Result<GetFileResponse> {
     // Get the link to the file
     let link = format!(
-        "http://{}:{}/file/{}",
-        producer.ip, producer.port, file_hash
+        "http://{}:{}/file/{}?chunk={}",
+        producer.ip, producer.port, file_hash, chunk
     );
-    println!("HTTP: Fetching file from {}", link);
+    println!("HTTP: Fetching file chunk from {}", link);
 
     // Fetch the file from the producer
     let client = reqwest::Client::new();
     let res = client
-        .get(format!("{}?chunk={}", link, chunk))
+        .get(&link)
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await?;
