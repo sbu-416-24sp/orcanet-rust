@@ -4,12 +4,17 @@ use crate::grpc::orcanet::User;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 
+pub enum GetFileResponse {
+    Token(String),
+    Done,
+}
+
 pub async fn get_file(
     producer: User,
     file_hash: String,
     token: String,
     chunk: u64,
-) -> Result<String> {
+) -> Result<GetFileResponse> {
     // Get the link to the file
     let link = format!(
         "http://{}:{}/file/{}",
@@ -27,20 +32,20 @@ pub async fn get_file(
 
     // Check if the request was successful
     if !res.status().is_success() {
+        if res.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(GetFileResponse::Done);
+        }
         return Err(anyhow!("Request failed with status code: {}", res.status()));
     }
 
-    // get auth token header from response
-    let auth_token = res
-        .headers()
+    // Get auth token header from response
+    let headers = res.headers().clone();
+    let auth_token = headers
         .get("X-Access-Token")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_owned();
+        .ok_or(anyhow!("No Authorization header"))?
+        .to_str()?;
 
     // Get the file name from the Content-Disposition header
-    let headers = res.headers().clone();
     let content_disposition = headers
         .get("Content-Disposition")
         .ok_or(anyhow!("No Content-Disposition header"))?
@@ -61,6 +66,6 @@ pub async fn get_file(
         .await?;
 
     download.write_all(&file).await?;
-    println!("HTTP: File saved as {}", file_name);
-    Ok(auth_token)
+    println!("HTTP: Chunk [{}] saved to {}", chunk, file_name);
+    Ok(GetFileResponse::Token(auth_token.to_string()))
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use glob::glob;
 use sha2::Digest;
 use sha2::Sha256;
@@ -11,8 +11,6 @@ use std::io;
 use tokio::io::SeekFrom;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::RwLock;
-
-use super::error::ChunkOutOfBoundsError;
 
 pub struct FileMap {
     files: RwLock<HashMap<String, PathBuf>>,
@@ -89,23 +87,20 @@ impl FileAccessType {
         })
     }
 
-    pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Vec<u8>> {
+    pub async fn get_chunk(&self, desired_chunk: u64) -> Result<Option<Vec<u8>>> {
         // open the file
         let mut file = tokio::fs::File::open(&self.file_path).await?;
 
         // get total chunk number (file size / chunk size)
         let metadata = file.metadata().await?;
         let total_chunks = metadata.len() / Self::CHUNK_SIZE;
-        // println!("metadata.len(): {:?}", metadata.len());
-        // println!("total_chunks: {:?}", total_chunks);
 
         // create a buffer to hold the file data
         let mut buffer = vec![0; Self::CHUNK_SIZE as usize];
 
         // check if the desired chunk is within the file size
         if desired_chunk > total_chunks {
-            eprintln!("Failed to get chunk number: Out of range");
-            return Err(anyhow!(ChunkOutOfBoundsError));
+            return Ok(None);
         }
 
         // seek to the desired chunk
@@ -113,9 +108,9 @@ impl FileAccessType {
             .await?;
 
         // read the chunk into the buffer
-        let _n = file.read(&mut buffer).await?;
+        file.read(&mut buffer).await?;
 
         // return the buffer
-        Ok(buffer)
+        Ok(Some(buffer))
     }
 }
