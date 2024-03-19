@@ -25,7 +25,7 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
     let mut chunk = 0;
     let mut token = String::from("token");
     loop {
-        match http::get_file(producer.clone(), file_hash.clone(), token, chunk).await {
+        match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
             Ok(response) => {
                 match response {
                     http::GetFileResponse::Token(new_token) => {

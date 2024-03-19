@@ -9,7 +9,7 @@ pub enum GetFileResponse {
     Done,
 }
 
-pub async fn get_file(
+pub async fn get_file_chunk(
     producer: User,
     file_hash: String,
     token: String,
