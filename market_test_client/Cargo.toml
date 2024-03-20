@@ -11,6 +11,10 @@ tonic = { version = "0.11.0" }
 tokio = { version = "1.36.0", features = ["full"] }
 anyhow = { version = "1.0.81" }
 clap = { version = "4.5.3", features = ["derive"] }
+rustyline = { version = "14.0.0" }
+strum = { version = "0.26.2", features = ["derive"] }
+strum_macros = { version = "0.26.2" }
+thiserror = { version = "1.0.58" }
 
 [build-dependencies]
 tonic-build = "0.11.0"

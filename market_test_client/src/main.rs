@@ -1,37 +1,39 @@
+use std::thread;
+
 use anyhow::Result;
 use clap::Parser;
-use tonic::transport::Uri;
+use tokio::{runtime::Runtime, sync::mpsc};
 
-use market_proto::market_proto_rpc::{market_client::MarketClient, RegisterFileRequest, User};
+use market_proto::market_proto_rpc::User;
 
-use crate::cli::{Cli, LOOPBACK_ADDR};
+use crate::{
+    actor::Actor,
+    cli::{start_main_loop, Cli, LOOPBACK_ADDR},
+};
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     // Market server is typically just a local server process that represents the DHT for the peer
     // node. Peer nodes then communicate through TCP sockets to the market server with the gRPC
     // method abstractions.
     let cli = Cli::parse();
-    let user = Box::leak(Box::new(User::new(
-        cli.id,
+    let user = User::new(
+        cli.id.unwrap_or("test_id".to_owned()),
         cli.username,
         cli.client_ip.to_string(),
         cli.client_port as i32,
         i64::try_from(cli.price)?,
-    )));
-    let mut client = MarketClient::connect(
-        Uri::builder()
-            .scheme("http")
-            .authority(format!("{}:{}", LOOPBACK_ADDR, cli.market_port).as_str())
-            .path_and_query("/")
-            .build()?,
-    )
-    .await?;
-    RegisterFileRequest {
-        user: Some(user.to_owned()),
-        file_hash: "asd".to_owned(),
-    };
-    todo!()
+    );
+    let (tx, rx) = mpsc::unbounded_channel();
+    thread::scope(|s| {
+        s.spawn(move || -> Result<()> {
+            let actor = Actor::new(user, rx);
+            Runtime::new()?.block_on(actor.run());
+            Ok(())
+        });
+        s.spawn(move || start_main_loop(tx).unwrap());
+    });
+    Ok(())
 }
 
+mod actor;
 mod cli;
