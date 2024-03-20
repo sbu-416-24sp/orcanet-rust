@@ -2,23 +2,15 @@ use std::thread;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::Port;
 use tokio::{
     runtime::Runtime,
     sync::{mpsc, oneshot},
 };
 
-use market_proto::market_proto_rpc::{market_client::MarketClient, User};
-use tonic::transport::{Channel, Uri};
-use util::LOOPBACK_ADDR;
+use market_proto::market_proto_rpc::User;
+use util::{initialize_client, ActorMarketState};
 
 use crate::{actor::Actor, cli::Cli, util::start_main_loop};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ActorMarketState {
-    NotConnected,
-    Connected,
-}
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -62,21 +54,6 @@ fn main() -> Result<()> {
         });
     });
     Ok(())
-}
-
-async fn initialize_client(market_port: Port) -> Result<MarketClient<Channel>> {
-    // Market server is typically just a local server process that represents the DHT for the peer
-    // node. Peer nodes then communicate through TCP sockets to the market server with the gRPC
-    // method abstractions. So we can just use the loopback address; eventually I believe we
-    // combine it with the peer node team and get rid of the gRPC socket overhead
-    let uri = Uri::builder()
-        .scheme("http")
-        .authority(format!("{}:{}", LOOPBACK_ADDR, market_port).as_str())
-        .path_and_query("/")
-        .build()?;
-    MarketClient::connect(uri)
-        .await
-        .map_err(|err| anyhow::anyhow!(err))
 }
 
 mod actor;
