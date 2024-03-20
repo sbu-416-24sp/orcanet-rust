@@ -99,29 +99,27 @@ impl TryFrom<Message> for Command {
         let trimmed = value.0.trim();
         let mut iter = trimmed.split_whitespace();
         let cmd = iter.next().ok_or(CommandParseError::NoCommand)?;
-        let cmd = Command::from_str(cmd).map_err(|_| CommandParseError::NotFound {
+        let mut cmd = Command::from_str(cmd).map_err(|_| CommandParseError::NotFound {
             cmd: cmd.to_owned(),
         })?;
-        match cmd {
-            Command::Quit => Ok(cmd),
-            Command::Help => Ok(cmd),
-            Command::RegisterFile { file_hash: _ } => {
-                let file_hash = iter
-                    .next()
-                    .ok_or(CommandParseError::MissingOrInvalidArgs { cmd })?;
-                Ok(Command::RegisterFile {
-                    file_hash: file_hash.to_owned(),
-                })
+        Ok(match &mut cmd {
+            Command::Quit | Command::Help => cmd,
+            Command::RegisterFile {
+                file_hash: cur_hash,
             }
-            Command::CheckHolders { file_hash: _ } => {
-                let file_hash = iter
-                    .next()
-                    .ok_or(CommandParseError::MissingOrInvalidArgs { cmd })?;
-                Ok(Command::CheckHolders {
-                    file_hash: file_hash.to_owned(),
-                })
+            | Command::CheckHolders {
+                file_hash: cur_hash,
+            } => {
+                if let Some(file_hash) = iter.next() {
+                    *cur_hash = file_hash.to_owned();
+                    cmd
+                } else {
+                    return Err(CommandParseError::MissingOrInvalidArgs {
+                        cmd: cmd.to_owned(),
+                    });
+                }
             }
-        }
+        })
     }
 }
 

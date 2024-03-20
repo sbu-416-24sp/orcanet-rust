@@ -8,6 +8,7 @@ use market_proto::market_proto_rpc::{
 };
 use tonic::{Request, Response, Status};
 
+// TODO: replace this with a DHT
 type MarketStore = HashMap<String, HashSet<User>>;
 
 #[derive(Debug, Clone, Default)]
@@ -21,8 +22,6 @@ impl Market for MarketService {
         &self,
         request: Request<RegisterFileRequest>,
     ) -> Result<Response<()>, Status> {
-        let addr = request.remote_addr();
-        println!("{:?}", addr);
         let file_req = request.into_inner();
         let mut store = self
             .store
@@ -45,8 +44,6 @@ impl Market for MarketService {
         &self,
         request: Request<CheckHoldersRequest>,
     ) -> Result<Response<HoldersResponse>, Status> {
-        let addr = request.remote_addr();
-        println!("{:?}", addr);
         let holders_req = request.into_inner();
         let file_hash = holders_req.file_hash;
         let store = self
