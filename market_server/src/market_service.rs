@@ -6,7 +6,7 @@ use std::{
 use market_proto::market_proto_rpc::{
     market_server::Market, CheckHoldersRequest, HoldersResponse, RegisterFileRequest, User,
 };
-use tonic::{Response, Status};
+use tonic::{Code, Request, Response, Status};
 
 type MarketStore = HashMap<String, HashSet<User>>;
 
@@ -19,18 +19,15 @@ pub struct MarketService {
 impl Market for MarketService {
     async fn register_file(
         &self,
-        request: tonic::Request<RegisterFileRequest>,
-    ) -> std::result::Result<Response<()>, Status> {
+        request: Request<RegisterFileRequest>,
+    ) -> Result<Response<()>, Status> {
         let file_req = request.into_inner();
         let mut store = self.store.lock().map_err(|err| {
-            Status::new(
-                tonic::Code::Internal,
-                format!("Internal Server Error: {}", err),
-            )
+            Status::new(Code::Internal, format!("Internal Server Error: {}", err))
         })?;
 
         let file_hash = file_req.file_hash;
-        let user = file_req.user.ok_or(tonic::Status::invalid_argument(
+        let user = file_req.user.ok_or(Status::invalid_argument(
             "The user field is required for this request",
         ))?;
         let entry = store.entry(file_hash).or_default();
@@ -40,15 +37,12 @@ impl Market for MarketService {
 
     async fn check_holders(
         &self,
-        request: tonic::Request<CheckHoldersRequest>,
-    ) -> std::result::Result<Response<HoldersResponse>, Status> {
+        request: Request<CheckHoldersRequest>,
+    ) -> Result<Response<HoldersResponse>, Status> {
         let holders_req = request.into_inner();
         let file_hash = holders_req.file_hash;
         let store = self.store.lock().map_err(|err| {
-            Status::new(
-                tonic::Code::Internal,
-                format!("Internal Server Error: {}", err),
-            )
+            Status::new(Code::Internal, format!("Internal Server Error: {}", err))
         })?;
 
         let holders = store
