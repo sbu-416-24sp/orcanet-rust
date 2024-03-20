@@ -1,4 +1,7 @@
-use std::thread;
+use std::{
+    sync::{Arc, Condvar, Mutex},
+    thread,
+};
 
 use anyhow::Result;
 use clap::Parser;
@@ -8,8 +11,17 @@ use market_proto::market_proto_rpc::User;
 
 use crate::{
     actor::Actor,
-    cli::{start_main_loop, Cli, LOOPBACK_ADDR},
+    cli::{start_main_loop, Cli},
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActorMarketState {
+    NotConnected,
+    FailedToConnect,
+    Connected,
+}
+
+pub type ActorMarketStateLockCond = Arc<(Mutex<ActorMarketState>, Condvar)>;
 
 fn main() -> Result<()> {
     // Market server is typically just a local server process that represents the DHT for the peer
@@ -25,13 +37,18 @@ fn main() -> Result<()> {
     );
     let market_port = cli.market_port;
     let (tx, rx) = mpsc::unbounded_channel();
+    let lock_cond = Arc::new((Mutex::new(ActorMarketState::NotConnected), Condvar::new()));
+    let actor_lock_cond = Arc::clone(&lock_cond);
+    let main_lock_cond = Arc::clone(&lock_cond);
     thread::scope(|s| {
         s.spawn(move || -> Result<()> {
             let actor = Actor::new(user, rx);
-            Runtime::new()?.block_on(actor.run(market_port));
+            // This thread will crash if market server is not running
+            // Since main loop depends on this thread,
+            Runtime::new()?.block_on(actor.run(market_port, actor_lock_cond))?;
             Ok(())
         });
-        s.spawn(move || start_main_loop(tx).unwrap());
+        s.spawn(move || start_main_loop(tx, main_lock_cond).unwrap());
     });
     Ok(())
 }

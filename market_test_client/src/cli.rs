@@ -6,7 +6,10 @@ use clap::Parser;
 use rustyline::DefaultEditor;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::actor::{Command, Message};
+use crate::{
+    actor::{Command, Message},
+    ActorMarketState, ActorMarketStateLockCond,
+};
 pub const LOOPBACK_ADDR: &str = "127.0.0.1";
 pub const DEFAULT_MARKET_SERVER_PORT: &str = "8080";
 
@@ -41,8 +44,29 @@ pub struct Cli {
 
 const PROMPT: &str = ">> ";
 
-pub fn start_main_loop(tx: UnboundedSender<Command>) -> Result<()> {
+pub fn start_main_loop(
+    tx: UnboundedSender<Command>,
+    lock_cond: ActorMarketStateLockCond,
+) -> Result<()> {
     let mut rl = DefaultEditor::new()?;
+    let (lock, cvar) = &*lock_cond;
+    let mut state = lock.lock().unwrap();
+    loop {
+        match *state {
+            ActorMarketState::NotConnected => {
+                state = cvar.wait(state).unwrap();
+                continue;
+            }
+            ActorMarketState::FailedToConnect => {
+                drop(state);
+                return Err(anyhow::anyhow!("Failed to find a command executor"));
+            }
+            ActorMarketState::Connected => {
+                drop(state);
+                break;
+            }
+        };
+    }
     loop {
         let line = rl.readline(PROMPT);
         match line {
@@ -65,12 +89,12 @@ pub fn start_main_loop(tx: UnboundedSender<Command>) -> Result<()> {
                 }
             }
             Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => {
-                tx.send(Command::Quit)?;
+                let _ = tx.send(Command::Quit);
                 break;
             }
             Err(err) => {
                 eprintln!("Error reading line: {}", err);
-                tx.send(Command::Quit)?;
+                let _ = tx.send(Command::Quit);
                 break;
             }
         }

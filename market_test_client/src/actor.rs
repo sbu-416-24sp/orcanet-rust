@@ -10,7 +10,10 @@ use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tonic::transport::Uri;
 
-use crate::cli::{Port, LOOPBACK_ADDR};
+use crate::{
+    cli::{Port, LOOPBACK_ADDR},
+    ActorMarketState, ActorMarketStateLockCond,
+};
 
 #[derive(Debug)]
 pub struct Actor {
@@ -23,52 +26,74 @@ impl Actor {
         Actor { user, receiver }
     }
 
-    pub async fn run(mut self, market_port: Port) -> Result<()> {
+    pub async fn run(
+        mut self,
+        market_port: Port,
+        lock_cond: ActorMarketStateLockCond,
+    ) -> Result<()> {
         let uri = Uri::builder()
             .scheme("http")
             .authority(format!("{}:{}", LOOPBACK_ADDR, market_port).as_str())
             .path_and_query("/")
             .build()?;
-        let mut client = MarketClient::connect(uri).await?;
-        while let Some(cmd) = self.receiver.recv().await {
-            match cmd {
-                Command::Quit => break,
-                Command::Help => {
-                    // TODO: maybe make it more modular by enumiter in command
-                    println!(
+        let (lock, cvar) = &*lock_cond;
+        match MarketClient::connect(uri).await {
+            Ok(mut client) => {
+                {
+                    let mut state = lock.lock().unwrap();
+                    *state = ActorMarketState::Connected;
+                    // I mean one works since there's only one thread for the cvar anyways
+                    cvar.notify_all();
+                }
+
+                while let Some(cmd) = self.receiver.recv().await {
+                    match cmd {
+                        Command::Quit => break,
+                        Command::Help => {
+                            // TODO: maybe make it more modular by enumiter in command
+                            println!(
                         "Available commands: quit, register <file_hash>, check <file_hash>, help"
                     );
-                }
-                Command::RegisterFile { file_hash } => {
-                    let res = client
-                        .register_file(RegisterFileRequest {
-                            user: Some(self.user.clone()),
-                            file_hash,
-                        })
-                        .await;
-                    match res {
-                        Ok(_) => {
-                            println!("Successfully registered file!")
                         }
-                        Err(err) => {
-                            eprintln!("Failed to register file: {err}");
+                        Command::RegisterFile { file_hash } => {
+                            let res = client
+                                .register_file(RegisterFileRequest {
+                                    user: Some(self.user.clone()),
+                                    file_hash,
+                                })
+                                .await;
+                            match res {
+                                Ok(_) => {
+                                    println!("Successfully registered file!")
+                                }
+                                Err(err) => {
+                                    eprintln!("Failed to register file: {err}");
+                                }
+                            };
                         }
-                    };
-                }
-                Command::CheckHolders { file_hash } => {
-                    let res = client
-                        .check_holders(CheckHoldersRequest { file_hash })
-                        .await;
-                    match res {
-                        Ok(res) => {
-                            let res = res.into_inner();
-                            println!("Holders: {:?}", res.holders);
-                        }
-                        Err(err) => {
-                            eprintln!("Failed to find holders: {err}")
+                        Command::CheckHolders { file_hash } => {
+                            let res = client
+                                .check_holders(CheckHoldersRequest { file_hash })
+                                .await;
+                            match res {
+                                Ok(res) => {
+                                    let res = res.into_inner();
+                                    println!("Holders: {:?}", res.holders);
+                                }
+                                Err(err) => {
+                                    eprintln!("Failed to find holders: {err}")
+                                }
+                            }
                         }
                     }
                 }
+            }
+            Err(err) => {
+                eprintln!("Failed to connect to market: {err}");
+                let mut state = lock.lock().unwrap();
+                *state = ActorMarketState::FailedToConnect;
+                // I mean one works since there's only one thread for the cvar anyways
+                cvar.notify_all();
             }
         }
         Ok(())
