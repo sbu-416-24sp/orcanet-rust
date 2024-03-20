@@ -6,7 +6,7 @@ use std::{
 use market_proto::market_proto_rpc::{
     market_server::Market, CheckHoldersRequest, HoldersResponse, RegisterFileRequest, User,
 };
-use tonic::{Code, Request, Response, Status};
+use tonic::{Request, Response, Status};
 
 type MarketStore = HashMap<String, HashSet<User>>;
 
@@ -22,9 +22,10 @@ impl Market for MarketService {
         request: Request<RegisterFileRequest>,
     ) -> Result<Response<()>, Status> {
         let file_req = request.into_inner();
-        let mut store = self.store.lock().map_err(|err| {
-            Status::new(Code::Internal, format!("Internal Server Error: {}", err))
-        })?;
+        let mut store = self
+            .store
+            .lock()
+            .map_err(|err| Status::internal(format!("Internal Server Error: {}", err)))?;
 
         let file_hash = file_req.file_hash;
         let user = file_req.user.ok_or(Status::invalid_argument(
@@ -41,9 +42,10 @@ impl Market for MarketService {
     ) -> Result<Response<HoldersResponse>, Status> {
         let holders_req = request.into_inner();
         let file_hash = holders_req.file_hash;
-        let store = self.store.lock().map_err(|err| {
-            Status::new(Code::Internal, format!("Internal Server Error: {}", err))
-        })?;
+        let store = self
+            .store
+            .lock()
+            .map_err(|err| Status::internal(format!("Internal Server Error: {}", err)))?;
 
         let holders = store
             .get(&file_hash)

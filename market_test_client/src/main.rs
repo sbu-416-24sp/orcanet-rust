@@ -36,10 +36,10 @@ fn main() -> Result<()> {
         i64::try_from(cli.price)?,
     );
     let market_port = cli.market_port;
+    // TODO: can prob maybe initialize market client here but idgaf atm anyways
     let (tx, rx) = mpsc::unbounded_channel();
     let lock_cond = Arc::new((Mutex::new(ActorMarketState::NotConnected), Condvar::new()));
     let actor_lock_cond = Arc::clone(&lock_cond);
-    let main_lock_cond = Arc::clone(&lock_cond);
     thread::scope(|s| {
         s.spawn(move || -> Result<()> {
             let actor = Actor::new(user, rx);
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
             Runtime::new()?.block_on(actor.run(market_port, actor_lock_cond))?;
             Ok(())
         });
-        s.spawn(move || start_main_loop(tx, main_lock_cond).unwrap());
+        s.spawn(move || start_main_loop(tx, lock_cond).unwrap());
     });
     Ok(())
 }

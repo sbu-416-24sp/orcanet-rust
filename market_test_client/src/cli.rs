@@ -59,7 +59,7 @@ pub fn start_main_loop(
             }
             ActorMarketState::FailedToConnect => {
                 drop(state);
-                return Err(anyhow::anyhow!("Failed to find a command executor"));
+                return Err(anyhow::anyhow!("Failed to find an actor"));
             }
             ActorMarketState::Connected => {
                 drop(state);
