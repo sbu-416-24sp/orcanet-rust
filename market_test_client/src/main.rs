@@ -2,15 +2,17 @@ use std::thread;
 
 use anyhow::Result;
 use clap::Parser;
+use market_test_client::{
+    actor::Actor,
+    cli::Cli,
+    util::{initialize_client, start_main_loop, ActorMarketState},
+};
 use tokio::{
     runtime::Runtime,
     sync::{mpsc, oneshot},
 };
 
 use market_proto::market_proto_rpc::User;
-use util::{initialize_client, ActorMarketState};
-
-use crate::{actor::Actor, cli::Cli, util::start_main_loop};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -55,7 +57,3 @@ fn main() -> Result<()> {
     });
     Ok(())
 }
-
-mod actor;
-mod cli;
-mod util;

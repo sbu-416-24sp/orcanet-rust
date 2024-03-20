@@ -2,9 +2,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use anyhow::Result;
 use clap::Parser;
-use cli::Cli;
 use market_proto::market_proto_rpc::market_server::MarketServer;
-use market_service::MarketService;
+use market_server::{cli::Cli, market_service::MarketService};
 use tonic::transport::Server;
 
 #[tokio::main]
@@ -21,6 +20,3 @@ async fn main() -> Result<()> {
         .await?;
     Ok(())
 }
-
-mod cli;
-mod market_service;
