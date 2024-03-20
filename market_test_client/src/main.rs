@@ -23,11 +23,12 @@ fn main() -> Result<()> {
         cli.client_port as i32,
         i64::try_from(cli.price)?,
     );
+    let market_port = cli.market_port;
     let (tx, rx) = mpsc::unbounded_channel();
     thread::scope(|s| {
         s.spawn(move || -> Result<()> {
             let actor = Actor::new(user, rx);
-            Runtime::new()?.block_on(actor.run());
+            Runtime::new()?.block_on(actor.run(market_port));
             Ok(())
         });
         s.spawn(move || start_main_loop(tx).unwrap());

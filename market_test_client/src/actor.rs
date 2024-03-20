@@ -1,12 +1,16 @@
+use anyhow::Result;
 use std::fmt::Display;
 
-use market_proto::market_proto_rpc::User;
+use market_proto::market_proto_rpc::{
+    market_client::MarketClient, CheckHoldersRequest, RegisterFileRequest, User,
+};
 use std::str::FromStr;
 use strum_macros::EnumString;
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
+use tonic::transport::Uri;
 
-use crate::cli::Port;
+use crate::cli::{Port, LOOPBACK_ADDR};
 
 #[derive(Debug)]
 pub struct Actor {
@@ -15,28 +19,59 @@ pub struct Actor {
 }
 
 impl Actor {
-    pub fn new(user: User, receiver: UnboundedReceiver<Command>, market_port: Port) -> Self {
+    pub fn new(user: User, receiver: UnboundedReceiver<Command>) -> Self {
         Actor { user, receiver }
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(mut self, market_port: Port) -> Result<()> {
+        let uri = Uri::builder()
+            .scheme("http")
+            .authority(format!("{}:{}", LOOPBACK_ADDR, market_port).as_str())
+            .path_and_query("/")
+            .build()?;
+        let mut client = MarketClient::connect(uri).await?;
         while let Some(cmd) = self.receiver.recv().await {
             match cmd {
                 Command::Quit => break,
-                Command::RequestFile { file_hash } => {
-                    println!("Requesting file with hash: {}", file_hash);
-                }
-                Command::CheckHolders { file_hash } => {
-                    println!("Checking holders of file with hash: {}", file_hash);
-                }
                 Command::Help => {
                     // TODO: maybe make it more modular by enumiter in command
                     println!(
-                        "Available commands: quit, request <file_hash>, check <file_hash>, help"
+                        "Available commands: quit, register <file_hash>, check <file_hash>, help"
                     );
+                }
+                Command::RegisterFile { file_hash } => {
+                    let res = client
+                        .register_file(RegisterFileRequest {
+                            user: Some(self.user.clone()),
+                            file_hash,
+                        })
+                        .await;
+                    match res {
+                        Ok(_) => {
+                            println!("Successfully registered file!")
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to register file: {err}");
+                        }
+                    };
+                }
+                Command::CheckHolders { file_hash } => {
+                    let res = client
+                        .check_holders(CheckHoldersRequest { file_hash })
+                        .await;
+                    match res {
+                        Ok(res) => {
+                            let res = res.into_inner();
+                            println!("Holders: {:?}", res.holders);
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to find holders: {err}")
+                        }
+                    }
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -44,8 +79,8 @@ impl Actor {
 pub enum Command {
     #[strum(serialize = "quit")]
     Quit,
-    #[strum(serialize = "request")]
-    RequestFile { file_hash: String },
+    #[strum(serialize = "register")]
+    RegisterFile { file_hash: String },
     #[strum(serialize = "check")]
     CheckHolders { file_hash: String },
     #[strum(serialize = "help")]
@@ -77,11 +112,11 @@ impl TryFrom<Message> for Command {
         match cmd {
             Command::Quit => Ok(cmd),
             Command::Help => Ok(cmd),
-            Command::RequestFile { file_hash: _ } => {
+            Command::RegisterFile { file_hash: _ } => {
                 let file_hash = iter
                     .next()
                     .ok_or(CommandParseError::MissingOrInvalidArgs { cmd })?;
-                Ok(Command::RequestFile {
+                Ok(Command::RegisterFile {
                     file_hash: file_hash.to_owned(),
                 })
             }
@@ -134,18 +169,18 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_message_request_no_args_command_conversion() {
-        let _ = Message::new("request".to_owned()).into_command().unwrap();
+    fn test_message_register_no_args_command_conversion() {
+        let _ = Message::new("register".to_owned()).into_command().unwrap();
     }
 
     #[test]
-    fn test_message_request_args_command_conversion() {
-        let request = Message::new("request sample_hash".to_owned())
+    fn test_message_register_args_command_conversion() {
+        let register = Message::new("register sample_hash".to_owned())
             .into_command()
             .unwrap();
         assert_eq!(
-            request,
-            Command::RequestFile {
+            register,
+            Command::RegisterFile {
                 file_hash: "sample_hash".to_owned()
             }
         );
