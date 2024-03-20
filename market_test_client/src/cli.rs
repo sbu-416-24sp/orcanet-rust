@@ -6,10 +6,7 @@ use clap::Parser;
 use rustyline::DefaultEditor;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{
-    actor::{Command, Message},
-    ActorMarketState, ActorMarketStateLockCond,
-};
+use crate::actor::{Command, Message};
 pub const LOOPBACK_ADDR: &str = "127.0.0.1";
 pub const DEFAULT_MARKET_SERVER_PORT: &str = "8080";
 
@@ -44,29 +41,8 @@ pub struct Cli {
 
 const PROMPT: &str = ">> ";
 
-pub fn start_main_loop(
-    tx: UnboundedSender<Command>,
-    lock_cond: ActorMarketStateLockCond,
-) -> Result<()> {
+pub fn start_main_loop(tx: UnboundedSender<Command>) -> Result<()> {
     let mut rl = DefaultEditor::new()?;
-    let (lock, cvar) = &*lock_cond;
-    let mut state = lock.lock().unwrap();
-    loop {
-        match *state {
-            ActorMarketState::NotConnected => {
-                state = cvar.wait(state).unwrap();
-                continue;
-            }
-            ActorMarketState::FailedToConnect => {
-                drop(state);
-                return Err(anyhow::anyhow!("Failed to find an actor"));
-            }
-            ActorMarketState::Connected => {
-                drop(state);
-                break;
-            }
-        };
-    }
     loop {
         let line = rl.readline(PROMPT);
         match line {
@@ -76,7 +52,6 @@ pub fn start_main_loop(
                     Ok(cmd) => {
                         // bails when the receiver is dropped
                         if let Command::Quit = cmd {
-                            println!("Quitting...");
                             tx.send(cmd)?;
                             break;
                         } else {

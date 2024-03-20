@@ -1,13 +1,15 @@
-use std::{
-    sync::{Arc, Condvar, Mutex},
-    thread,
-};
+use std::thread;
 
 use anyhow::Result;
 use clap::Parser;
-use tokio::{runtime::Runtime, sync::mpsc};
+use cli::{Port, LOOPBACK_ADDR};
+use tokio::{
+    runtime::Runtime,
+    sync::{mpsc, oneshot},
+};
 
-use market_proto::market_proto_rpc::User;
+use market_proto::market_proto_rpc::{market_client::MarketClient, User};
+use tonic::transport::{Channel, Uri};
 
 use crate::{
     actor::Actor,
@@ -17,16 +19,10 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActorMarketState {
     NotConnected,
-    FailedToConnect,
     Connected,
 }
 
-pub type ActorMarketStateLockCond = Arc<(Mutex<ActorMarketState>, Condvar)>;
-
 fn main() -> Result<()> {
-    // Market server is typically just a local server process that represents the DHT for the peer
-    // node. Peer nodes then communicate through TCP sockets to the market server with the gRPC
-    // method abstractions.
     let cli = Cli::parse();
     let user = User::new(
         cli.id.unwrap_or("test_id".to_owned()),
@@ -38,19 +34,51 @@ fn main() -> Result<()> {
     let market_port = cli.market_port;
     // TODO: can prob maybe initialize market client here but idgaf atm anyways
     let (tx, rx) = mpsc::unbounded_channel();
-    let lock_cond = Arc::new((Mutex::new(ActorMarketState::NotConnected), Condvar::new()));
-    let actor_lock_cond = Arc::clone(&lock_cond);
+    let (m_state_tx, m_state_rx) = oneshot::channel::<ActorMarketState>();
+
     thread::scope(|s| {
         s.spawn(move || -> Result<()> {
             let actor = Actor::new(user, rx);
-            // This thread will crash if market server is not running
-            // Since main loop depends on this thread,
-            Runtime::new()?.block_on(actor.run(market_port, actor_lock_cond))?;
+            Runtime::new()?.block_on(async {
+                if let Ok(client) = initialize_client(market_port).await {
+                    if let Ok(()) = m_state_tx.send(ActorMarketState::Connected) {
+                        actor.run(client).await;
+                    }
+                } else {
+                    m_state_tx.send(ActorMarketState::NotConnected).unwrap();
+                }
+            });
             Ok(())
         });
-        s.spawn(move || start_main_loop(tx, lock_cond).unwrap());
+        s.spawn(move || {
+            println!("Waiting for actor client to connect to market server...");
+            if let ActorMarketState::Connected = m_state_rx.blocking_recv().expect(
+                "We should be expecting that it does send something so this shouldn't panic, but panics if sender doesn't send something",
+            ) {
+                println!("Market client connected!");
+                start_main_loop(tx).unwrap();
+            } else {
+                eprintln!("Failed to connect to market server!");
+            }
+
+        });
     });
     Ok(())
+}
+
+async fn initialize_client(market_port: Port) -> Result<MarketClient<Channel>> {
+    // Market server is typically just a local server process that represents the DHT for the peer
+    // node. Peer nodes then communicate through TCP sockets to the market server with the gRPC
+    // method abstractions. So we can just use the loopback address; eventually I believe we
+    // combine it with the peer node team and get rid of the gRPC socket overhead
+    let uri = Uri::builder()
+        .scheme("http")
+        .authority(format!("{}:{}", LOOPBACK_ADDR, market_port).as_str())
+        .path_and_query("/")
+        .build()?;
+    MarketClient::connect(uri)
+        .await
+        .map_err(|err| anyhow::anyhow!(err))
 }
 
 mod actor;
