@@ -2,7 +2,7 @@ use std::thread;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{Port, LOOPBACK_ADDR};
+use cli::Port;
 use tokio::{
     runtime::Runtime,
     sync::{mpsc, oneshot},
@@ -10,11 +10,9 @@ use tokio::{
 
 use market_proto::market_proto_rpc::{market_client::MarketClient, User};
 use tonic::transport::{Channel, Uri};
+use util::LOOPBACK_ADDR;
 
-use crate::{
-    actor::Actor,
-    cli::{start_main_loop, Cli},
-};
+use crate::{actor::Actor, cli::Cli, util::start_main_loop};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActorMarketState {
@@ -83,3 +81,4 @@ async fn initialize_client(market_port: Port) -> Result<MarketClient<Channel>> {
 
 mod actor;
 mod cli;
+mod util;

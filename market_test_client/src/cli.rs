@@ -1,17 +1,10 @@
-use anyhow::Result;
-use rustyline::error::ReadlineError;
 use std::net::Ipv4Addr;
 
 use clap::Parser;
-use rustyline::DefaultEditor;
-use tokio::sync::mpsc::UnboundedSender;
 
-use crate::actor::{Command, Message};
-pub const LOOPBACK_ADDR: &str = "127.0.0.1";
-pub const DEFAULT_MARKET_SERVER_PORT: &str = "8080";
+use crate::util::DEFAULT_MARKET_SERVER_PORT;
 
 pub type Port = u16;
-
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
@@ -37,42 +30,4 @@ pub struct Cli {
     /// IP where other consumer peer clients should connect to retrieve files
     #[arg(long)]
     pub client_ip: Ipv4Addr,
-}
-
-const PROMPT: &str = ">> ";
-
-pub fn start_main_loop(tx: UnboundedSender<Command>) -> Result<()> {
-    let mut rl = DefaultEditor::new()?;
-    loop {
-        let line = rl.readline(PROMPT);
-        match line {
-            Ok(line) => {
-                let msg = Message::new(line);
-                match msg.into_command() {
-                    Ok(cmd) => {
-                        // bails when the receiver is dropped
-                        if let Command::Quit = cmd {
-                            tx.send(cmd)?;
-                            break;
-                        } else {
-                            tx.send(cmd)?;
-                        }
-                    }
-                    Err(err) => {
-                        eprintln!("Error parsing command: {}", err);
-                    }
-                }
-            }
-            Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => {
-                let _ = tx.send(Command::Quit);
-                break;
-            }
-            Err(err) => {
-                eprintln!("Error reading line: {}", err);
-                let _ = tx.send(Command::Quit);
-                break;
-            }
-        }
-    }
-    Ok(())
 }
