@@ -1,0 +1,3 @@
+[submodule "market_proto/proto"]
+	path = market_proto/proto
+	url = https://github.com/sbu-416-24sp/orcanet-market-go
