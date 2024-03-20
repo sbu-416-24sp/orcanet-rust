@@ -21,6 +21,8 @@ impl Market for MarketService {
         &self,
         request: Request<RegisterFileRequest>,
     ) -> Result<Response<()>, Status> {
+        let addr = request.remote_addr();
+        println!("{:?}", addr);
         let file_req = request.into_inner();
         let mut store = self
             .store
@@ -32,6 +34,9 @@ impl Market for MarketService {
             "The user field is required for this request",
         ))?;
         let entry = store.entry(file_hash).or_default();
+        // Only on the assumption that user IDs are unique. We have defined the hasher in the gRPC
+        // to have it where the user is uniquely identified by the hash of the ID argument they
+        // pass in.
         entry.insert(user);
         Ok(Response::new(()))
     }
@@ -40,6 +45,8 @@ impl Market for MarketService {
         &self,
         request: Request<CheckHoldersRequest>,
     ) -> Result<Response<HoldersResponse>, Status> {
+        let addr = request.remote_addr();
+        println!("{:?}", addr);
         let holders_req = request.into_inner();
         let file_hash = holders_req.file_hash;
         let store = self
@@ -47,9 +54,9 @@ impl Market for MarketService {
             .lock()
             .map_err(|err| Status::internal(format!("Internal Server Error: {}", err)))?;
 
-        let holders = store
-            .get(&file_hash)
-            .ok_or(Status::not_found(format!("{file_hash} not found")))?;
+        let holders = store.get(&file_hash).ok_or(Status::not_found(format!(
+            "{file_hash} does not exist in the table!"
+        )))?;
         Ok(Response::new(HoldersResponse {
             holders: holders.iter().cloned().collect(),
         }))

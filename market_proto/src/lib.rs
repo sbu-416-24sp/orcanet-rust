@@ -1,4 +1,7 @@
-use std::hash::{Hash, Hasher};
+use std::{
+    fmt::Display,
+    hash::{Hash, Hasher},
+};
 
 use gen::market_proto_rpc::User;
 
@@ -20,6 +23,16 @@ impl User {
             port,
             price,
         }
+    }
+}
+
+impl Display for User {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Peer ID: {}, Username: {}, Consumer IP Addr: {}:{}, Price Per MB: ${}",
+            self.id, self.name, self.ip, self.port, self.price
+        )
     }
 }
 

@@ -54,10 +54,12 @@ impl Actor {
                     match res {
                         Ok(res) => {
                             let res = res.into_inner();
-                            println!("Holders: {:?}", res.holders);
+                            for holder in res.holders {
+                                println!("{}", holder);
+                            }
                         }
                         Err(err) => {
-                            eprintln!("Failed to find holders: {err}")
+                            eprintln!("Failed to find holders: {}", err.message())
                         }
                     }
                 }
