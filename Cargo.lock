@@ -1739,6 +1739,7 @@ dependencies = [
  "anyhow",
  "futures",
  "libp2p",
+ "pretty_assertions",
  "thiserror",
  "tokio",
 ]

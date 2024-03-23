@@ -1,7 +1,73 @@
-//! A bridge between a dht_client API with the actual dht_server
+//! A bridge between a dht_client API with the dht_server
+
+use anyhow::Result;
+use futures::channel::mpsc;
+use libp2p::{
+    kad::{self, store::MemoryStore},
+    noise, yamux, SwarmBuilder,
+};
+
+use self::{dht_client::DhtClient, dht_server::DhtServer};
 
 pub mod dht_client;
 pub mod dht_server;
+
+pub fn bridge(cmd_buffer: usize) -> Result<(DhtClient, DhtServer)> {
+    let swarm = SwarmBuilder::with_new_identity()
+        .with_tokio()
+        .with_tcp(
+            Default::default(),
+            noise::Config::new,
+            yamux::Config::default,
+        )?
+        .with_dns()?
+        .with_behaviour(|key| {
+            let peer_id = key.public().to_peer_id();
+            kad::Behaviour::new(peer_id, MemoryStore::new(peer_id))
+        })?
+        .build();
+    let (command_sender, command_receiver) = mpsc::channel(cmd_buffer);
+    // TODO: maybe bridge should also start up the command receiver server?
+    Ok((
+        DhtClient::new(command_sender),
+        DhtServer::new(command_receiver, swarm),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use libp2p::Multiaddr;
+    use pretty_assertions::assert_eq;
+
+    use crate::{command::Command, CommandOk};
+
+    #[tokio::test]
+    async fn test_listen_on() {
+        let (mut client, mut server) = super::bridge(16).unwrap();
+        tokio::spawn(async move {
+            let _ = server.run().await;
+        });
+        // NOTE: this blocks until the server on the other end sends that oneshot back or if the
+        // oneshot is dropped without sending (in which case it would crash)
+        let msg = client
+            .listen_on("/ip4/127.0.0.1/tcp/6969".parse::<Multiaddr>().unwrap())
+            .await
+            .unwrap();
+        assert!(matches!(msg, CommandOk::Listen { .. }))
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "No known peers.")]
+    async fn test_bootstrap_should_panic() {
+        let (mut client, mut server) = super::bridge(16).unwrap();
+        tokio::spawn(async move {
+            let _ = server.run().await;
+        });
+        // NOTE: this blocks until the server on the other end sends that oneshot back or if the
+        // oneshot is dropped without sending (in which case it would crash)
+        let _msg = client.bootstrap(vec![]).await.unwrap();
+    }
+}
 
 // use std::{fmt::Debug, marker::PhantomData};
 //

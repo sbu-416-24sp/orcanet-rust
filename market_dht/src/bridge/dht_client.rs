@@ -18,7 +18,7 @@ pub struct DhtClient {
 }
 
 impl DhtClient {
-    fn new(sender: Sender<CommandCallback>) -> Self {
+    pub(crate) fn new(sender: Sender<CommandCallback>) -> Self {
         Self { sender }
     }
 
@@ -97,11 +97,50 @@ impl DhtClient {
 #[cfg(test)]
 mod tests {
     use futures::{channel::oneshot::Sender, StreamExt};
-    use libp2p::{Multiaddr, PeerId};
+    use libp2p::{core::transport::ListenerId, Multiaddr, PeerId};
+    use pretty_assertions::assert_eq;
 
     use crate::{command::Command, CommandOk, CommandResult};
 
     use super::DhtClient;
+    // TODO: write tests
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_bootstrap_should_fail() {
+        let (sender, mut mock_receiver) =
+            futures::channel::mpsc::channel::<(Command, Sender<CommandResult>)>(16);
+        let mut client = DhtClient::new(sender);
+        let mock_id = libp2p::PeerId::random();
+        tokio::spawn(async move {
+            while let Some(command) = mock_receiver.next().await {
+                if let Command::Bootstrap { boot_nodes } = command.0 {
+                    if boot_nodes.is_empty() {
+                        command
+                            .1
+                            .send(Err(anyhow::anyhow!("no boot nodes")))
+                            .unwrap();
+                    }
+                } else {
+                    panic!("unexpected command: {:?}", command.0);
+                }
+            }
+        });
+        if let CommandOk::Bootstrap {
+            peer,
+            num_remaining,
+        } = client
+            .bootstrap([(
+                PeerId::random(),
+                "/ip4/127.0.0.1".parse::<Multiaddr>().unwrap(),
+            )])
+            .await
+            .unwrap()
+        {
+            assert_eq!(peer, mock_id);
+            assert_eq!(num_remaining, 32);
+        }
+    }
 
     #[tokio::test]
     async fn test_bootstrap_basic() {
@@ -147,10 +186,16 @@ mod tests {
     async fn test_listen_on_basic() {
         let (sender, mut mock_receiver) =
             futures::channel::mpsc::channel::<(Command, Sender<CommandResult>)>(16);
+        let expected_listener_id = ListenerId::next();
         tokio::spawn(async move {
             while let Some(command) = mock_receiver.next().await {
-                if let Command::Listen { addr } = command.0 {
-                    command.1.send(Ok(CommandOk::Listen { addr })).unwrap();
+                if let Command::Listen { addr: _addr } = command.0 {
+                    command
+                        .1
+                        .send(Ok(CommandOk::Listen {
+                            listener_id: expected_listener_id,
+                        }))
+                        .unwrap();
                 } else {
                     panic!("unexpected command: {:?}", command.0);
                 }
@@ -158,12 +203,12 @@ mod tests {
         });
         let mut client = DhtClient::new(sender);
         // NOTE: this thing blocks until the oneshot is received back
-        if let CommandOk::Listen { addr } = client
+        if let CommandOk::Listen { listener_id } = client
             .listen_on("/ip4/127.0.0.1".parse::<Multiaddr>().unwrap())
             .await
             .unwrap()
         {
-            assert_eq!(addr, "/ip4/127.0.0.1".parse::<Multiaddr>().unwrap());
+            assert_eq!(expected_listener_id, listener_id);
         }
     }
 
@@ -174,10 +219,12 @@ mod tests {
             futures::channel::mpsc::channel::<(Command, Sender<CommandResult>)>(16);
         tokio::spawn(async move {
             while let Some(command) = mock_receiver.next().await {
-                if let Command::Listen { addr } = command.0 {
+                if let Command::Listen { addr: _addr } = command.0 {
                     command
                         .1
-                        .send(Ok(super::CommandOk::Listen { addr }))
+                        .send(Ok(CommandOk::Listen {
+                            listener_id: ListenerId::next(),
+                        }))
                         .unwrap();
                 } else {
                     panic!("unexpected command: {:?}", command.0);

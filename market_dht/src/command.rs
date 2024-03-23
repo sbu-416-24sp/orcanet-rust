@@ -2,10 +2,35 @@ use std::{collections::HashSet, net::Ipv4Addr};
 
 use anyhow::Result;
 use futures::channel::oneshot;
-use libp2p::{swarm::dial_opts::DialOpts, Multiaddr, PeerId};
+use libp2p::{core::transport::ListenerId, swarm::dial_opts::DialOpts, Multiaddr, PeerId};
 
 pub(crate) type CommandCallback = (Command, oneshot::Sender<CommandResult>);
 pub type CommandResult = Result<CommandOk>;
+
+#[derive(Debug)]
+pub enum CommandOk {
+    Listen {
+        listener_id: ListenerId,
+    },
+    Bootstrap {
+        peer: PeerId,
+        num_remaining: u32,
+    },
+    Dial {
+        opts: DialOpts,
+    },
+    Register {
+        file_cid: String,
+    },
+    FindHolders {
+        file_cid: String,
+        peers: HashSet<PeerId>,
+    },
+    GetClosestPeers {
+        file_cid: String,
+        peers: Vec<PeerId>,
+    },
+}
 
 #[derive(Debug)]
 pub(crate) enum Command {
@@ -42,31 +67,6 @@ pub(crate) enum Command {
     },
     GetClosestPeers {
         file_cid: String,
-    },
-}
-
-#[derive(Debug)]
-pub enum CommandOk {
-    Listen {
-        addr: Multiaddr,
-    },
-    Bootstrap {
-        peer: PeerId,
-        num_remaining: u32,
-    },
-    Dial {
-        opts: DialOpts,
-    },
-    Register {
-        file_cid: String,
-    },
-    FindHolders {
-        file_cid: String,
-        peers: HashSet<PeerId>,
-    },
-    GetClosestPeers {
-        file_cid: String,
-        peers: Vec<PeerId>,
     },
 }
 
