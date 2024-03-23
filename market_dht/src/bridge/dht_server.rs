@@ -3,15 +3,17 @@
 
 use std::{collections::HashMap, fmt::Debug};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::{
     channel::{mpsc, oneshot},
     select, StreamExt,
 };
 use libp2p::{
-    kad::{self, store::MemoryStore, Behaviour, Event, QueryId},
+    kad::{
+        self, store::MemoryStore, Behaviour, BootstrapOk, Event, QueryId, QueryResult, QueryStats,
+    },
     swarm::SwarmEvent,
-    Swarm,
+    PeerId, Swarm,
 };
 
 use crate::{
@@ -47,7 +49,7 @@ impl DhtServer {
                     }
                 }
                 event = self.swarm.select_next_some() => {
-                    println!("{:?}", event);
+                    self.handle_swarm_event(event).await?;
                 }
             }
         }
@@ -55,18 +57,50 @@ impl DhtServer {
 
     async fn handle_swarm_event(&mut self, event: SwarmEvent<Event>) -> Result<()> {
         match event {
-            SwarmEvent::Behaviour(kad::Event::RoutingUpdated {
-                peer,
-                is_new_peer,
-                addresses,
-                bucket_range,
-                old_peer,
+            SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
+                id,
+                result:
+                    QueryResult::Bootstrap(Ok(BootstrapOk {
+                        peer,
+                        num_remaining,
+                    })),
+                ..
             }) => {
-                println!("{peer}");
-                Ok(())
+                // NOTE: bootstrap still returns BootstrapOk even if dialing the bootnodes
+                // fail...
+                let sender = self
+                    .pending_queries
+                    .remove(&id)
+                    .with_context(|| anyhow!("Query ID not found"))?;
+                if let Err(err) = sender.send(Ok(CommandOk::Bootstrap {
+                    peer,
+                    num_remaining,
+                })) {
+                    return Err(anyhow!("Failed to send oneshot response: {:?}", err));
+                }
             }
-            _ => todo!(),
-        }
+            SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::Bootstrap(Err(kad::BootstrapError::Timeout { .. })),
+                ..
+            }) => {
+                let sender = self
+                    .pending_queries
+                    .remove(&id)
+                    .with_context(|| anyhow!("Query ID not found"))?;
+                if let Err(err) = sender.send(Err(anyhow!("Bootstrap timeout"))) {
+                    return Err(anyhow!("Failed to send oneshot response: {:?}", err));
+                }
+            }
+            SwarmEvent::OutgoingConnectionError {
+                peer_id: Some(peer_id),
+                ..
+            } => {
+                self.swarm.behaviour_mut().remove_peer(&peer_id);
+            }
+            ev => {}
+        };
+        Ok(())
     }
 
     async fn handle_cmd(&mut self, cmd: CommandCallback) -> Result<()> {

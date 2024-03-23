@@ -1,5 +1,7 @@
 //! A bridge between a dht_client API with the dht_server
 
+use std::time::Duration;
+
 use anyhow::Result;
 use futures::channel::mpsc;
 use libp2p::{
@@ -25,6 +27,7 @@ pub fn bridge(cmd_buffer: usize) -> Result<(DhtClient, DhtServer)> {
             let peer_id = key.public().to_peer_id();
             kad::Behaviour::new(peer_id, MemoryStore::new(peer_id))
         })?
+        .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(8)))
         .build();
     let (command_sender, command_receiver) = mpsc::channel(cmd_buffer);
     // TODO: maybe bridge should also start up the command receiver server?
@@ -36,7 +39,7 @@ pub fn bridge(cmd_buffer: usize) -> Result<(DhtClient, DhtServer)> {
 
 #[cfg(test)]
 mod tests {
-    use libp2p::Multiaddr;
+    use libp2p::{Multiaddr, PeerId};
     use pretty_assertions::assert_eq;
 
     use crate::{command::Command, CommandOk};
@@ -57,15 +60,30 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic(expected = "No known peers.")]
-    async fn test_bootstrap_should_panic() {
+    async fn test_bootstrap_basic_should_pass() {
         let (mut client, mut server) = super::bridge(16).unwrap();
         tokio::spawn(async move {
             let _ = server.run().await;
         });
         // NOTE: this blocks until the server on the other end sends that oneshot back or if the
         // oneshot is dropped without sending (in which case it would crash)
-        let _msg = client.bootstrap(vec![]).await.unwrap();
+        let mock_peer_id = PeerId::random();
+        let mock_addr = "/ip4/127.0.0.1/tcp/6696".parse::<Multiaddr>().unwrap();
+        // NOTE: this still passes since bootstrap still passes even if the dialing fails...
+        client
+            .bootstrap(vec![(mock_peer_id, mock_addr)])
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "No known peers")]
+    async fn test_bootstrap_basic_should_fail() {
+        let (mut client, mut server) = super::bridge(16).unwrap();
+        tokio::spawn(async move {
+            let _ = server.run().await;
+        });
+        client.bootstrap(vec![]).await.unwrap();
     }
 }
 
