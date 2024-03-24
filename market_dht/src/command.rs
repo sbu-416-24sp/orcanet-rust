@@ -37,13 +37,20 @@ pub enum CommandOk {
         // TODO: maybe change to CID type instead
         file_cid: Vec<u8>,
     },
+    /// Successful result for the [Command::GetFile] request sent
     GetFile {
+        /// The CID of the file that the user requested
         file_cid: Vec<u8>,
+        /// The value/metadata of the file that the user requested
         metadata: FileMetadata,
+        /// The peer that we got the record from
         owner_peer: PeerId,
     },
+    /// Successful result for the [Command::GetClosestPeers] request sent
     GetClosestPeers {
+        /// The CID of the file that the user wants to find the closest peers to
         file_cid: Vec<u8>,
+        /// The list of closest peers
         peers: Vec<PeerId>,
     },
 }
