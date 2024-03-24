@@ -2,7 +2,7 @@
 #![warn(missing_debug_implementations)]
 #![deny(unsafe_code, unreachable_pub)]
 // NOTE: possibly an extension to more protocols later on in libp2p? so may have to also refactor
-// the name.
+// the dht name.
 
 pub use bridge::*;
 pub use command::{CommandOk, CommandResult};

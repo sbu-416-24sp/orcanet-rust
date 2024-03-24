@@ -28,16 +28,16 @@ use crate::{
     CommandOk, CommandResult,
 };
 
-type OneshotCommandResultSender = oneshot::Sender<CommandResult>;
+type CommandResultSender = oneshot::Sender<CommandResult>;
 
 use self::macros::send_oneshot;
 
 pub struct DhtServer {
     swarm: Swarm<Behaviour<MemoryStore>>,
     cmd_receiver: mpsc::Receiver<CommandCallback>,
-    pending_queries: HashMap<QueryId, OneshotCommandResultSender>,
-    pending_dials: HashMap<PeerId, OneshotCommandResultSender>,
-    pending_listeners: HashMap<ListenerId, OneshotCommandResultSender>,
+    pending_queries: HashMap<QueryId, CommandResultSender>,
+    pending_dials: HashMap<PeerId, CommandResultSender>,
+    pending_listeners: HashMap<ListenerId, CommandResultSender>,
 }
 
 impl DhtServer {
