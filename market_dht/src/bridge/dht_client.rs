@@ -15,6 +15,7 @@ use crate::{
     CommandOk, CommandResult,
 };
 
+/// Client that is used to interact with the DHT server
 #[derive(Debug)]
 pub struct DhtClient {
     sender: Sender<CommandCallback>,
@@ -25,7 +26,11 @@ impl DhtClient {
         Self { sender }
     }
 
-    pub async fn listen_on(&mut self, addr: impl Into<Multiaddr>) -> Result<CommandOk> {
+    /// Sends a listening request to listen on some [Multiaddr]
+    ///
+    /// # Errors
+    /// Can fail if the [Multiaddr] provided by the user is already in use
+    pub async fn listen_on(&mut self, addr: impl Into<Multiaddr>) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
         let addr = addr.into();
         self.sender
@@ -34,6 +39,10 @@ impl DhtClient {
         receiver.await?
     }
 
+    /// Sends a bootstrap request to start connecting to the user provided bootnodes
+    ///
+    /// # Errors
+    /// This can ultimately fail if you provided no bootnodes.
     pub async fn bootstrap(
         &mut self,
         boot_nodes: impl IntoIterator<Item = (PeerId, Multiaddr)>,
@@ -50,7 +59,13 @@ impl DhtClient {
         receiver.await?
     }
 
+    /// Dials the requested peer knowing the peer_id and the addr
+    ///
+    /// # Errors
+    /// Can fail if the peer_id or addr is invalid, or if we just can't connect due to not sharing
+    /// the same protocols
     pub async fn dial(&mut self, peer_id: PeerId, addr: Multiaddr) -> CommandResult {
+        // TODO: maybe change in the future to support it more genericly with dialopts
         let (callback_sender, receiver) = oneshot::channel();
         self.sender
             .send((Command::Dial { peer_id, addr }, callback_sender))
@@ -58,6 +73,14 @@ impl DhtClient {
         receiver.await?
     }
 
+    /// Registers the file based on the CID to the DHT server
+    ///
+    /// We use the ip, port, and price_per_mb to register the as reference metadata to the DHT
+    /// server. That way, users that use the [libp2p::kad::Behaviour::get_record] method to yield this
+    /// reference metadata so that they can yield this specific file or chunk.
+    ///
+    /// # Errors
+    /// Can fail if the file_cid is invalid
     pub async fn register(
         &mut self,
         file_cid: &[u8],
@@ -81,6 +104,10 @@ impl DhtClient {
         receiver.await?
     }
 
+    /// Yields the file metadata based on the CID
+    ///
+    /// # Errors
+    /// Fails if the file_cid is invalid
     pub async fn get_file(&mut self, file_cid: &[u8]) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
         let file_cid = Cid::try_from(file_cid)?;
@@ -90,6 +117,10 @@ impl DhtClient {
         receiver.await?
     }
 
+    /// Yields the closest peers based on the file CID
+    ///
+    /// # Errors
+    /// Fails if the file_cid is invalid
     pub async fn get_closest_peers(&mut self, file_cid: &[u8]) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
         let file_cid = Cid::try_from(file_cid)?;
