@@ -1,5 +1,7 @@
-//! DHT server that listens for client commands and responds to them by communicating with the
-//! libp2p DHT swarm
+//! # DHT Server
+//!
+//! This is just the other end of the bridge where it handles the commands from the client by
+//! directing it to the actual [libp2p] swarm.
 
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -32,6 +34,8 @@ type CommandResultSender = oneshot::Sender<CommandResult>;
 
 use self::macros::send_oneshot;
 
+/// DHT server that listens for client commands and responds to them by communicating with the
+/// libp2p DHT swarm
 pub struct DhtServer {
     swarm: Swarm<Behaviour<MemoryStore>>,
     cmd_receiver: mpsc::Receiver<CommandCallback>,
@@ -53,6 +57,12 @@ impl DhtServer {
             pending_listeners: Default::default(),
         }
     }
+    /// Starts running the DHT server
+    ///
+    /// # Errors
+    /// The error returned can depend on either if it's an error that comes from a command or an
+    /// event from the swarm. Later on in the future, there will be something more concrete than
+    /// the generic [anyhow] error type.
     pub async fn run(&mut self) -> Result<()> {
         loop {
             select! {

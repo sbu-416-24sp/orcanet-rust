@@ -8,21 +8,32 @@ use libp2p::{Multiaddr, PeerId};
 use crate::file::FileMetadata;
 
 pub(crate) type CommandCallback = (Command, oneshot::Sender<CommandResult>);
+/// Result for the client's [Command] request
 pub type CommandResult = Result<CommandOk>;
 
 #[derive(Debug)]
+/// The successful result of the [Command] that was sent
 pub enum CommandOk {
+    /// Successful result for the [Command::Listen] request sent
     Listen {
+        /// Returns the address of where the peer is now listening
         addr: Multiaddr,
     },
+    /// Successful result for the [Command::Bootstrap] request sent
     Bootstrap {
+        /// The peer sent from the [libp2p::Swarm] bootstrap request
         peer: PeerId,
+        /// The num_remaining sent from the [libp2p::Swarm] bootstrap request
         num_remaining: u32,
     },
+    /// Successful result for the [Command::Dial] request sent
     Dial {
+        /// The peer that we have successfully dialed
         peer: PeerId,
     },
+    /// Successful result for the [Command::Register] request sent
     Register {
+        /// The CID of the file that the user requested to register to the DHT
         // TODO: maybe change to CID type instead
         file_cid: Vec<u8>,
     },

@@ -1,3 +1,5 @@
+//! DHT client for interacting with the DHT server
+
 use std::net::Ipv4Addr;
 
 use anyhow::Result;
@@ -19,7 +21,7 @@ pub struct DhtClient {
 }
 
 impl DhtClient {
-    pub(crate) fn new(sender: Sender<CommandCallback>) -> Self {
+    pub(crate) const fn new(sender: Sender<CommandCallback>) -> Self {
         Self { sender }
     }
 

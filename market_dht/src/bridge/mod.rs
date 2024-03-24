@@ -14,6 +14,37 @@ use self::{dht_client::DhtClient, dht_server::DhtServer};
 pub mod dht_client;
 pub mod dht_server;
 
+/// Creates a dht client and server bridge
+///
+/// # Warning
+/// [DhtClient] and a [DhtServer] object are returned. Note that this does not start the command
+/// server. You will need to start the command server with the [DhtServer::run] method. Only then
+/// will the client be able to send commands to the server. If the client sends a command before
+/// the server is started, the client will block until the server is started so that it can listen
+/// to client commands.
+///
+/// # Errors
+/// Returns a generic error based on [anyhow::Error] but we will probably introduce a more concrete
+/// type for the [Result]
+///
+/// # Example
+/// Here's an example with [tokio]
+///
+/// ```rust
+/// use market_dht::bridge;
+/// use tokio::spawn;
+/// use tokio::sync::oneshot;
+/// use libp2p::Multiaddr;
+///
+/// # tokio_test::block_on(async {
+///     let (mut client, mut server) = bridge(16).unwrap();
+///     spawn(async move {
+///         server.run().await;
+///     });
+///     client.listen_on("/ip4/127.0.0.1/tcp/6669".parse::<Multiaddr>().unwrap()).await.unwrap();
+/// # })
+///
+/// ```
 pub fn bridge(cmd_buffer: usize) -> Result<(DhtClient, DhtServer)> {
     let swarm = SwarmBuilder::with_new_identity()
         .with_tokio()
