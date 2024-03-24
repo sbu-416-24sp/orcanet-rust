@@ -4,9 +4,11 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Debug,
+    net::Ipv4Addr,
 };
 
 use anyhow::{anyhow, Context, Result};
+use cid::Cid;
 use futures::{
     channel::{mpsc, oneshot},
     select, StreamExt,
@@ -14,10 +16,13 @@ use futures::{
 use libp2p::{
     kad::{
         self, store::MemoryStore, Behaviour, BootstrapOk, Event, QueryId, QueryResult, QueryStats,
+        Record,
     },
     swarm::{ConnectionId, SwarmEvent},
     PeerId, Swarm,
 };
+use log::{error, info, warn};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     command::{Command, CommandCallback},
@@ -79,6 +84,7 @@ impl DhtServer {
                     .pending_queries
                     .remove(&id)
                     .with_context(|| anyhow!("Query ID not found"))?;
+                info!("Bootstrapped peer {peer}");
                 send_oneshot!(
                     sender,
                     Ok(CommandOk::Bootstrap {
@@ -87,11 +93,15 @@ impl DhtServer {
                     })
                 );
             }
+            SwarmEvent::NewListenAddr { address, .. } => {
+                info!("Listening on {address}");
+            }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
                 result: QueryResult::Bootstrap(Err(kad::BootstrapError::Timeout { .. })),
                 ..
             }) => {
+                error!("Bootstrap timed out!");
                 let sender = self
                     .pending_queries
                     .remove(&id)
@@ -101,11 +111,18 @@ impl DhtServer {
             SwarmEvent::OutgoingConnectionError {
                 peer_id: Some(peer_id),
                 error,
-                ..
+                connection_id,
             } => {
+                error!("[{connection_id}]: Failed to connect to {peer_id}");
                 if let Some(sender) = self.pending_dials.remove(&peer_id) {
                     send_oneshot!(sender, Err(error.into()));
                 }
+            }
+            SwarmEvent::Dialing {
+                peer_id: Some(peer_id),
+                connection_id,
+            } => {
+                warn!("[{connection_id}]: Currently dialing {peer_id}");
             }
             _ev => {}
         };
@@ -114,6 +131,7 @@ impl DhtServer {
 
     async fn handle_cmd(&mut self, cmd: CommandCallback) -> Result<()> {
         let (cmd, sender) = cmd;
+        info!("Received command: {cmd:?}");
         match cmd {
             Command::Listen { addr } => {
                 let oneshot_res = match self.swarm.listen_on(addr) {
@@ -162,7 +180,17 @@ impl DhtServer {
                 ip,
                 port,
                 price_per_mb,
-            } => todo!(),
+            } => {
+                let record = Record::new(
+                    file_cid.to_bytes(),
+                    bincode::serialize(&FileMetadata {
+                        ip,
+                        port,
+                        price_per_mb,
+                    }).
+                    ,
+                );
+            }
             Command::FindHolders { file_cid } => todo!(),
             Command::GetClosestPeers { file_cid } => todo!(),
         };
@@ -177,6 +205,13 @@ impl Debug for DhtServer {
             .field("swarm_local_peer_id", &self.swarm.local_peer_id())
             .finish()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct FileMetadata {
+    ip: Ipv4Addr,
+    port: u16,
+    price_per_mb: u64,
 }
 
 mod macros {

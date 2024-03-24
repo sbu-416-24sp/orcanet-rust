@@ -1,11 +1,12 @@
 use std::net::Ipv4Addr;
 
 use anyhow::Result;
+use cid::Cid;
 use futures::{
     channel::{mpsc::Sender, oneshot},
     SinkExt,
 };
-use libp2p::{swarm::dial_opts::DialOpts, Multiaddr, PeerId};
+use libp2p::{Multiaddr, PeerId};
 
 use crate::{
     command::{Command, CommandCallback},
@@ -57,12 +58,13 @@ impl DhtClient {
 
     pub async fn register(
         &mut self,
-        file_cid: String,
+        file_cid: &[u8],
         ip: impl Into<Ipv4Addr>,
         port: u16,
         price_per_mb: u64,
     ) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
+        let file_cid = Cid::try_from(file_cid)?;
         self.sender
             .send((
                 Command::Register {
@@ -77,16 +79,18 @@ impl DhtClient {
         receiver.await?
     }
 
-    pub async fn find_holders(&mut self, file_cid: String) -> CommandResult {
+    pub async fn find_holders(&mut self, file_cid: &[u8]) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
+        let file_cid = Cid::try_from(file_cid)?;
         self.sender
             .send((Command::FindHolders { file_cid }, callback_sender))
             .await?;
         receiver.await?
     }
 
-    pub async fn get_closest_peers(&mut self, file_cid: String) -> CommandResult {
+    pub async fn get_closest_peers(&mut self, file_cid: &[u8]) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
+        let file_cid = Cid::try_from(file_cid)?;
         self.sender
             .send((Command::GetClosestPeers { file_cid }, callback_sender))
             .await?;

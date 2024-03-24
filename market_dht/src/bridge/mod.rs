@@ -39,23 +39,39 @@ pub fn bridge(cmd_buffer: usize) -> Result<(DhtClient, DhtServer)> {
 
 #[cfg(test)]
 mod tests {
+    use cid::Cid;
     use libp2p::{
         swarm::dial_opts::{DialOpts, PeerCondition},
         Multiaddr, PeerId,
     };
     use pretty_assertions::assert_eq;
 
-    use crate::{command::Command, CommandOk};
+    use crate::{command::Command, new_cidv0, CommandOk};
+
+    #[tokio::test]
+    async fn test_register_file() {
+        let mut client = setup();
+        let file_cid = new_cidv0(b"this is some content!").unwrap();
+        let ip = [127, 0, 0, 1];
+        let port = 6969;
+        let price_per_mb = 2;
+        if let CommandOk::Register {
+            file_cid: actual_file_cid,
+        } = client
+            .register(&file_cid.to_bytes(), ip, port, price_per_mb)
+            .await
+            .unwrap()
+        {
+            assert_eq!(file_cid, actual_file_cid);
+        }
+    }
 
     #[tokio::test]
     #[should_panic]
     async fn test_dial_should_fail() {
         // NOTE: we'll have an actual test that can succeed in the integration tests when we can
         // create two peers with this library and have them dial each other
-        let (mut client, mut server) = super::bridge(16).unwrap();
-        tokio::spawn(async move {
-            let _ = server.run().await;
-        });
+        let mut client = setup();
         let peer_id = PeerId::random();
         let addr = "/ip4/127.0.0.1/tcp/6969".parse().unwrap();
         let msg = client.dial(peer_id, addr).await.unwrap();
@@ -64,10 +80,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_listen_on() {
-        let (mut client, mut server) = super::bridge(16).unwrap();
-        tokio::spawn(async move {
-            let _ = server.run().await;
-        });
+        let mut client = setup();
         // NOTE: this blocks until the server on the other end sends that oneshot back or if the
         // oneshot is dropped without sending (in which case it would crash)
         let msg = client
@@ -79,10 +92,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bootstrap_basic_should_pass() {
-        let (mut client, mut server) = super::bridge(16).unwrap();
-        tokio::spawn(async move {
-            let _ = server.run().await;
-        });
+        let mut client = setup();
         // NOTE: this blocks until the server on the other end sends that oneshot back or if the
         // oneshot is dropped without sending (in which case it would crash)
         let mock_peer_id = PeerId::random();
@@ -97,11 +107,16 @@ mod tests {
     #[tokio::test]
     #[should_panic(expected = "No known peers")]
     async fn test_bootstrap_basic_should_fail() {
-        let (mut client, mut server) = super::bridge(16).unwrap();
+        let mut client = setup();
+        client.bootstrap(vec![]).await.unwrap();
+    }
+
+    fn setup() -> super::DhtClient {
+        let (client, mut server) = super::bridge(16).unwrap();
         tokio::spawn(async move {
             let _ = server.run().await;
         });
-        client.bootstrap(vec![]).await.unwrap();
+        client
     }
 }
 

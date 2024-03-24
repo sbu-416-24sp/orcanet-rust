@@ -1,6 +1,7 @@
 use std::{collections::HashSet, net::Ipv4Addr};
 
 use anyhow::Result;
+use cid::Cid;
 use futures::channel::oneshot;
 use libp2p::{core::transport::ListenerId, swarm::dial_opts::DialOpts, Multiaddr, PeerId};
 
@@ -56,7 +57,7 @@ pub(crate) enum Command {
     // providing the content, but they still get the reference of where to get the content actually
     // is. But that quite literally just means that we only need put_record and get_record
     Register {
-        file_cid: String,
+        file_cid: Cid,
         ip: Ipv4Addr,
         port: u16,
         // TODO: maybe f64 instead?
@@ -64,10 +65,10 @@ pub(crate) enum Command {
     },
     // NOTE: this checks for who is willing to provide the file?
     FindHolders {
-        file_cid: String,
+        file_cid: Cid,
     },
     GetClosestPeers {
-        file_cid: String,
+        file_cid: Cid,
     },
 }
 
