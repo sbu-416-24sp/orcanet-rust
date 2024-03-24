@@ -249,6 +249,42 @@ impl DhtServer {
                     Err(anyhow!("Timed out on getting closest peers with {key:?}"))
                 )
             }
+            SwarmEvent::IncomingConnection {
+                connection_id,
+                local_addr,
+                send_back_addr,
+            } => {
+                info!(
+                    "[{connection_id}] - Incoming connection from {send_back_addr} to {local_addr}"
+                );
+            }
+            SwarmEvent::IncomingConnectionError {
+                connection_id,
+                local_addr,
+                send_back_addr,
+                error,
+            } => {
+                error!(
+                    "[{connection_id}] - Incoming connection error from {send_back_addr} to {local_addr}: {error}"
+                );
+            }
+            SwarmEvent::ConnectionEstablished {
+                peer_id,
+                connection_id,
+                endpoint,
+                established_in,
+                ..
+            } => {
+                info!("[{connection_id}] - Connection established with {peer_id} established in {established_in:?}ms");
+                if endpoint.is_dialer() {
+                    // taking here from libp2p example code
+                    let sender = self
+                        .pending_dials
+                        .remove(&peer_id)
+                        .with_context(|| anyhow!("Peer ID not found"))?;
+                    send_oneshot!(sender, Ok(CommandOk::Dial { peer: peer_id }));
+                }
+            }
             // TODO: support provider records?
             ev => {
                 error!("Unsupported event handler for {ev:?}");

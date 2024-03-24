@@ -20,7 +20,7 @@ pub enum CommandOk {
         num_remaining: u32,
     },
     Dial {
-        opts: DialOpts,
+        peer: PeerId,
     },
     Register {
         // TODO: maybe change to CID type instead
