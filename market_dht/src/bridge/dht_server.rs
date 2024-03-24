@@ -4,38 +4,40 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Debug,
-    net::Ipv4Addr,
+    time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, Context, Result};
-use cid::Cid;
 use futures::{
     channel::{mpsc, oneshot},
     select, StreamExt,
 };
 use libp2p::{
+    core::transport::ListenerId,
     kad::{
-        self, store::MemoryStore, Behaviour, BootstrapOk, Event, QueryId, QueryResult, QueryStats,
-        Record,
+        self, store::MemoryStore, Behaviour, BootstrapOk, Event, GetRecordOk, PutRecordOk, QueryId,
+        QueryResult, Record, RecordKey,
     },
-    swarm::{ConnectionId, SwarmEvent},
+    swarm::SwarmEvent,
     PeerId, Swarm,
 };
 use log::{error, info, warn};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     command::{Command, CommandCallback},
-    CommandOk, CommandResult,
+    CommandOk, CommandResult, FileMetadata,
 };
+
+type OneshotCommandResultSender = oneshot::Sender<CommandResult>;
 
 use self::macros::send_oneshot;
 
 pub struct DhtServer {
     swarm: Swarm<Behaviour<MemoryStore>>,
     cmd_receiver: mpsc::Receiver<CommandCallback>,
-    pending_queries: HashMap<QueryId, oneshot::Sender<CommandResult>>,
-    pending_dials: HashMap<PeerId, oneshot::Sender<CommandResult>>,
+    pending_queries: HashMap<QueryId, OneshotCommandResultSender>,
+    pending_dials: HashMap<PeerId, OneshotCommandResultSender>,
+    pending_listeners: HashMap<ListenerId, OneshotCommandResultSender>,
 }
 
 impl DhtServer {
@@ -48,6 +50,7 @@ impl DhtServer {
             swarm,
             pending_queries: Default::default(),
             pending_dials: Default::default(),
+            pending_listeners: Default::default(),
         }
     }
     pub async fn run(&mut self) -> Result<()> {
@@ -93,9 +96,6 @@ impl DhtServer {
                     })
                 );
             }
-            SwarmEvent::NewListenAddr { address, .. } => {
-                info!("Listening on {address}");
-            }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
                 result: QueryResult::Bootstrap(Err(kad::BootstrapError::Timeout { .. })),
@@ -124,7 +124,100 @@ impl DhtServer {
             } => {
                 warn!("[{connection_id}]: Currently dialing {peer_id}");
             }
-            _ev => {}
+            SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::PutRecord(Err(err)),
+                ..
+            }) => {
+                error!("PutRecord failed: {err}");
+                let sender = self
+                    .pending_queries
+                    .remove(&id)
+                    .with_context(|| anyhow!("Query ID not found"))?;
+                send_oneshot!(sender, Err(err.into()));
+            }
+            SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::PutRecord(Ok(PutRecordOk { key })),
+                ..
+            }) => {
+                info!("Record {key:?} was successfully placed into the DHT");
+                let sender = self
+                    .pending_queries
+                    .remove(&id)
+                    .with_context(|| anyhow!("Query ID not found"))?;
+                send_oneshot!(
+                    sender,
+                    Ok(CommandOk::Register {
+                        file_cid: key.to_vec()
+                    })
+                );
+            }
+            SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::GetRecord(Err(err)),
+                ..
+            }) => {
+                error!("GetRecord failed: {err}");
+                let sender = self
+                    .pending_queries
+                    .remove(&id)
+                    .with_context(|| anyhow!("Query ID not found"))?;
+                send_oneshot!(sender, Err(err.into()));
+            }
+            SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::GetRecord(Ok(get_record_ok)),
+                ..
+            }) => {
+                info!("GetRecord succeeded: {get_record_ok:?}");
+                let sender = self
+                    .pending_queries
+                    .remove(&id)
+                    .with_context(|| anyhow!("Query ID not found"))?;
+                if let GetRecordOk::FoundRecord(record_ok) = get_record_ok {
+                    let record = record_ok.record;
+                    match bincode::deserialize::<FileMetadata>(&record.value) {
+                        Ok(metadata) => {
+                            let peer = record_ok.peer.unwrap_or(*self.swarm.local_peer_id());
+                            send_oneshot!(
+                                sender,
+                                Ok(CommandOk::GetFile {
+                                    file_cid: record.key.to_vec(),
+                                    metadata,
+                                    owner_peer: peer
+                                })
+                            );
+                        }
+                        Err(err) => {
+                            send_oneshot!(sender, Err(err.into()))
+                        }
+                    };
+                } else {
+                    // NOTE: Finished with no additional record case but they return no record so yeah.
+                    send_oneshot!(sender, Err(anyhow!("Record not found")));
+                }
+            }
+            SwarmEvent::ListenerError { listener_id, error } => {
+                error!("[{listener_id}] - Listener error: {error}");
+                let sender = self
+                    .pending_listeners
+                    .remove(&listener_id)
+                    .with_context(|| anyhow!("Listener ID not found"))?;
+                send_oneshot!(sender, Err(error.into()));
+            }
+            SwarmEvent::NewListenAddr {
+                address,
+                listener_id,
+            } => {
+                info!("[{listener_id}] - Listening on {address}");
+                let sender = self
+                    .pending_listeners
+                    .remove(&listener_id)
+                    .with_context(|| anyhow!("Listener ID not found"))?;
+                send_oneshot!(sender, Ok(CommandOk::Listen { addr: address }));
+            }
+            ev => {}
         };
         Ok(())
     }
@@ -134,11 +227,14 @@ impl DhtServer {
         info!("Received command: {cmd:?}");
         match cmd {
             Command::Listen { addr } => {
-                let oneshot_res = match self.swarm.listen_on(addr) {
-                    Ok(listener_id) => Ok(CommandOk::Listen { listener_id }),
-                    Err(err) => Err(err.into()),
+                match self.swarm.listen_on(addr) {
+                    Ok(listener_id) => {
+                        self.pending_listeners.insert(listener_id, sender);
+                    }
+                    Err(err) => {
+                        send_oneshot!(sender, Err(err.into()));
+                    }
                 };
-                send_oneshot!(sender, oneshot_res);
             }
             Command::Bootstrap { boot_nodes } => {
                 // TODO: bootstrap can fail if boot_nodes is empty
@@ -146,7 +242,8 @@ impl DhtServer {
                     self.swarm.behaviour_mut().add_address(&node.0, node.1);
                 }
                 // TODO: note that addresses we add here can be pending so the bootstrap command we
-                // run after shouldn't actually fail.
+                // run after shouldn't actually fail. We can probably do something with blocking
+                // channels here
                 match self.swarm.behaviour_mut().bootstrap() {
                     Ok(qid) => {
                         self.pending_queries.insert(qid, sender);
@@ -181,17 +278,31 @@ impl DhtServer {
                 port,
                 price_per_mb,
             } => {
-                let record = Record::new(
+                // NOTE: read message in command.rs
+                let mut record = Record::new(
                     file_cid.to_bytes(),
-                    bincode::serialize(&FileMetadata {
-                        ip,
-                        port,
-                        price_per_mb,
-                    }).
-                    ,
+                    bincode::serialize(&FileMetadata::new(ip, port, price_per_mb))?,
                 );
+                // TODO: set expiration
+                record.publisher = Some(*self.swarm.local_peer_id());
+                match self
+                    .swarm
+                    .behaviour_mut()
+                    .put_record(record, kad::Quorum::One)
+                {
+                    Ok(qid) => {
+                        self.pending_queries.insert(qid, sender);
+                    }
+                    Err(err) => {
+                        send_oneshot!(sender, Err(err.into()));
+                    }
+                }
             }
-            Command::FindHolders { file_cid } => todo!(),
+            Command::GetFile { file_cid } => {
+                let key = RecordKey::new(&file_cid.to_bytes());
+                let qid = self.swarm.behaviour_mut().get_record(key);
+                self.pending_queries.insert(qid, sender);
+            }
             Command::GetClosestPeers { file_cid } => todo!(),
         };
         Ok(())
@@ -205,13 +316,6 @@ impl Debug for DhtServer {
             .field("swarm_local_peer_id", &self.swarm.local_peer_id())
             .finish()
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct FileMetadata {
-    ip: Ipv4Addr,
-    port: u16,
-    price_per_mb: u64,
 }
 
 mod macros {

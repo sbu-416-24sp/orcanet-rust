@@ -79,11 +79,11 @@ impl DhtClient {
         receiver.await?
     }
 
-    pub async fn find_holders(&mut self, file_cid: &[u8]) -> CommandResult {
+    pub async fn get_file(&mut self, file_cid: &[u8]) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
         let file_cid = Cid::try_from(file_cid)?;
         self.sender
-            .send((Command::FindHolders { file_cid }, callback_sender))
+            .send((Command::GetFile { file_cid }, callback_sender))
             .await?;
         receiver.await?
     }
@@ -101,7 +101,7 @@ impl DhtClient {
 #[cfg(test)]
 mod tests {
     use futures::{channel::oneshot::Sender, StreamExt};
-    use libp2p::{core::transport::ListenerId, Multiaddr, PeerId};
+    use libp2p::{Multiaddr, PeerId};
     use pretty_assertions::assert_eq;
 
     use crate::{command::Command, CommandOk, CommandResult};
@@ -190,14 +190,14 @@ mod tests {
     async fn test_listen_on_basic() {
         let (sender, mut mock_receiver) =
             futures::channel::mpsc::channel::<(Command, Sender<CommandResult>)>(16);
-        let expected_listener_id = ListenerId::next();
+        let expected_addr = "/ip4/127.0.0.1".parse::<Multiaddr>().unwrap();
         tokio::spawn(async move {
-            while let Some(command) = mock_receiver.next().await {
+            if let Some(command) = mock_receiver.next().await {
                 if let Command::Listen { addr: _addr } = command.0 {
                     command
                         .1
                         .send(Ok(CommandOk::Listen {
-                            listener_id: expected_listener_id,
+                            addr: expected_addr,
                         }))
                         .unwrap();
                 } else {
@@ -207,12 +207,12 @@ mod tests {
         });
         let mut client = DhtClient::new(sender);
         // NOTE: this thing blocks until the oneshot is received back
-        if let CommandOk::Listen { listener_id } = client
+        if let CommandOk::Listen { addr } = client
             .listen_on("/ip4/127.0.0.1".parse::<Multiaddr>().unwrap())
             .await
             .unwrap()
         {
-            assert_eq!(expected_listener_id, listener_id);
+            assert_eq!(addr, "/ip4/127.0.0.1".parse::<Multiaddr>().unwrap());
         }
     }
 
@@ -227,7 +227,7 @@ mod tests {
                     command
                         .1
                         .send(Ok(CommandOk::Listen {
-                            listener_id: ListenerId::next(),
+                            addr: "/ip4/".parse::<Multiaddr>().unwrap(),
                         }))
                         .unwrap();
                 } else {
@@ -236,7 +236,6 @@ mod tests {
             }
         });
         let mut client = DhtClient::new(sender);
-        // NOTE: this thing blocks until the oneshot is received back
         client
             .listen_on("/ip4/1270.0.1".parse::<Multiaddr>().unwrap())
             .await

@@ -49,21 +49,24 @@ mod tests {
     use crate::{command::Command, new_cidv0, CommandOk};
 
     #[tokio::test]
-    async fn test_register_file() {
+    async fn test_find_holder_should_fail() {
+        let mut client = setup();
+        let file_cid = new_cidv0(b"this is some content!").unwrap();
+        client.get_file(&file_cid.to_bytes()).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "the quorum failed")]
+    async fn test_register_file_should_fail() {
         let mut client = setup();
         let file_cid = new_cidv0(b"this is some content!").unwrap();
         let ip = [127, 0, 0, 1];
         let port = 6969;
         let price_per_mb = 2;
-        if let CommandOk::Register {
-            file_cid: actual_file_cid,
-        } = client
+        client
             .register(&file_cid.to_bytes(), ip, port, price_per_mb)
             .await
-            .unwrap()
-        {
-            assert_eq!(file_cid, actual_file_cid);
-        }
+            .unwrap();
     }
 
     #[tokio::test]

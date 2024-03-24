@@ -5,13 +5,15 @@ use cid::Cid;
 use futures::channel::oneshot;
 use libp2p::{core::transport::ListenerId, swarm::dial_opts::DialOpts, Multiaddr, PeerId};
 
+use crate::FileMetadata;
+
 pub(crate) type CommandCallback = (Command, oneshot::Sender<CommandResult>);
 pub type CommandResult = Result<CommandOk>;
 
 #[derive(Debug)]
 pub enum CommandOk {
     Listen {
-        listener_id: ListenerId,
+        addr: Multiaddr,
     },
     Bootstrap {
         peer: PeerId,
@@ -21,14 +23,16 @@ pub enum CommandOk {
         opts: DialOpts,
     },
     Register {
-        file_cid: String,
+        // TODO: maybe change to CID type instead
+        file_cid: Vec<u8>,
     },
-    FindHolders {
-        file_cid: String,
-        peers: HashSet<PeerId>,
+    GetFile {
+        file_cid: Vec<u8>,
+        metadata: FileMetadata,
+        owner_peer: PeerId,
     },
     GetClosestPeers {
-        file_cid: String,
+        file_cid: Vec<u8>,
         peers: Vec<PeerId>,
     },
 }
@@ -64,7 +68,7 @@ pub(crate) enum Command {
         price_per_mb: u64,
     },
     // NOTE: this checks for who is willing to provide the file?
-    FindHolders {
+    GetFile {
         file_cid: Cid,
     },
     GetClosestPeers {
