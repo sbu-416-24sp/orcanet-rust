@@ -24,6 +24,7 @@ pub fn bridge(cmd_buffer: usize) -> Result<(DhtClient, DhtServer)> {
         )?
         .with_dns()?
         .with_behaviour(|key| {
+            // TODO: maybe mdns for bootstrap nodes that are close?
             let peer_id = key.public().to_peer_id();
             kad::Behaviour::new(peer_id, MemoryStore::new(peer_id))
         })?
