@@ -39,16 +39,32 @@ pub fn bridge(cmd_buffer: usize) -> Result<(DhtClient, DhtServer)> {
 
 #[cfg(test)]
 mod tests {
-    use cid::Cid;
-    use libp2p::{
-        swarm::dial_opts::{DialOpts, PeerCondition},
-        Multiaddr, PeerId,
-    };
+    use libp2p::{Multiaddr, PeerId};
     use pretty_assertions::assert_eq;
 
-    use crate::{command::Command, new_cidv0, CommandOk};
+    use crate::{new_cidv0, CommandOk};
 
     #[tokio::test]
+    async fn test_get_closest_peers() {
+        let mut client = setup();
+        let file_cid = new_cidv0(b"this is some content!").unwrap();
+        if let CommandOk::GetClosestPeers {
+            file_cid: fcid,
+            peers,
+        } = client
+            .get_closest_peers(&file_cid.to_bytes())
+            .await
+            .unwrap()
+        {
+            assert!(peers.is_empty());
+            assert_eq!(fcid, file_cid.to_bytes());
+        } else {
+            panic!("unexpected command")
+        }
+    }
+
+    #[tokio::test]
+    #[should_panic]
     async fn test_find_holder_should_fail() {
         let mut client = setup();
         let file_cid = new_cidv0(b"this is some content!").unwrap();

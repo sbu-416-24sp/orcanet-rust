@@ -4,7 +4,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Debug,
-    time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -15,8 +14,8 @@ use futures::{
 use libp2p::{
     core::transport::ListenerId,
     kad::{
-        self, store::MemoryStore, Behaviour, BootstrapOk, Event, GetRecordOk, PutRecordOk, QueryId,
-        QueryResult, Record, RecordKey,
+        self, store::MemoryStore, Behaviour, BootstrapOk, Event, GetClosestPeersError,
+        GetClosestPeersOk, GetRecordOk, PutRecordOk, QueryId, QueryResult, Record, RecordKey,
     },
     swarm::SwarmEvent,
     PeerId, Swarm,
@@ -217,7 +216,43 @@ impl DhtServer {
                     .with_context(|| anyhow!("Listener ID not found"))?;
                 send_oneshot!(sender, Ok(CommandOk::Listen { addr: address }));
             }
-            ev => {}
+            SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::GetClosestPeers(Ok(GetClosestPeersOk { key, peers })),
+                ..
+            }) => {
+                info!("Got closest peers");
+                let sender = self
+                    .pending_queries
+                    .remove(&id)
+                    .with_context(|| anyhow!("Query ID not found"))?;
+                send_oneshot!(
+                    sender,
+                    Ok(CommandOk::GetClosestPeers {
+                        file_cid: key,
+                        peers
+                    })
+                )
+            }
+            SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::GetClosestPeers(Err(GetClosestPeersError::Timeout { key, .. })),
+                ..
+            }) => {
+                error!("Timed out on getting closest peers");
+                let sender = self
+                    .pending_queries
+                    .remove(&id)
+                    .with_context(|| anyhow!("Query ID not found"))?;
+                send_oneshot!(
+                    sender,
+                    Err(anyhow!("Timed out on getting closest peers with {key:?}"))
+                )
+            }
+            // TODO: support provider records?
+            ev => {
+                error!("Unsupported event handler for {ev:?}");
+            }
         };
         Ok(())
     }
@@ -303,7 +338,11 @@ impl DhtServer {
                 let qid = self.swarm.behaviour_mut().get_record(key);
                 self.pending_queries.insert(qid, sender);
             }
-            Command::GetClosestPeers { file_cid } => todo!(),
+            Command::GetClosestPeers { file_cid } => {
+                let key = RecordKey::new(&file_cid.to_bytes());
+                let qid = self.swarm.behaviour_mut().get_closest_peers(key.to_vec());
+                self.pending_queries.insert(qid, sender);
+            }
         };
         Ok(())
     }
