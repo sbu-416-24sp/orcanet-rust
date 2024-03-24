@@ -41,7 +41,8 @@ pub(crate) enum Command {
         boot_nodes: Vec<(PeerId, Multiaddr)>,
     },
     Dial {
-        opts: DialOpts,
+        peer_id: PeerId,
+        addr: Multiaddr,
     },
     // NOTE: Register should probably just be start_providing; the reason being is that this should
     // be the only file owner until the file is actually purchased. Rather in the future, it

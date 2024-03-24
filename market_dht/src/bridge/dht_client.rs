@@ -47,10 +47,10 @@ impl DhtClient {
         receiver.await?
     }
 
-    pub async fn dial(&mut self, opts: impl Into<DialOpts>) -> CommandResult {
+    pub async fn dial(&mut self, peer_id: PeerId, addr: Multiaddr) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
         self.sender
-            .send((Command::Dial { opts: opts.into() }, callback_sender))
+            .send((Command::Dial { peer_id, addr }, callback_sender))
             .await?;
         receiver.await?
     }

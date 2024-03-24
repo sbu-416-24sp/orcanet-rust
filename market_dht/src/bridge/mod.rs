@@ -39,10 +39,28 @@ pub fn bridge(cmd_buffer: usize) -> Result<(DhtClient, DhtServer)> {
 
 #[cfg(test)]
 mod tests {
-    use libp2p::{Multiaddr, PeerId};
+    use libp2p::{
+        swarm::dial_opts::{DialOpts, PeerCondition},
+        Multiaddr, PeerId,
+    };
     use pretty_assertions::assert_eq;
 
     use crate::{command::Command, CommandOk};
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_dial_should_fail() {
+        // NOTE: we'll have an actual test that can succeed in the integration tests when we can
+        // create two peers with this library and have them dial each other
+        let (mut client, mut server) = super::bridge(16).unwrap();
+        tokio::spawn(async move {
+            let _ = server.run().await;
+        });
+        let peer_id = PeerId::random();
+        let addr = "/ip4/127.0.0.1/tcp/6969".parse().unwrap();
+        let msg = client.dial(peer_id, addr).await.unwrap();
+        assert!(matches!(msg, CommandOk::Dial { .. }))
+    }
 
     #[tokio::test]
     async fn test_listen_on() {

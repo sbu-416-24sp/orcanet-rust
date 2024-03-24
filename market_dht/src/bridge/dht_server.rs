@@ -1,7 +1,10 @@
 //! DHT server that listens for client commands and responds to them by communicating with the
 //! libp2p DHT swarm
 
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fmt::Debug,
+};
 
 use anyhow::{anyhow, Context, Result};
 use futures::{
@@ -12,7 +15,7 @@ use libp2p::{
     kad::{
         self, store::MemoryStore, Behaviour, BootstrapOk, Event, QueryId, QueryResult, QueryStats,
     },
-    swarm::SwarmEvent,
+    swarm::{ConnectionId, SwarmEvent},
     PeerId, Swarm,
 };
 
@@ -21,10 +24,13 @@ use crate::{
     CommandOk, CommandResult,
 };
 
+use self::macros::send_oneshot;
+
 pub struct DhtServer {
     swarm: Swarm<Behaviour<MemoryStore>>,
     cmd_receiver: mpsc::Receiver<CommandCallback>,
     pending_queries: HashMap<QueryId, oneshot::Sender<CommandResult>>,
+    pending_dials: HashMap<PeerId, oneshot::Sender<CommandResult>>,
 }
 
 impl DhtServer {
@@ -36,6 +42,7 @@ impl DhtServer {
             cmd_receiver,
             swarm,
             pending_queries: Default::default(),
+            pending_dials: Default::default(),
         }
     }
     pub async fn run(&mut self) -> Result<()> {
@@ -72,12 +79,13 @@ impl DhtServer {
                     .pending_queries
                     .remove(&id)
                     .with_context(|| anyhow!("Query ID not found"))?;
-                if let Err(err) = sender.send(Ok(CommandOk::Bootstrap {
-                    peer,
-                    num_remaining,
-                })) {
-                    return Err(anyhow!("Failed to send oneshot response: {:?}", err));
-                }
+                send_oneshot!(
+                    sender,
+                    Ok(CommandOk::Bootstrap {
+                        peer,
+                        num_remaining,
+                    })
+                );
             }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
@@ -88,17 +96,18 @@ impl DhtServer {
                     .pending_queries
                     .remove(&id)
                     .with_context(|| anyhow!("Query ID not found"))?;
-                if let Err(err) = sender.send(Err(anyhow!("Bootstrap timeout"))) {
-                    return Err(anyhow!("Failed to send oneshot response: {:?}", err));
-                }
+                send_oneshot!(sender, Err(anyhow!("Bootstrap timeout")));
             }
             SwarmEvent::OutgoingConnectionError {
                 peer_id: Some(peer_id),
+                error,
                 ..
             } => {
-                self.swarm.behaviour_mut().remove_peer(&peer_id);
+                if let Some(sender) = self.pending_dials.remove(&peer_id) {
+                    send_oneshot!(sender, Err(error.into()));
+                }
             }
-            ev => {}
+            _ev => {}
         };
         Ok(())
     }
@@ -111,9 +120,7 @@ impl DhtServer {
                     Ok(listener_id) => Ok(CommandOk::Listen { listener_id }),
                     Err(err) => Err(err.into()),
                 };
-                if let Err(err) = sender.send(oneshot_res) {
-                    return Err(anyhow!("Failed to send oneshot response: {:?}", err));
-                }
+                send_oneshot!(sender, oneshot_res);
             }
             Command::Bootstrap { boot_nodes } => {
                 // TODO: bootstrap can fail if boot_nodes is empty
@@ -127,13 +134,29 @@ impl DhtServer {
                         self.pending_queries.insert(qid, sender);
                     }
                     Err(err) => {
-                        if let Err(err) = sender.send(Err(err.into())) {
-                            return Err(anyhow!("Failed to send oneshot response: {:?}", err));
-                        }
+                        send_oneshot!(sender, Err(err.into()));
                     }
                 }
             }
-            Command::Dial { opts } => todo!(),
+            Command::Dial { peer_id, addr } => {
+                // TODO: maybe use connectionIds in the future?
+                // NOTE: taking this from the libp2p example
+                if let Entry::Vacant(entry) = self.pending_dials.entry(peer_id) {
+                    self.swarm
+                        .behaviour_mut()
+                        .add_address(&peer_id, addr.clone());
+                    match self.swarm.dial(addr.with_p2p(peer_id).unwrap()) {
+                        Ok(()) => {
+                            entry.insert(sender);
+                        }
+                        Err(err) => {
+                            send_oneshot!(sender, Err(err.into()));
+                        }
+                    }
+                } else {
+                    send_oneshot!(sender, Err(anyhow!("Dial already in progress")));
+                }
+            }
             Command::Register {
                 file_cid,
                 ip,
@@ -154,4 +177,15 @@ impl Debug for DhtServer {
             .field("swarm_local_peer_id", &self.swarm.local_peer_id())
             .finish()
     }
+}
+
+mod macros {
+    macro_rules! send_oneshot {
+        ($sender:expr, $msg:expr) => {
+            if let Err(err) = $sender.send($msg) {
+                return Err(anyhow!("Failed to send oneshot response: {:?}", err));
+            }
+        };
+    }
+    pub(crate) use send_oneshot;
 }
