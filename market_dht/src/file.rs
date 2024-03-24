@@ -1,3 +1,4 @@
+//! File related utilities
 use anyhow::Result;
 use cid::Cid;
 use multihash_codetable::{Code, MultihashDigest};
