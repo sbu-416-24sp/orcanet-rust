@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use anyhow::Result;
 use cid::Cid;
 use futures::channel::oneshot;
-use libp2p::{swarm::dial_opts::DialOpts, Multiaddr, PeerId};
+use libp2p::{Multiaddr, PeerId};
 
 use crate::FileMetadata;
 
