@@ -5,7 +5,7 @@ use cid::Cid;
 use futures::channel::oneshot;
 use libp2p::{Multiaddr, PeerId};
 
-use crate::FileMetadata;
+use crate::file::FileMetadata;
 
 pub(crate) type CommandCallback = (Command, oneshot::Sender<CommandResult>);
 pub type CommandResult = Result<CommandOk>;
@@ -76,6 +76,7 @@ pub(crate) enum Command {
     },
 }
 
+// TODO: use actual error types, but im lazy atm so l8r
 // #[derive(Debug, Error)]
 // pub enum CommandError {
 //     #[error("failed to listen on {addr}")]

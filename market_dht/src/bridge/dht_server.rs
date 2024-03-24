@@ -24,7 +24,8 @@ use log::{error, info, warn};
 
 use crate::{
     command::{Command, CommandCallback},
-    CommandOk, CommandResult, FileMetadata,
+    file::FileMetadata,
+    CommandOk, CommandResult,
 };
 
 type OneshotCommandResultSender = oneshot::Sender<CommandResult>;

@@ -42,7 +42,7 @@ mod tests {
     use libp2p::{Multiaddr, PeerId};
     use pretty_assertions::assert_eq;
 
-    use crate::{new_cidv0, CommandOk};
+    use crate::{file::new_cidv0, CommandOk};
 
     #[tokio::test]
     async fn test_get_closest_peers() {
