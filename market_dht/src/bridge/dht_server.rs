@@ -83,8 +83,8 @@ impl DhtServer {
     }
 
     async fn handle_swarm_event(&mut self, event: SwarmEvent<Event>) -> Result<()> {
-        println!("{:?}", self.swarm.connected_peers().collect::<Vec<_>>());
         match event {
+            // FIXIT: bootstrap is extremely broken atm
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
                 result:
@@ -96,18 +96,18 @@ impl DhtServer {
             }) => {
                 // NOTE: bootstrap still returns BootstrapOk even if dialing the bootnodes
                 // fail...
-                let sender = self
-                    .pending_queries
-                    .remove(&id)
-                    .with_context(|| anyhow!("Query ID not found"))?;
-                info!("Bootstrapped peer {peer}");
-                send_oneshot!(
-                    sender,
-                    Ok(CommandOk::Bootstrap {
-                        peer,
-                        num_remaining,
-                    })
-                );
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    info!("Bootstrapped peer {peer}");
+                    send_oneshot!(
+                        sender,
+                        Ok(CommandOk::Bootstrap {
+                            peer,
+                            num_remaining,
+                        })
+                    );
+                } else {
+                    error!("Query ID not found");
+                }
             }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
@@ -115,11 +115,11 @@ impl DhtServer {
                 ..
             }) => {
                 error!("Bootstrap timed out!");
-                let sender = self
-                    .pending_queries
-                    .remove(&id)
-                    .with_context(|| anyhow!("Query ID not found"))?;
-                send_oneshot!(sender, Err(anyhow!("Bootstrap timeout")));
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    send_oneshot!(sender, Err(anyhow!("Bootstrap timeout")));
+                } else {
+                    error!("Query ID not found");
+                }
             }
             SwarmEvent::OutgoingConnectionError {
                 peer_id: Some(peer_id),
@@ -129,6 +129,8 @@ impl DhtServer {
                 error!("[{connection_id}]: Failed to connect to {peer_id}");
                 if let Some(sender) = self.pending_dials.remove(&peer_id) {
                     send_oneshot!(sender, Err(error.into()));
+                } else {
+                    error!("Peer ID not found");
                 }
             }
             SwarmEvent::Dialing {
@@ -143,11 +145,11 @@ impl DhtServer {
                 ..
             }) => {
                 error!("PutRecord failed: {err}");
-                let sender = self
-                    .pending_queries
-                    .remove(&id)
-                    .with_context(|| anyhow!("Query ID not found"))?;
-                send_oneshot!(sender, Err(err.into()));
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    send_oneshot!(sender, Err(err.into()));
+                } else {
+                    error!("Query ID not found")
+                }
             }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
@@ -155,16 +157,16 @@ impl DhtServer {
                 ..
             }) => {
                 info!("Record {key:?} was successfully placed into the DHT");
-                let sender = self
-                    .pending_queries
-                    .remove(&id)
-                    .with_context(|| anyhow!("Query ID not found"))?;
-                send_oneshot!(
-                    sender,
-                    Ok(CommandOk::Register {
-                        file_cid: key.to_vec()
-                    })
-                );
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    send_oneshot!(
+                        sender,
+                        Ok(CommandOk::Register {
+                            file_cid: key.to_vec()
+                        })
+                    );
+                } else {
+                    error!("Query ID not found");
+                }
             }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
@@ -172,11 +174,11 @@ impl DhtServer {
                 ..
             }) => {
                 error!("GetRecord failed: {err}");
-                let sender = self
-                    .pending_queries
-                    .remove(&id)
-                    .with_context(|| anyhow!("Query ID not found"))?;
-                send_oneshot!(sender, Err(err.into()));
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    send_oneshot!(sender, Err(err.into()));
+                } else {
+                    error!("Query ID not found");
+                }
             }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
@@ -213,22 +215,22 @@ impl DhtServer {
             }
             SwarmEvent::ListenerError { listener_id, error } => {
                 error!("[{listener_id}] - Listener error: {error}");
-                let sender = self
-                    .pending_listeners
-                    .remove(&listener_id)
-                    .with_context(|| anyhow!("Listener ID not found"))?;
-                send_oneshot!(sender, Err(error.into()));
+                if let Some(sender) = self.pending_listeners.remove(&listener_id) {
+                    send_oneshot!(sender, Err(error.into()));
+                } else {
+                    error!("Listener ID not found");
+                }
             }
             SwarmEvent::NewListenAddr {
                 address,
                 listener_id,
             } => {
                 info!("[{listener_id}] - Listening on {address}");
-                let sender = self
-                    .pending_listeners
-                    .remove(&listener_id)
-                    .with_context(|| anyhow!("Listener ID not found"))?;
-                send_oneshot!(sender, Ok(CommandOk::Listen { addr: address }));
+                if let Some(sender) = self.pending_listeners.remove(&listener_id) {
+                    send_oneshot!(sender, Ok(CommandOk::Listen { addr: address }));
+                } else {
+                    error!("Listener ID not found");
+                }
             }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
@@ -236,32 +238,32 @@ impl DhtServer {
                 ..
             }) => {
                 info!("Got closest peers");
-                let sender = self
-                    .pending_queries
-                    .remove(&id)
-                    .with_context(|| anyhow!("Query ID not found"))?;
-                send_oneshot!(
-                    sender,
-                    Ok(CommandOk::GetClosestPeers {
-                        file_cid: key,
-                        peers
-                    })
-                )
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    send_oneshot!(
+                        sender,
+                        Ok(CommandOk::GetClosestPeers {
+                            file_cid: key,
+                            peers
+                        })
+                    )
+                } else {
+                    error!("Query ID not found");
+                }
             }
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
                 result: QueryResult::GetClosestPeers(Err(GetClosestPeersError::Timeout { key, .. })),
                 ..
             }) => {
-                error!("Timed out on getting closest peers");
-                let sender = self
-                    .pending_queries
-                    .remove(&id)
-                    .with_context(|| anyhow!("Query ID not found"))?;
-                send_oneshot!(
-                    sender,
-                    Err(anyhow!("Timed out on getting closest peers with {key:?}"))
-                )
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    error!("Timed out on getting closest peers");
+                    send_oneshot!(
+                        sender,
+                        Err(anyhow!("Timed out on getting closest peers with {key:?}"))
+                    );
+                } else {
+                    error!("Query ID not found");
+                }
             }
             SwarmEvent::IncomingConnection {
                 connection_id,
@@ -289,16 +291,15 @@ impl DhtServer {
                 established_in,
                 ..
             } => {
-                info!("[{connection_id}] - Connection established with {peer_id} established in {established_in:?}ms");
+                info!("[{connection_id}] - Connection established with {peer_id} established in {established_in:?}");
                 if endpoint.is_dialer() {
-                    // dialer already adds to address table
+                    // NOTE: dialer already adds to address table
                     // taking here from libp2p example code
-                    let sender = self
-                        .pending_dials
-                        .remove(&peer_id)
-                        .with_context(|| anyhow!("Peer ID not found"))?;
-                    // FIX: am i supposed to do this here?
-                    send_oneshot!(sender, Ok(CommandOk::Dial { peer: peer_id }));
+                    if let Some(sender) = self.pending_dials.remove(&peer_id) {
+                        send_oneshot!(sender, Ok(CommandOk::Dial { peer: peer_id }));
+                    } else {
+                        error!("Peer ID not found");
+                    }
                 } else {
                     self.swarm
                         .behaviour_mut()
@@ -333,7 +334,6 @@ impl DhtServer {
     async fn handle_cmd(&mut self, cmd: CommandCallback) -> Result<()> {
         let (cmd, sender) = cmd;
         info!("Received command: {cmd:?}");
-        println!("{:?}", self.swarm.behaviour().protocol_names());
         match cmd {
             Command::Listen { addr } => {
                 match self.swarm.listen_on(addr) {
@@ -404,6 +404,7 @@ impl DhtServer {
                         self.pending_queries.insert(qid, sender);
                     }
                     Err(err) => {
+                        error!("PutRecord failed: failed to store key locally");
                         send_oneshot!(sender, Err(err.into()));
                     }
                 }
