@@ -1,11 +1,12 @@
 //! DHT client for interacting with the DHT server
 
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, sync::Arc};
 
 use anyhow::Result;
 use cid::Cid;
 use futures::{
     channel::{mpsc::Sender, oneshot},
+    lock::Mutex,
     SinkExt,
 };
 use libp2p::{Multiaddr, PeerId};
@@ -18,24 +19,28 @@ use crate::{
 /// Client that is used to interact with the DHT server
 #[derive(Debug)]
 pub struct DhtClient {
-    sender: Sender<CommandCallback>,
+    sender: Arc<Mutex<Sender<CommandCallback>>>,
 }
 
 impl DhtClient {
-    pub(crate) const fn new(sender: Sender<CommandCallback>) -> Self {
-        Self { sender }
+    pub(crate) fn new(sender: Sender<CommandCallback>) -> Self {
+        Self {
+            sender: Arc::new(Mutex::new(sender)),
+        }
     }
 
     /// Sends a listening request to listen on some [Multiaddr]
     ///
     /// # Errors
     /// Can fail if the [Multiaddr] provided by the user is already in use
-    pub async fn listen_on(&mut self, addr: impl Into<Multiaddr>) -> CommandResult {
+    pub async fn listen_on(&self, addr: impl Into<Multiaddr>) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
         let addr = addr.into();
-        self.sender
+        let mut sender_lock = self.sender.lock().await;
+        sender_lock
             .send((Command::Listen { addr }, callback_sender))
             .await?;
+        drop(sender_lock);
         receiver.await?
     }
 
@@ -44,11 +49,12 @@ impl DhtClient {
     /// # Errors
     /// This can ultimately fail if you provided no bootnodes.
     pub async fn bootstrap(
-        &mut self,
+        &self,
         boot_nodes: impl IntoIterator<Item = (PeerId, Multiaddr)>,
     ) -> Result<CommandOk> {
         let (callback_sender, receiver) = oneshot::channel();
-        self.sender
+        let mut sender_lock = self.sender.lock().await;
+        sender_lock
             .send((
                 Command::Bootstrap {
                     boot_nodes: boot_nodes.into_iter().collect(),
@@ -56,6 +62,7 @@ impl DhtClient {
                 callback_sender,
             ))
             .await?;
+        drop(sender_lock);
         receiver.await?
     }
 
@@ -64,12 +71,14 @@ impl DhtClient {
     /// # Errors
     /// Can fail if the peer_id or addr is invalid, or if we just can't connect due to not sharing
     /// the same protocols
-    pub async fn dial(&mut self, peer_id: PeerId, addr: Multiaddr) -> CommandResult {
+    pub async fn dial(&self, peer_id: PeerId, addr: Multiaddr) -> CommandResult {
         // TODO: maybe change in the future to support it more genericly with dialopts
         let (callback_sender, receiver) = oneshot::channel();
-        self.sender
+        let mut sender_lock = self.sender.lock().await;
+        sender_lock
             .send((Command::Dial { peer_id, addr }, callback_sender))
             .await?;
+        drop(sender_lock);
         receiver.await?
     }
 
@@ -82,7 +91,7 @@ impl DhtClient {
     /// # Errors
     /// Can fail if the file_cid is invalid
     pub async fn register(
-        &mut self,
+        &self,
         file_cid: &[u8],
         ip: impl Into<Ipv4Addr>,
         port: u16,
@@ -90,7 +99,8 @@ impl DhtClient {
     ) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
         let file_cid = Cid::try_from(file_cid)?;
-        self.sender
+        let mut sender_lock = self.sender.lock().await;
+        sender_lock
             .send((
                 Command::Register {
                     file_cid,
@@ -101,6 +111,7 @@ impl DhtClient {
                 callback_sender,
             ))
             .await?;
+        drop(sender_lock);
         receiver.await?
     }
 
@@ -108,12 +119,14 @@ impl DhtClient {
     ///
     /// # Errors
     /// Fails if the file_cid is invalid
-    pub async fn get_file(&mut self, file_cid: &[u8]) -> CommandResult {
+    pub async fn get_file(&self, file_cid: &[u8]) -> CommandResult {
         let (callback_sender, receiver) = oneshot::channel();
         let file_cid = Cid::try_from(file_cid)?;
-        self.sender
+        let mut sender_lock = self.sender.lock().await;
+        sender_lock
             .send((Command::GetFile { file_cid }, callback_sender))
             .await?;
+        drop(sender_lock);
         receiver.await?
     }
 
@@ -121,12 +134,14 @@ impl DhtClient {
     ///
     /// # Errors
     /// Fails if the file_cid is invalid
-    pub async fn get_closest_peers(&mut self, file_cid: &[u8]) -> CommandResult {
-        let (callback_sender, receiver) = oneshot::channel();
+    pub async fn get_closest_peers(&self, file_cid: &[u8]) -> CommandResult {
         let file_cid = Cid::try_from(file_cid)?;
-        self.sender
+        let (callback_sender, receiver) = oneshot::channel();
+        let mut sender_lock = self.sender.lock().await;
+        sender_lock
             .send((Command::GetClosestPeers { file_cid }, callback_sender))
             .await?;
+        drop(sender_lock);
         receiver.await?
     }
 }
@@ -147,7 +162,7 @@ mod tests {
     async fn test_bootstrap_should_fail() {
         let (sender, mut mock_receiver) =
             futures::channel::mpsc::channel::<(Command, Sender<CommandResult>)>(16);
-        let mut client = DhtClient::new(sender);
+        let client = DhtClient::new(sender);
         let mock_id = libp2p::PeerId::random();
         tokio::spawn(async move {
             while let Some(command) = mock_receiver.next().await {
@@ -183,7 +198,7 @@ mod tests {
     async fn test_bootstrap_basic() {
         let (sender, mut mock_receiver) =
             futures::channel::mpsc::channel::<(Command, Sender<CommandResult>)>(16);
-        let mut client = DhtClient::new(sender);
+        let client = DhtClient::new(sender);
         let mock_id = libp2p::PeerId::random();
         tokio::spawn(async move {
             while let Some(command) = mock_receiver.next().await {
@@ -238,7 +253,7 @@ mod tests {
                 }
             }
         });
-        let mut client = DhtClient::new(sender);
+        let client = DhtClient::new(sender);
         // NOTE: this thing blocks until the oneshot is received back
         if let CommandOk::Listen { addr } = client
             .listen_on("/ip4/127.0.0.1".parse::<Multiaddr>().unwrap())
@@ -268,7 +283,7 @@ mod tests {
                 }
             }
         });
-        let mut client = DhtClient::new(sender);
+        let client = DhtClient::new(sender);
         client
             .listen_on("/ip4/1270.0.1".parse::<Multiaddr>().unwrap())
             .await
