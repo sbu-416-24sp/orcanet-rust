@@ -144,6 +144,20 @@ impl DhtClient {
         drop(sender_lock);
         receiver.await?
     }
+
+    /// Yields the local peer node ID
+    ///
+    /// # Errors
+    /// Fails if the file_cid is invalid
+    pub async fn get_local_peer_id(&self) -> CommandResult {
+        let (callback_sender, receiver) = oneshot::channel();
+        let mut sender_lock = self.sender.lock().await;
+        sender_lock
+            .send((Command::GetLocalPeerId, callback_sender))
+            .await?;
+        drop(sender_lock);
+        receiver.await?
+    }
 }
 
 #[cfg(test)]

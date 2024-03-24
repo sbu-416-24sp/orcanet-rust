@@ -1838,11 +1838,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "libp2p",
+ "market_dht",
  "market_proto",
  "pretty_assertions",
  "tokio",
  "tonic",
  "tonic-build",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
 ]
 
 [[package]]

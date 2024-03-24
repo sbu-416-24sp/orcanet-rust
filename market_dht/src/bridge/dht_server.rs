@@ -16,8 +16,10 @@ use futures::{
 use libp2p::{
     core::transport::ListenerId,
     kad::{
-        self, store::MemoryStore, Behaviour, BootstrapOk, Event, GetClosestPeersError,
-        GetClosestPeersOk, GetRecordOk, PutRecordOk, QueryId, QueryResult, Record, RecordKey,
+        self,
+        store::{MemoryStore, RecordStore},
+        Behaviour, BootstrapOk, Event, GetClosestPeersError, GetClosestPeersOk, GetRecordOk,
+        PutRecordOk, QueryId, QueryResult, Record, RecordKey,
     },
     swarm::SwarmEvent,
     PeerId, Swarm,
@@ -81,6 +83,7 @@ impl DhtServer {
     }
 
     async fn handle_swarm_event(&mut self, event: SwarmEvent<Event>) -> Result<()> {
+        println!("{:?}", self.swarm.connected_peers().collect::<Vec<_>>());
         match event {
             SwarmEvent::Behaviour(kad::Event::OutboundQueryProgressed {
                 id,
@@ -181,31 +184,31 @@ impl DhtServer {
                 ..
             }) => {
                 info!("GetRecord succeeded: {get_record_ok:?}");
-                let sender = self
-                    .pending_queries
-                    .remove(&id)
-                    .with_context(|| anyhow!("Query ID not found"))?;
-                if let GetRecordOk::FoundRecord(record_ok) = get_record_ok {
-                    let record = record_ok.record;
-                    match bincode::deserialize::<FileMetadata>(&record.value) {
-                        Ok(metadata) => {
-                            let peer = record_ok.peer.unwrap_or(*self.swarm.local_peer_id());
-                            send_oneshot!(
-                                sender,
-                                Ok(CommandOk::GetFile {
-                                    file_cid: record.key.to_vec(),
-                                    metadata,
-                                    owner_peer: peer
-                                })
-                            );
-                        }
-                        Err(err) => {
-                            send_oneshot!(sender, Err(err.into()))
-                        }
-                    };
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    if let GetRecordOk::FoundRecord(record_ok) = get_record_ok {
+                        let record = record_ok.record;
+                        match bincode::deserialize::<FileMetadata>(&record.value) {
+                            Ok(metadata) => {
+                                let peer = record_ok.peer.unwrap_or(*self.swarm.local_peer_id());
+                                send_oneshot!(
+                                    sender,
+                                    Ok(CommandOk::GetFile {
+                                        file_cid: record.key.to_vec(),
+                                        metadata,
+                                        owner_peer: peer
+                                    })
+                                );
+                            }
+                            Err(err) => {
+                                send_oneshot!(sender, Err(err.into()))
+                            }
+                        };
+                    } else {
+                        // NOTE: Finished with no additional record case but they return no record so yeah.
+                        send_oneshot!(sender, Err(anyhow!("Record not found")));
+                    }
                 } else {
-                    // NOTE: Finished with no additional record case but they return no record so yeah.
-                    send_oneshot!(sender, Err(anyhow!("Record not found")));
+                    error!("Query ID not found");
                 }
             }
             SwarmEvent::ListenerError { listener_id, error } => {
@@ -288,13 +291,36 @@ impl DhtServer {
             } => {
                 info!("[{connection_id}] - Connection established with {peer_id} established in {established_in:?}ms");
                 if endpoint.is_dialer() {
+                    // dialer already adds to address table
                     // taking here from libp2p example code
                     let sender = self
                         .pending_dials
                         .remove(&peer_id)
                         .with_context(|| anyhow!("Peer ID not found"))?;
+                    // FIX: am i supposed to do this here?
                     send_oneshot!(sender, Ok(CommandOk::Dial { peer: peer_id }));
+                } else {
+                    self.swarm
+                        .behaviour_mut()
+                        .add_address(&peer_id, endpoint.get_remote_address().clone());
                 }
+            }
+            SwarmEvent::ConnectionClosed {
+                peer_id,
+                connection_id,
+                endpoint,
+                num_established,
+                ..
+            } => {
+                warn!("[{connection_id}] - Connection closed with {peer_id}. There are {num_established} connections left with this peer.");
+                self.swarm
+                    .behaviour_mut()
+                    .remove_address(&peer_id, endpoint.get_remote_address());
+            }
+            SwarmEvent::Behaviour(kad::Event::RoutingUpdated {
+                peer, addresses, ..
+            }) => {
+                warn!("Routing table updated with {peer} {addresses:?}");
             }
             // TODO: support provider records?
             ev => {
@@ -307,6 +333,7 @@ impl DhtServer {
     async fn handle_cmd(&mut self, cmd: CommandCallback) -> Result<()> {
         let (cmd, sender) = cmd;
         info!("Received command: {cmd:?}");
+        println!("{:?}", self.swarm.behaviour().protocol_names());
         match cmd {
             Command::Listen { addr } => {
                 match self.swarm.listen_on(addr) {
@@ -373,6 +400,7 @@ impl DhtServer {
                     .put_record(record, kad::Quorum::One)
                 {
                     Ok(qid) => {
+                        info!("[{qid}] - PutRecord was stored locally successfully");
                         self.pending_queries.insert(qid, sender);
                     }
                     Err(err) => {
@@ -389,6 +417,10 @@ impl DhtServer {
                 let key = RecordKey::new(&file_cid.to_bytes());
                 let qid = self.swarm.behaviour_mut().get_closest_peers(key.to_vec());
                 self.pending_queries.insert(qid, sender);
+            }
+            Command::GetLocalPeerId => {
+                let peer_id = *self.swarm.local_peer_id();
+                send_oneshot!(sender, Ok(CommandOk::GetLocalPeerId { peer_id }));
             }
         };
         Ok(())

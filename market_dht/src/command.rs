@@ -53,6 +53,11 @@ pub enum CommandOk {
         /// The list of closest peers
         peers: Vec<PeerId>,
     },
+    /// Successful result for the [Command::GetLocalPeerId] request sent
+    GetLocalPeerId {
+        /// The peer id of the local node
+        peer_id: PeerId,
+    },
 }
 
 #[derive(Debug)]
@@ -92,6 +97,7 @@ pub(crate) enum Command {
     GetClosestPeers {
         file_cid: Cid,
     },
+    GetLocalPeerId,
 }
 
 // TODO: use actual error types, but im lazy atm so l8r
