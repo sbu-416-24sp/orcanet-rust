@@ -29,24 +29,27 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
     // when the client cancels, the chunk num they stopped at should be returned to them so they
     // can query another producer for the next chunk
     loop {
-        let start = Instant::now();
-        match http::get_file(producer.clone(), file_hash.clone(), token, chunk).await {
-            Ok(auth_token) => {
-                token = auth_token;
-                println!("HTTP: Chunk {} downloaded successfully", chunk);
+        let start: Instant = Instant::now();
+        match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
+            Ok(response) => {
+                match response {
+                    http::GetFileResponse::Token(new_token) => {
+                        token = new_token;
+                    }
+                    http::GetFileResponse::Done => {
+                        println!("Consumer: File downloaded successfully");
+                        break;
+                    }
+                }
                 chunk += 1;
             }
             Err(e) => {
-                if e.to_string() == "Request failed with status code: 404 Not Found" {
-                    println!("HTTP: File downloaded successfully");
-                    break;
-                }
                 eprintln!("Failed to download chunk {}: {}", chunk, e);
                 break;
             }
         }
         let duration = start.elapsed();
-        println!("HTTP: Chunk {} took {:?} s to download", chunk, duration.as_secs());
+        println!("HTTP: Chunk {} took {:?} seconds to download", chunk, duration.as_secs());
     }
 
     // // Fetch the file from the producer

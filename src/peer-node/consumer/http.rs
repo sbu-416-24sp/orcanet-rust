@@ -4,43 +4,48 @@ use crate::grpc::orcanet::User;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 
-pub async fn get_file(
+pub enum GetFileResponse {
+    Token(String),
+    Done,
+}
+
+pub async fn get_file_chunk(
     producer: User,
     file_hash: String,
     token: String,
     chunk: u64,
-) -> Result<String> {
+) -> Result<GetFileResponse> {
     // Get the link to the file
     let link = format!(
-        "http://{}:{}/file/{}",
-        producer.ip, producer.port, file_hash
+        "http://{}:{}/file/{}?chunk={}",
+        producer.ip, producer.port, file_hash, chunk
     );
-    println!("HTTP: Fetching file from {}", link);
+    println!("HTTP: Fetching file chunk from {}", link);
 
     // Fetch the file from the producer
     let client = reqwest::Client::new();
     let res = client
-        .get(format!("{}?chunk={}", link, chunk))
+        .get(&link)
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await?;
 
     // Check if the request was successful
     if !res.status().is_success() {
+        if res.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(GetFileResponse::Done);
+        }
         return Err(anyhow!("Request failed with status code: {}", res.status()));
     }
 
-    // get auth token header from response
-    let auth_token = res
-        .headers()
+    // Get auth token header from response
+    let headers = res.headers().clone();
+    let auth_token = headers
         .get("X-Access-Token")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_owned();
+        .ok_or(anyhow!("No Authorization header"))?
+        .to_str()?;
 
     // Get the file name from the Content-Disposition header
-    let headers = res.headers().clone();
     let content_disposition = headers
         .get("Content-Disposition")
         .ok_or(anyhow!("No Content-Disposition header"))?
@@ -61,6 +66,6 @@ pub async fn get_file(
         .await?;
 
     download.write_all(&file).await?;
-    println!("HTTP: File saved as {}", file_name);
-    Ok(auth_token)
+    println!("HTTP: Chunk [{}] saved to {}", chunk, file_name);
+    Ok(GetFileResponse::Token(auth_token.to_string()))
 }

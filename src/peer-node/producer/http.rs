@@ -8,14 +8,11 @@ use axum::{
 };
 use serde::Deserialize;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use anyhow::{Result, anyhow};
 
 use crate::producer::db;
 
 use super::files::AsyncFileMap;
 use super::files::FileAccessType;
-
-use super::error::ChunkOutOfBoundsError;
 
 #[derive(Clone)]
 struct AppState {
@@ -97,7 +94,7 @@ async fn handle_file_request(
     let file_path = match state.files.get_file_path(&hash).await {
         Some(path) => path,
         None => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
+            return (StatusCode::NOT_FOUND, "File not found").into_response();
         }
     };
     // Get the file name
@@ -120,18 +117,26 @@ async fn handle_file_request(
 
     // Get the desired chunk
     let file_chunk: Vec<u8> = match file.get_chunk(chunk).await {
-        Ok(file_chunk) => file_chunk,
-        Err(e) => {
-            match e {
-                Error(ChunkOutOfBoundsError) => {
-                    eprintln!("HTTP: Chunk [{}] from {:?} out of range, sending 404", chunk, file_path);
-                    return (StatusCode::NOT_FOUND, format!("HTTP: Chunk [{}] out of range, sending 404",chunk)).into_response();
-                }
-                _ => {
-                    eprintln!("Failed to get chunk {}: {}", chunk, e);
-                    return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
-                }
+        Ok(file_chunk) => match file_chunk {
+            Some(file_chunk) => file_chunk,
+            None => {
+                println!(
+                    "HTTP: Chunk [{}] from {:?} out of range, sending 404",
+                    chunk, file_path
+                );
+                return (
+                    StatusCode::NOT_FOUND,
+                    format!("Chunk [{}] not found", chunk),
+                )
+                    .into_response();
             }
+        },
+        Err(e) => {
+            eprintln!(
+                "Failed to get chunk {} from {:?}: {:?}",
+                chunk, file_path, e
+            );
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
 
@@ -145,8 +150,8 @@ async fn handle_file_request(
     request.chunks_sent += 1;
 
     println!(
-        "Sending file chunk {} for {} to consumer {}",
-        chunk, hash, address
+        "HTTP: Sending Chunk [{}] for file {:?} to consumer {}",
+        chunk, file_path, address
     );
 
     Response::builder()
