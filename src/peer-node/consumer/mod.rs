@@ -1,6 +1,7 @@
 pub mod http;
 
 use crate::grpc::MarketClient;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 
@@ -12,7 +13,7 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
     let producers = client.check_holders(file_hash.clone()).await?;
 
     // For now, use the first producer
-    // TODO: Pick the least expensive producer
+    // TODO: Allow user to choose a producer, give them a list of options with IP and port
     let producer = producers
         .holders
         .get(0)
@@ -24,7 +25,11 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
 
     let mut chunk = 0;
     let mut token = String::from("token");
+    // TODO: allow looping through chunks, but client should be allowed to cancel at any time
+    // when the client cancels, the chunk num they stopped at should be returned to them so they
+    // can query another producer for the next chunk
     loop {
+        let start = Instant::now();
         match http::get_file(producer.clone(), file_hash.clone(), token, chunk).await {
             Ok(auth_token) => {
                 token = auth_token;
@@ -40,6 +45,8 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
                 break;
             }
         }
+        let duration = start.elapsed();
+        println!("HTTP: Chunk {} took {:?} s to download", chunk, duration.as_secs());
     }
 
     // // Fetch the file from the producer
