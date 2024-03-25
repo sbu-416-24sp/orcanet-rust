@@ -1,7 +1,6 @@
 pub mod http;
 
 use crate::grpc::MarketClient;
-use std::time::{Duration, Instant};
 
 use anyhow::Result;
 
@@ -29,7 +28,6 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
     // when the client cancels, the chunk num they stopped at should be returned to them so they
     // can query another producer for the next chunk
     loop {
-        let start: Instant = Instant::now();
         match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
             Ok(response) => {
                 match response {
@@ -48,8 +46,6 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
                 break;
             }
         }
-        let duration = start.elapsed();
-        println!("HTTP: Chunk {} took {:?} seconds to download", chunk, duration.as_secs());
     }
 
     // // Fetch the file from the producer
