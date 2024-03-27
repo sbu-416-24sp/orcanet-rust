@@ -1,28 +1,12 @@
 mod consumer;
 mod grpc;
 mod producer;
+mod store;
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Arg, Command, Parser};
+// use config::{builder, Config, File, FileFormat};
 
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-
-/// Peer node client
-struct Args {
-    /// Market service address
-    #[arg(short, long, default_value = "localhost:50051")]
-    market: String,
-
-    /// Whether to run as a producer
-    #[arg(short, long, default_value = "false")]
-    producer: bool,
-
-    /// File hash
-    /// Only used when running as a consumer
-    #[arg(short, long)]
-    file_hash: Option<String>,
-}
 
 fn cli() -> Command {
     Command::new("peernode")
@@ -74,13 +58,15 @@ fn cli() -> Command {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let config = store::Configurations::new();
+
     let matches = cli().get_matches();
     match matches.subcommand() {
         Some(("producer", producer_matches)) => {
             match producer_matches.subcommand() {
                 Some(("register", register_matches)) => {
                     println!("Register command: {:?}", register_matches);
-                   // producer::run().await?;
+                    // producer::run().await?;
                 }
                 Some(("add", add_matches)) => {
                     println!("Add command: {:?}", add_matches);
