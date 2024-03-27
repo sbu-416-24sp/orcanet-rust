@@ -28,3 +28,4 @@ cargo run -- -f <file_hash>
 - [ ] Producer selection algorithm
 - [ ] Payment verification
 - [ ] File upload
+- [ ] File verification on consumer

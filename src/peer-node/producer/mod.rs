@@ -45,3 +45,4 @@ pub async fn run(market: String) -> Result<()> {
 
     Ok(())
 }
+
