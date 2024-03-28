@@ -1,4 +1,3 @@
-//! # A library for providing an interface to the Orcanet Kademlia DHT
 #![warn(
     missing_debug_implementations,
     // missing_docs,
@@ -8,9 +7,8 @@
 )]
 #![deny(unsafe_code, unreachable_pub)]
 
-pub use bridge::*;
-pub use command::{CommandOk, CommandResult};
+pub use libp2p::Multiaddr;
+pub use libp2p::PeerId;
 
-mod bridge;
-pub(crate) mod command;
-pub mod file;
+pub mod boot_nodes;
+pub mod config;
