@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::boot_nodes::BootNodes;
 use crate::Multiaddr;
 
@@ -11,7 +9,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn builder(listener: Multiaddr) -> ConfigBuilder<WithBootNodes> {
+    pub fn builder(listener: Multiaddr) -> ConfigBuilder {
         ConfigBuilder::new(listener)
     }
 
@@ -26,18 +24,16 @@ impl Config {
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct ConfigBuilder<T> {
+pub struct ConfigBuilder {
     boot_nodes: Option<BootNodes>,
     listener: Multiaddr,
-    _pd: PhantomData<T>,
 }
 
-impl<T> ConfigBuilder<T> {
+impl ConfigBuilder {
     fn new(listener: Multiaddr) -> Self {
         Self {
             boot_nodes: None,
             listener,
-            _pd: Default::default(),
         }
     }
     pub fn boot_nodes(mut self, boot_nodes: BootNodes) -> Self {
@@ -52,6 +48,3 @@ impl<T> ConfigBuilder<T> {
         }
     }
 }
-
-#[derive(Debug)]
-pub struct WithBootNodes;
