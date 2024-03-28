@@ -90,7 +90,7 @@ impl Display for BootNode {
 }
 
 impl BootNode {
-    pub fn new(addr: Multiaddr, peer_id: PeerId) -> Self {
+    pub const fn new(addr: Multiaddr, peer_id: PeerId) -> Self {
         BootNode { addr, peer_id }
     }
 }

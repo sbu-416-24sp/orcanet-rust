@@ -9,7 +9,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn builder(listener: Multiaddr) -> ConfigBuilder {
+    pub const fn builder(listener: Multiaddr) -> ConfigBuilder {
         ConfigBuilder::new(listener)
     }
 
@@ -30,7 +30,7 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    fn new(listener: Multiaddr) -> Self {
+    const fn new(listener: Multiaddr) -> Self {
         Self {
             boot_nodes: None,
             listener,
