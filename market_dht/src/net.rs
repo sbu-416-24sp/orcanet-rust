@@ -9,7 +9,7 @@ use thiserror::Error;
 use tokio::{runtime::Runtime, sync::oneshot};
 
 use crate::{
-    behaviour::{MarketBehaviour, IDENTIFY_PROTOCOL_NAME},
+    behaviour::{MarketBehaviour, IDENTIFY_PROTOCOL_NAME, KAD_PROTOCOL_NAME},
     config::Config,
     coordinator::Coordinator,
     peer::Peer,
@@ -17,7 +17,10 @@ use crate::{
 
 const BRIDGE_THREAD_NAME: &str = "peer_command_coordinator_netbridge_thread";
 
-pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
+pub fn spawn_bridge(
+    config: Config,
+    bridge_thread_name: String,
+) -> Result<Peer, NetworkBridgeError> {
     let swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
@@ -31,20 +34,19 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
         .with_behaviour(|key| {
             let peer_id = key.public().to_peer_id();
             // TODO: maybe configure something?
-            let config = KadConfig::default();
+            let mut config = KadConfig::default();
+            config.set_protocol_names(vec![KAD_PROTOCOL_NAME]);
             let kad_behaviour =
                 KadBehaviour::with_config(peer_id, MemoryStore::new(peer_id), config);
-            let identify_behaviour = IdentifyBehaviour::new(IdentifyConfig::new(
-                IDENTIFY_PROTOCOL_NAME.to_string(),
-                key.public(),
-            ));
+            let mut config = IdentifyConfig::new(IDENTIFY_PROTOCOL_NAME.to_string(), key.public());
+            let identify_behaviour = IdentifyBehaviour::new(config);
             MarketBehaviour::new(kad_behaviour, identify_behaviour)
         })
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
         .build();
     let (ready_tx, ready_rx) = oneshot::channel();
     thread::Builder::new()
-        .name(BRIDGE_THREAD_NAME.to_string())
+        .name(bridge_thread_name)
         .spawn(move || {
             Runtime::new().unwrap().block_on(async move {
                 let coordinator = Coordinator::new(swarm, config);

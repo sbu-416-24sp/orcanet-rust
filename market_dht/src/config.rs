@@ -36,7 +36,7 @@ impl ConfigBuilder {
             listener,
         }
     }
-    pub fn boot_nodes(mut self, boot_nodes: BootNodes) -> Self {
+    pub fn with_boot_nodes(mut self, boot_nodes: BootNodes) -> Self {
         self.boot_nodes = Some(boot_nodes);
         self
     }

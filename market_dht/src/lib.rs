@@ -7,6 +7,7 @@
 )]
 #![deny(unsafe_code, unreachable_pub)]
 
+pub use libp2p::multiaddr::multiaddr;
 pub use libp2p::Multiaddr;
 pub use libp2p::PeerId;
 

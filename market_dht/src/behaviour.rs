@@ -1,25 +1,29 @@
 use crate::{boot_nodes::BootNodes, Multiaddr, PeerId};
 use libp2p::{
-    identify::Behaviour as IdentifyBehaviour,
+    identify::{self, Behaviour as IdentifyBehaviour},
     kad::{
+        self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour,
+        Behaviour as KadBehaviour, BootstrapOk, QueryResult, QueryStats,
     },
     swarm::NetworkBehaviour,
+    StreamProtocol,
 };
+use log::{error, info, warn};
 use thiserror::Error;
 
-pub(crate) const IDENTIFY_PROTOCOL_NAME: &str = "/ipfs/id/1.0.0";
+pub(crate) const IDENTIFY_PROTOCOL_NAME: &str = "/orcanet/id/1.0.0";
+pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
 
-pub trait KadStore: RecordStore + Send + Sync + 'static {}
+pub(crate) trait KadStore: RecordStore + Send + Sync + 'static {}
 impl KadStore for MemoryStore {}
 
 #[derive(NetworkBehaviour)]
 #[allow(missing_debug_implementations)]
 #[non_exhaustive] // NOTE: maybe more protocols?
 pub(crate) struct MarketBehaviour<TKadStore: KadStore> {
-    pub(crate) kademlia: Kad<TKadStore>,
-    pub(crate) identify: IdentifyBehaviour,
+    kademlia: Kad<TKadStore>,
+    identify: Identify,
 }
 
 impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
@@ -29,7 +33,73 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
     ) -> Self {
         Self {
             kademlia: Kad::new(kademlia),
-            identify,
+            identify: Identify::new(identify),
+        }
+    }
+
+    pub(crate) fn handle_event(&mut self, event: MarketBehaviourEvent<TKadStore>) {
+        match event {
+            MarketBehaviourEvent::Kademlia(event) => {
+                self.handle_kad_event(event);
+            }
+            MarketBehaviourEvent::Identify(event) => self.handle_identify_event(event),
+        }
+    }
+
+    pub(crate) fn bootstrap_with_nodes(&mut self, boot_nodes: BootNodes) -> Result<(), KadError> {
+        self.kademlia.bootstrap_with_nodes(boot_nodes)?;
+        Ok(())
+    }
+
+    pub(crate) fn bootstrap_peer(&mut self) -> Result<(), KadError> {
+        self.kademlia.bootstrap_peer()?;
+        Ok(())
+    }
+
+    fn handle_kad_event(&mut self, KadEvent::Kad(event): KadEvent<TKadStore>) {
+        match event {
+            kad::Event::InboundRequest { request } => todo!(),
+            kad::Event::OutboundQueryProgressed { id, result, .. } => {
+                self.kademlia.handle_outbound_query(id, result);
+            }
+            kad::Event::RoutingUpdated {
+                peer, addresses, ..
+            } => {
+                warn!(
+                    "Routing updated for peer {} with addresses: {addresses:?}",
+                    peer
+                );
+            }
+            kad::Event::UnroutablePeer { peer } => todo!(),
+            kad::Event::RoutablePeer { peer, address } => todo!(),
+            kad::Event::PendingRoutablePeer { peer, address } => todo!(),
+            kad::Event::ModeChanged { new_mode } => todo!(),
+        }
+    }
+
+    fn handle_identify_event(&mut self, IdentifyEvent::Identify(event): IdentifyEvent) {
+        match event {
+            identify::Event::Received {
+                peer_id,
+                info:
+                    identify::Info {
+                        listen_addrs,
+                        protocols,
+                        ..
+                    },
+            } => {
+                warn!("Peer {peer_id} identified with listen addresses: {listen_addrs:?} and protocols: {protocols:?}");
+                if protocols.iter().any(|proto| proto == &KAD_PROTOCOL_NAME) {
+                    for addr in listen_addrs {
+                        self.kademlia.kad.add_address(&peer_id, addr);
+                    }
+                }
+            }
+            identify::Event::Sent { peer_id } => {
+                info!("Sent an identify request to peer {}", peer_id)
+            }
+            identify::Event::Pushed { peer_id, info } => todo!(),
+            identify::Event::Error { peer_id, error } => todo!(),
         }
     }
 }
@@ -39,20 +109,70 @@ pub(crate) struct Kad<TStore> {
     kad: KadBehaviour<TStore>,
 }
 
+#[derive(NetworkBehaviour)]
+pub(crate) struct Identify {
+    identify: IdentifyBehaviour,
+}
+
+impl Identify {
+    #[inline(always)]
+    const fn new(identify: IdentifyBehaviour) -> Self {
+        Self { identify }
+    }
+}
+
 impl<TStore: KadStore> Kad<TStore> {
-    pub(crate) const fn new(kad: KadBehaviour<TStore>) -> Self {
+    const fn new(kad: KadBehaviour<TStore>) -> Self {
         Self { kad }
     }
 
-    pub(crate) fn bootstrap(&mut self, boot_nodes: BootNodes) -> Result<(), KadError> {
+    fn bootstrap_with_nodes(&mut self, boot_nodes: BootNodes) -> Result<(), KadError> {
         for node in boot_nodes {
             self.kad.add_address(&node.peer_id, node.addr);
         }
-        let qid = self
-            .kad
+        self.bootstrap_peer()?;
+        Ok(())
+    }
+
+    fn bootstrap_peer(&mut self) -> Result<(), KadError> {
+        self.kad
             .bootstrap()
             .map_err(|err| KadError::Bootstrap(err.to_string()))?;
         Ok(())
+    }
+
+    fn handle_outbound_query(&mut self, qid: kad::QueryId, result: QueryResult) {
+        match result {
+            QueryResult::Bootstrap(res) => match res {
+                Ok(kad::BootstrapOk {
+                    peer,
+                    num_remaining,
+                }) => {
+                    info!(
+                            "Bootstrap query {qid} succeeded with peer {peer} and {num_remaining} remaining"
+                        );
+                }
+                Err(kad::BootstrapError::Timeout {
+                    peer,
+                    num_remaining,
+                }) => {
+                    if let Some(num_remaining) = num_remaining {
+                        error!(
+                            "Bootstrap query {qid} timed out with peer {peer} and {num_remaining} remaining"
+                        );
+                    } else {
+                        error!("Bootstrap query {qid} timed out with peer {peer}",);
+                    }
+                }
+            },
+            QueryResult::GetClosestPeers(_) => todo!(),
+            QueryResult::GetProviders(_) => todo!(),
+            QueryResult::StartProviding(_) => todo!(),
+            QueryResult::RepublishProvider(_) => todo!(),
+            QueryResult::GetRecord(_) => todo!(),
+            QueryResult::PutRecord(_) => todo!(),
+            QueryResult::RepublishRecord(_) => todo!(),
+        }
     }
 }
 
