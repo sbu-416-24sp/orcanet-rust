@@ -77,14 +77,15 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
                     peer
                 );
             }
-            kad::Event::UnroutablePeer { peer } => {
-                error!("Peer {} is unroutable", peer);
-            }
-            kad::Event::RoutablePeer { peer, address } => todo!(),
-            kad::Event::PendingRoutablePeer { peer, address } => todo!(),
+            // kad::Event::UnroutablePeer { peer } => {
+            //     error!("Peer {} is unroutable", peer);
+            // }
+            // kad::Event::RoutablePeer { peer, address } => todo!(),
+            // kad::Event::PendingRoutablePeer { peer, address } => todo!(),
             kad::Event::ModeChanged { new_mode } => {
                 info!("Kademlia mode changed to {}", new_mode);
             }
+            _ => {}
         }
     }
 
