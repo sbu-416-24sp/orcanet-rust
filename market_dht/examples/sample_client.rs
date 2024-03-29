@@ -1,10 +1,10 @@
 use std::{
-    thread::{self, sleep},
+    thread::{self},
     time::Duration,
 };
 
-use libp2p::Multiaddr;
 use market_dht::{config::Config, multiaddr, net::spawn_bridge};
+use tracing::Level;
 use tracing_log::LogTracer;
 
 fn main() {
@@ -31,6 +31,19 @@ fn main() {
             )
             .build(),
         "peer2".to_owned(),
+    )
+    .unwrap();
+
+    thread::sleep(Duration::from_secs(5));
+    let peer3 = spawn_bridge(
+        Config::builder(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(3333u16)))
+            .with_boot_nodes(
+                vec![("/ip4/127.0.0.1/tcp/5555".to_owned(), peer1_id.to_string())]
+                    .try_into()
+                    .unwrap(),
+            )
+            .build(),
+        "peer3".to_owned(),
     )
     .unwrap();
     thread::sleep(Duration::from_secs(7777777));

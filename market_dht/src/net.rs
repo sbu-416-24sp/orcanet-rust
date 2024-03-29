@@ -1,4 +1,4 @@
-use std::thread;
+use std::{thread, time::Duration};
 
 use libp2p::{
     identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
@@ -16,6 +16,7 @@ use crate::{
 };
 
 const BRIDGE_THREAD_NAME: &str = "peer_command_coordinator_netbridge_thread";
+const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 
 pub fn spawn_bridge(
     config: Config,
@@ -38,11 +39,12 @@ pub fn spawn_bridge(
             config.set_protocol_names(vec![KAD_PROTOCOL_NAME]);
             let kad_behaviour =
                 KadBehaviour::with_config(peer_id, MemoryStore::new(peer_id), config);
-            let mut config = IdentifyConfig::new(IDENTIFY_PROTOCOL_NAME.to_string(), key.public());
+            let config = IdentifyConfig::new(IDENTIFY_PROTOCOL_NAME.to_string(), key.public());
             let identify_behaviour = IdentifyBehaviour::new(config);
             MarketBehaviour::new(kad_behaviour, identify_behaviour)
         })
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
+        .with_swarm_config(|c| c.with_idle_connection_timeout(KEEP_ALIVE_TIMEOUT))
         .build();
     let (ready_tx, ready_rx) = oneshot::channel();
     thread::Builder::new()

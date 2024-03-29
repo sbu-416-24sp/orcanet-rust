@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures::StreamExt;
 use libp2p::{core::ConnectedPoint, kad::store::MemoryStore, swarm::SwarmEvent, Swarm};
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use tokio::{
     sync::{mpsc, oneshot::Sender},
     time,
@@ -15,7 +15,7 @@ use crate::{
     request::Request,
 };
 
-const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(10);
+const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(60 * 5);
 
 pub(crate) struct Coordinator {
     swarm: Swarm<MarketBehaviour<MemoryStore>>,
@@ -54,7 +54,7 @@ impl Coordinator {
                     if let Some(request) = request {
                         self.handle_request(request).await;
                     } else {
-                        debug!("request receiver channel closed, shutting down coordinator");
+                        error!("request receiver channel closed, shutting down coordinator");
                         break;
                     }
                 }
@@ -82,9 +82,7 @@ impl Coordinator {
                 established_in,
                 ..
             } => {
-                info!("[ConnId {connection_id}] - Connection established with peer: {peer_id}");
-                info!("Number of established connections: {num_established}");
-                info!("Established in: {established_in:?}");
+                info!("[ConnId {connection_id}] - Connection established with peer: {peer_id}. Number of established connections: {num_established}. Established in: {established_in:?}");
                 match endpoint {
                     ConnectedPoint::Dialer { address, .. } => {
                         info!("[ConnId {connection_id}] - Dialer connection to: {address}");
@@ -103,9 +101,7 @@ impl Coordinator {
                 num_established,
                 cause,
             } => {
-                warn!("[ConnId {connection_id}] - Connection closed with peer: {peer_id}");
-                warn!("Number of established connections: {num_established}");
-                warn!("Established in: {num_established:?}");
+                warn!("[ConnId {connection_id}] - Connection closed with peer: {peer_id}. Number of established connections: {num_established}.");
                 match endpoint {
                     ConnectedPoint::Dialer { address, .. } => {
                         warn!("[ConnId {connection_id}] - Dialer connection to: {address} ended");
@@ -145,7 +141,13 @@ impl Coordinator {
                 connection_id,
                 peer_id,
                 error,
-            } => todo!(),
+            } => {
+                if let Some(peer_id) = peer_id {
+                    error!("[ConnId {connection_id}] - Outgoing connection to {peer_id} failed with {error}");
+                } else {
+                    error!("[ConnId {connection_id}] - Outgoing connection failed with {error}");
+                }
+            }
             SwarmEvent::NewListenAddr {
                 listener_id,
                 address,
@@ -168,8 +170,11 @@ impl Coordinator {
             } => {
                 warn!("[ConnId {connection_id}] - Dialing peer: {:?}", peer_id);
             }
-            ev => {
-                error!("Unsupported Swarm Event: {ev:?}");
+            SwarmEvent::NewExternalAddrCandidate { address } => {
+                self.swarm.add_external_address(address);
+            }
+            _ => {
+                error!("Unhandled swarm event: {:?}", event);
             }
         }
     }

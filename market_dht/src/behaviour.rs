@@ -4,7 +4,7 @@ use libp2p::{
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour, BootstrapOk, QueryResult, QueryStats,
+        Behaviour as KadBehaviour, BootstrapOk, InboundRequest, QueryResult, QueryStats,
     },
     swarm::NetworkBehaviour,
     StreamProtocol,
@@ -58,8 +58,15 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
 
     fn handle_kad_event(&mut self, KadEvent::Kad(event): KadEvent<TKadStore>) {
         match event {
-            kad::Event::InboundRequest { request } => todo!(),
-            kad::Event::OutboundQueryProgressed { id, result, .. } => {
+            kad::Event::InboundRequest { request } => {
+                self.kademlia.handle_inbound_request(request);
+            }
+            kad::Event::OutboundQueryProgressed {
+                id,
+                result,
+                stats,
+                step,
+            } => {
                 self.kademlia.handle_outbound_query(id, result);
             }
             kad::Event::RoutingUpdated {
@@ -70,10 +77,14 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
                     peer
                 );
             }
-            kad::Event::UnroutablePeer { peer } => todo!(),
+            kad::Event::UnroutablePeer { peer } => {
+                error!("Peer {} is unroutable", peer);
+            }
             kad::Event::RoutablePeer { peer, address } => todo!(),
             kad::Event::PendingRoutablePeer { peer, address } => todo!(),
-            kad::Event::ModeChanged { new_mode } => todo!(),
+            kad::Event::ModeChanged { new_mode } => {
+                info!("Kademlia mode changed to {}", new_mode);
+            }
         }
     }
 
@@ -98,8 +109,12 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
             identify::Event::Sent { peer_id } => {
                 info!("Sent an identify request to peer {}", peer_id)
             }
-            identify::Event::Pushed { peer_id, info } => todo!(),
-            identify::Event::Error { peer_id, error } => todo!(),
+            identify::Event::Pushed { peer_id, info } => {
+                warn!("Pushed identify info to peer {peer_id}: {info:?}")
+            }
+            identify::Event::Error { peer_id, error } => {
+                error!("Error identifying peer {peer_id}: {error}")
+            }
         }
     }
 }
@@ -172,6 +187,31 @@ impl<TStore: KadStore> Kad<TStore> {
             QueryResult::GetRecord(_) => todo!(),
             QueryResult::PutRecord(_) => todo!(),
             QueryResult::RepublishRecord(_) => todo!(),
+        }
+    }
+
+    fn handle_inbound_request(&mut self, request: InboundRequest) {
+        match request {
+            InboundRequest::FindNode { num_closer_peers } => {
+                info!(
+                    "FindNode request handled. Number of closest peers found: {}",
+                    num_closer_peers
+                );
+            }
+            InboundRequest::GetProvider {
+                num_closer_peers,
+                num_provider_peers,
+            } => todo!(),
+            InboundRequest::AddProvider { record } => todo!(),
+            InboundRequest::GetRecord {
+                num_closer_peers,
+                present_locally,
+            } => todo!(),
+            InboundRequest::PutRecord {
+                source,
+                connection,
+                record,
+            } => todo!(),
         }
     }
 }
