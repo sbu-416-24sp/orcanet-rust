@@ -12,10 +12,10 @@ use crate::{Multiaddr, PeerId};
 pub struct BootNodes(pub(crate) Vec<BootNode>);
 
 impl BootNodes {
-    pub fn new<TErr, TNode, TIter>(iter: TIter) -> Result<Self, NodesError>
+    pub fn new<TNode, TIter>(iter: TIter) -> Result<Self, NodesError>
     where
-        TNode: TryInto<BootNode, Error = TErr>,
-        TErr: StdError + Send + Sync,
+        TNode: TryInto<BootNode>,
+        TNode::Error: StdError + Send + Sync + 'static,
         TIter: IntoIterator<Item = TNode>,
     {
         let boot_nodes = iter
@@ -35,6 +35,12 @@ impl BootNodes {
         BootNodesIter {
             inner: self.0.iter(),
         }
+    }
+}
+
+impl From<BootNodes> for Vec<BootNode> {
+    fn from(value: BootNodes) -> Self {
+        value.0
     }
 }
 
@@ -65,10 +71,10 @@ impl IntoIterator for BootNodes {
     }
 }
 
-impl<T, E> TryFrom<Vec<T>> for BootNodes
+impl<T> TryFrom<Vec<T>> for BootNodes
 where
-    E: StdError + Send + Sync,
-    T: TryInto<BootNode, Error = E>,
+    T: TryInto<BootNode>,
+    T::Error: StdError + Send + Sync + 'static,
 {
     type Error = NodesError;
 

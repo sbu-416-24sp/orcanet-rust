@@ -4,8 +4,8 @@ use crate::Multiaddr;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Config {
-    boot_nodes: Option<BootNodes>,
-    listener: Multiaddr,
+    pub(crate) boot_nodes: Option<BootNodes>,
+    pub(crate) listener: Multiaddr,
 }
 
 impl Config {
