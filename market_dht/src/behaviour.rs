@@ -1,10 +1,10 @@
-use crate::{boot_nodes::BootNodes, Multiaddr, PeerId};
+use crate::boot_nodes::BootNodes;
 use libp2p::{
     identify::{self, Behaviour as IdentifyBehaviour},
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour, BootstrapOk, InboundRequest, QueryResult, QueryStats,
+        Behaviour as KadBehaviour, InboundRequest, QueryResult,
     },
     swarm::NetworkBehaviour,
     StreamProtocol,
@@ -40,26 +40,79 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
     pub(crate) fn handle_event(&mut self, event: MarketBehaviourEvent<TKadStore>) {
         match event {
             MarketBehaviourEvent::Kademlia(event) => {
-                self.handle_kad_event(event);
+                self.kademlia.handle_kad_event(event);
             }
-            MarketBehaviourEvent::Identify(event) => self.handle_identify_event(event),
+            MarketBehaviourEvent::Identify(event) => self
+                .identify
+                .handle_identify_event(event, &mut self.kademlia),
         }
     }
 
-    pub(crate) fn bootstrap_with_nodes(&mut self, boot_nodes: BootNodes) -> Result<(), KadError> {
-        self.kademlia.bootstrap_with_nodes(boot_nodes)?;
-        Ok(())
+    pub(crate) fn bootstrap(&mut self, mode: BootstrapMode) -> Result<(), KadError> {
+        self.kademlia.bootstrap(mode)
+    }
+}
+
+#[derive(NetworkBehaviour)]
+pub(crate) struct Kad<TKadStore> {
+    kad: KadBehaviour<TKadStore>,
+}
+
+#[derive(NetworkBehaviour)]
+pub(crate) struct Identify {
+    identify: IdentifyBehaviour,
+}
+
+impl Identify {
+    #[inline(always)]
+    const fn new(identify: IdentifyBehaviour) -> Self {
+        Self { identify }
     }
 
-    pub(crate) fn bootstrap_peer(&mut self) -> Result<(), KadError> {
-        self.kademlia.bootstrap_peer()?;
-        Ok(())
+    fn handle_identify_event<TKadStore: KadStore>(
+        &mut self,
+        IdentifyEvent::Identify(event): IdentifyEvent,
+        kademlia: &mut Kad<TKadStore>,
+    ) {
+        match event {
+            identify::Event::Received {
+                peer_id,
+                info:
+                    identify::Info {
+                        listen_addrs,
+                        protocols,
+                        ..
+                    },
+            } => {
+                warn!("Peer {peer_id} identified with listen addresses: {listen_addrs:?} and protocols: {protocols:?}");
+                if protocols.iter().any(|proto| proto == &KAD_PROTOCOL_NAME) {
+                    for addr in listen_addrs {
+                        kademlia.kad.add_address(&peer_id, addr);
+                    }
+                }
+            }
+            identify::Event::Sent { peer_id } => {
+                info!("Sent an identify request to peer {}", peer_id)
+            }
+            identify::Event::Pushed { peer_id, info } => {
+                warn!("Pushed identify info to peer {peer_id}: {info:?}")
+            }
+            identify::Event::Error { peer_id, error } => {
+                error!("Error identifying peer {peer_id}: {error}")
+            }
+        }
+    }
+}
+
+impl<TKadStore: KadStore> Kad<TKadStore> {
+    const fn new(kad: KadBehaviour<TKadStore>) -> Self {
+        Self { kad }
     }
 
     fn handle_kad_event(&mut self, KadEvent::Kad(event): KadEvent<TKadStore>) {
         match event {
             kad::Event::InboundRequest { request } => {
-                self.kademlia.handle_inbound_request(request);
+                self.handle_inbound_request(request);
             }
             kad::Event::OutboundQueryProgressed {
                 id,
@@ -67,7 +120,7 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
                 stats,
                 step,
             } => {
-                self.kademlia.handle_outbound_query(id, result);
+                self.handle_outbound_query(id, result);
             }
             kad::Event::RoutingUpdated {
                 peer, addresses, ..
@@ -89,65 +142,16 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
         }
     }
 
-    fn handle_identify_event(&mut self, IdentifyEvent::Identify(event): IdentifyEvent) {
-        match event {
-            identify::Event::Received {
-                peer_id,
-                info:
-                    identify::Info {
-                        listen_addrs,
-                        protocols,
-                        ..
-                    },
-            } => {
-                warn!("Peer {peer_id} identified with listen addresses: {listen_addrs:?} and protocols: {protocols:?}");
-                if protocols.iter().any(|proto| proto == &KAD_PROTOCOL_NAME) {
-                    for addr in listen_addrs {
-                        self.kademlia.kad.add_address(&peer_id, addr);
-                    }
+    fn bootstrap(&mut self, mode: BootstrapMode) -> Result<(), KadError> {
+        Ok(match mode {
+            BootstrapMode::WithNodes(boot_nodes) => {
+                for node in boot_nodes {
+                    self.kad.add_address(&node.peer_id, node.addr);
                 }
+                self.bootstrap_peer()?
             }
-            identify::Event::Sent { peer_id } => {
-                info!("Sent an identify request to peer {}", peer_id)
-            }
-            identify::Event::Pushed { peer_id, info } => {
-                warn!("Pushed identify info to peer {peer_id}: {info:?}")
-            }
-            identify::Event::Error { peer_id, error } => {
-                error!("Error identifying peer {peer_id}: {error}")
-            }
-        }
-    }
-}
-
-#[derive(NetworkBehaviour)]
-pub(crate) struct Kad<TStore> {
-    kad: KadBehaviour<TStore>,
-}
-
-#[derive(NetworkBehaviour)]
-pub(crate) struct Identify {
-    identify: IdentifyBehaviour,
-}
-
-impl Identify {
-    #[inline(always)]
-    const fn new(identify: IdentifyBehaviour) -> Self {
-        Self { identify }
-    }
-}
-
-impl<TStore: KadStore> Kad<TStore> {
-    const fn new(kad: KadBehaviour<TStore>) -> Self {
-        Self { kad }
-    }
-
-    fn bootstrap_with_nodes(&mut self, boot_nodes: BootNodes) -> Result<(), KadError> {
-        for node in boot_nodes {
-            self.kad.add_address(&node.peer_id, node.addr);
-        }
-        self.bootstrap_peer()?;
-        Ok(())
+            BootstrapMode::WithoutNodes => self.bootstrap_peer()?,
+        })
     }
 
     fn bootstrap_peer(&mut self) -> Result<(), KadError> {
@@ -221,4 +225,10 @@ impl<TStore: KadStore> Kad<TStore> {
 pub(crate) enum KadError {
     #[error("Failed to bootstrap Kademlia: {0}")]
     Bootstrap(String),
+}
+
+#[derive(Debug)]
+pub(crate) enum BootstrapMode {
+    WithNodes(BootNodes),
+    WithoutNodes,
 }

@@ -46,5 +46,19 @@ fn main() {
         "peer3".to_owned(),
     )
     .unwrap();
+
+    thread::sleep(Duration::from_secs(3));
+    let peer3_id = peer3.id();
+    let peer4 = spawn_bridge(
+        Config::builder(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(22222u16)))
+            .with_boot_nodes(
+                vec![("/ip4/127.0.0.1/tcp/3333".to_owned(), peer3_id.to_string())]
+                    .try_into()
+                    .unwrap(),
+            )
+            .build(),
+        "peer4".to_owned(),
+    )
+    .unwrap();
     thread::sleep(Duration::from_secs(7777777));
 }
