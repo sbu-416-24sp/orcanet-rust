@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use libp2p::{
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour, InboundRequest, QueryResult,
+        Behaviour as KadBehaviour, InboundRequest, QueryId, QueryResult,
     },
     swarm::NetworkBehaviour,
     StreamProtocol,
@@ -10,24 +12,25 @@ use libp2p::{
 use log::{error, info, warn};
 use thiserror::Error;
 
-use crate::boot_nodes::BootNodes;
+use crate::{
+    boot_nodes::BootNodes,
+    request::{RequestData, RequestHandler},
+};
 
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
-
 pub(crate) trait KadStore: RecordStore + Send + Sync + 'static {}
-impl KadStore for MemoryStore {}
 
-#[derive(NetworkBehaviour)]
-pub(crate) struct Kad<TKadStore> {
-    pub(crate) kad: KadBehaviour<TKadStore>,
+#[derive(Debug, Default)]
+pub(crate) struct KadHandler {
+    pending_queries: HashMap<QueryId, RequestHandler>,
 }
 
-impl<TKadStore: KadStore> Kad<TKadStore> {
-    pub(crate) const fn new(kad: KadBehaviour<TKadStore>) -> Self {
-        Self { kad }
-    }
-
-    pub(crate) fn handle_kad_event(&mut self, KadEvent::Kad(event): KadEvent<TKadStore>) {
+impl KadHandler {
+    pub(crate) fn handle_kad_event<TKadStore: KadStore>(
+        &mut self,
+        kad: &mut Kad<TKadStore>,
+        KadEvent::Kad(event): KadEvent<TKadStore>,
+    ) {
         match event {
             kad::Event::InboundRequest { request } => {
                 self.handle_inbound_request(request);
@@ -38,7 +41,7 @@ impl<TKadStore: KadStore> Kad<TKadStore> {
                 stats,
                 step,
             } => {
-                self.handle_outbound_query(id, result);
+                self.handle_outbound_query(kad, id, result);
             }
             kad::Event::RoutingUpdated {
                 peer, addresses, ..
@@ -48,31 +51,24 @@ impl<TKadStore: KadStore> Kad<TKadStore> {
                     peer
                 );
             }
+            kad::Event::ModeChanged { new_mode } => {
+                info!("Kademlia mode changed to {}", new_mode);
+            }
             // kad::Event::UnroutablePeer { peer } => {
             //     error!("Peer {} is unroutable", peer);
             // }
             // kad::Event::RoutablePeer { peer, address } => todo!(),
             // kad::Event::PendingRoutablePeer { peer, address } => todo!(),
-            kad::Event::ModeChanged { new_mode } => {
-                info!("Kademlia mode changed to {}", new_mode);
-            }
             _ => {}
         }
     }
 
-    pub(crate) fn bootstrap(&mut self, mode: BootstrapMode) -> Result<(), KadError> {
-        if let BootstrapMode::WithNodes(boot_nodes) = mode {
-            for node in boot_nodes {
-                self.kad.add_address(&node.peer_id, node.addr);
-            }
-        }
-        self.kad
-            .bootstrap()
-            .map_err(|err| KadError::Bootstrap(err.to_string()))?;
-        Ok(())
-    }
-
-    fn handle_outbound_query(&mut self, qid: kad::QueryId, result: QueryResult) {
+    fn handle_outbound_query<TKadStore: KadStore>(
+        &mut self,
+        kad: &mut Kad<TKadStore>,
+        qid: kad::QueryId,
+        result: QueryResult,
+    ) {
         match result {
             QueryResult::Bootstrap(res) => match res {
                 Ok(kad::BootstrapOk {
@@ -132,6 +128,38 @@ impl<TKadStore: KadStore> Kad<TKadStore> {
     }
 }
 
+#[derive(NetworkBehaviour)]
+pub(crate) struct Kad<TKadStore> {
+    kad: KadBehaviour<TKadStore>,
+}
+
+impl<TKadStore: KadStore> Kad<TKadStore> {
+    pub(crate) const fn new(kad: KadBehaviour<TKadStore>) -> Self {
+        Self { kad }
+    }
+
+    pub(crate) fn bootstrap(&mut self, mode: BootstrapMode) -> Result<(), KadError> {
+        if let BootstrapMode::WithNodes(boot_nodes) = mode {
+            for node in boot_nodes {
+                self.kad.add_address(&node.peer_id, node.addr);
+            }
+        }
+        self.kad
+            .bootstrap()
+            .map_err(|err| KadError::Bootstrap(err.to_string()))?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub(crate) const fn kad(&self) -> &KadBehaviour<TKadStore> {
+        &self.kad
+    }
+
+    pub(crate) fn kad_mut(&mut self) -> &mut KadBehaviour<TKadStore> {
+        &mut self.kad
+    }
+}
+
 #[derive(Debug, Error)]
 pub(crate) enum KadError {
     #[error("Failed to bootstrap Kademlia: {0}")]
@@ -143,3 +171,5 @@ pub(crate) enum BootstrapMode {
     WithNodes(BootNodes),
     WithoutNodes,
 }
+
+impl KadStore for MemoryStore {}

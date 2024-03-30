@@ -15,7 +15,7 @@ use crate::{
     peer::Peer,
 };
 
-const BRIDGE_THREAD_NAME: &str = "peer_command_coordinator_netbridge_thread";
+const BRIDGE_THREAD_NAME: &str = "coordinator_netbridge_thread";
 const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 
 pub fn spawn_bridge(
@@ -47,8 +47,12 @@ pub fn spawn_bridge(
         .with_swarm_config(|c| c.with_idle_connection_timeout(KEEP_ALIVE_TIMEOUT))
         .build();
     let (ready_tx, ready_rx) = oneshot::channel();
+    // NOTE: this thread places the coordinator in a static context assuming the
+    // thread lives for program life
+    //
+    // TODO: Remove the bridge thread name argument later
     thread::Builder::new()
-        .name(bridge_thread_name)
+        .name(bridge_thread_name + "-" + BRIDGE_THREAD_NAME)
         .spawn(move || {
             Runtime::new().unwrap().block_on(async move {
                 let coordinator = Coordinator::new(swarm, config);

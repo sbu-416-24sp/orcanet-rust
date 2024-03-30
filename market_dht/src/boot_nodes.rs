@@ -8,6 +8,8 @@ use thiserror::Error;
 
 use crate::{Multiaddr, PeerId};
 
+// FIXIT: fix the generic types here and can prob be more modular
+
 #[derive(Debug, Clone)]
 pub struct BootNodes(pub(crate) Vec<BootNode>);
 

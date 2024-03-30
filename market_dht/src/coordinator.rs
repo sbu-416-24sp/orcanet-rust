@@ -9,16 +9,22 @@ use tokio::{
 };
 
 use crate::{
-    behaviour::{kademlia::BootstrapMode, MarketBehaviour, MarketBehaviourEvent},
+    behaviour::{
+        ident::IdentifyHandler,
+        kademlia::{BootstrapMode, KadHandler},
+        MarketBehaviour, MarketBehaviourEvent,
+    },
     config::Config,
     peer::Peer,
-    request::Request,
+    request::{RequestData, RequestHandler, ResponseData},
 };
 
 const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(60 * 30);
 
 pub(crate) struct Coordinator {
     swarm: Swarm<MarketBehaviour<MemoryStore>>,
+    kad_handler: KadHandler,
+    identify_handler: IdentifyHandler,
 }
 
 impl Coordinator {
@@ -27,16 +33,34 @@ impl Coordinator {
         if let Some(boot_nodes) = config.boot_nodes {
             swarm
                 .behaviour_mut()
+                .kademlia_mut()
                 .bootstrap(BootstrapMode::WithNodes(boot_nodes))
                 .expect("initial bootstrap to work");
         }
-        Self { swarm }
+        Self {
+            swarm,
+            kad_handler: Default::default(),
+            identify_handler: Default::default(),
+        }
+    }
+
+    fn handle_event(&mut self, event: MarketBehaviourEvent<MemoryStore>) {
+        match event {
+            MarketBehaviourEvent::Kademlia(event) => {
+                self.kad_handler
+                    .handle_kad_event(self.swarm.behaviour_mut().kademlia_mut(), event);
+            }
+            MarketBehaviourEvent::Identify(event) => self
+                .identify_handler
+                .handle_identify_event(event, self.swarm.behaviour_mut().kademlia_mut()),
+        }
     }
 
     fn handle_bootstrap_refresh(&mut self) {
         if let Err(err) = self
             .swarm
             .behaviour_mut()
+            .kademlia_mut()
             .bootstrap(BootstrapMode::WithoutNodes)
         {
             error!("Failed to bootstrap peer: {}", err);
@@ -46,8 +70,8 @@ impl Coordinator {
     pub(crate) async fn run(mut self, ready_tx: Sender<Peer>) {
         let (request_tx, mut request_rx) = mpsc::unbounded_channel();
         let peer = Peer::new(request_tx, *self.swarm.local_peer_id());
-        ready_tx.send(peer).unwrap();
         let mut bootstrap_refresh_interval = time::interval(BOOTSTRAP_REFRESH_INTERVAL);
+        ready_tx.send(peer).unwrap();
 
         loop {
             tokio::select! {
@@ -69,14 +93,24 @@ impl Coordinator {
         }
     }
 
-    async fn handle_request(&mut self, request: Request) {
-        match request {}
+    async fn handle_request(&mut self, request: RequestHandler) {
+        match request.request_data {
+            RequestData::GetAllListeners => {
+                let listeners = self.swarm.listeners().cloned().collect::<Vec<_>>();
+                request.respond(ResponseData::GetAllListeners { listeners });
+            }
+            RequestData::GetConnectedPeers => todo!(),
+            RequestData::IsConnectedTo(peer_id) => {
+                let is_connected = self.swarm.is_connected(&peer_id);
+                request.respond(ResponseData::IsConnectedTo { is_connected });
+            }
+        }
     }
 
     async fn handle_swarm_event(&mut self, event: SwarmEvent<MarketBehaviourEvent<MemoryStore>>) {
         match event {
             SwarmEvent::Behaviour(event) => {
-                self.swarm.behaviour_mut().handle_event(event);
+                self.handle_event(event);
             }
             SwarmEvent::ConnectionEstablished {
                 peer_id,

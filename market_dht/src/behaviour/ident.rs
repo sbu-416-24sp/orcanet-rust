@@ -10,17 +10,10 @@ use super::kademlia::{Kad, KadStore};
 
 pub(crate) const IDENTIFY_PROTOCOL_NAME: &str = "/orcanet/id/1.0.0";
 
-#[derive(NetworkBehaviour)]
-pub(crate) struct Identify {
-    identify: IdentifyBehaviour,
-}
+#[derive(Debug, Default)]
+pub(crate) struct IdentifyHandler {}
 
-impl Identify {
-    #[inline(always)]
-    pub(crate) const fn new(identify: IdentifyBehaviour) -> Self {
-        Self { identify }
-    }
-
+impl IdentifyHandler {
     pub(crate) fn handle_identify_event<TKadStore: KadStore>(
         &mut self,
         IdentifyEvent::Identify(event): IdentifyEvent,
@@ -39,7 +32,7 @@ impl Identify {
                 warn!("Peer {peer_id} identified with listen addresses: {listen_addrs:?} and protocols: {protocols:?}");
                 if protocols.iter().any(|proto| proto == &KAD_PROTOCOL_NAME) {
                     for addr in listen_addrs {
-                        kademlia.kad.add_address(&peer_id, addr);
+                        kademlia.kad_mut().add_address(&peer_id, addr);
                     }
                 }
             }
@@ -53,5 +46,17 @@ impl Identify {
                 error!("Error identifying peer {peer_id}: {error}")
             }
         }
+    }
+}
+
+#[derive(NetworkBehaviour)]
+pub(crate) struct Identify {
+    identify: IdentifyBehaviour,
+}
+
+impl Identify {
+    #[inline(always)]
+    pub(crate) const fn new(identify: IdentifyBehaviour) -> Self {
+        Self { identify }
     }
 }

@@ -5,7 +5,7 @@ use libp2p::{
 
 use self::{
     ident::Identify,
-    kademlia::{BootstrapMode, Kad, KadError, KadStore},
+    kademlia::{Kad, KadStore},
 };
 
 #[derive(NetworkBehaviour)]
@@ -17,6 +17,7 @@ pub(crate) struct MarketBehaviour<TKadStore: KadStore> {
 }
 
 impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
+    #[inline(always)]
     pub(crate) const fn new(
         kademlia: KadBehaviour<TKadStore>,
         identify: IdentifyBehaviour,
@@ -27,19 +28,23 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
         }
     }
 
-    pub(crate) fn handle_event(&mut self, event: MarketBehaviourEvent<TKadStore>) {
-        match event {
-            MarketBehaviourEvent::Kademlia(event) => {
-                self.kademlia.handle_kad_event(event);
-            }
-            MarketBehaviourEvent::Identify(event) => self
-                .identify
-                .handle_identify_event(event, &mut self.kademlia),
-        }
+    #[allow(dead_code)]
+    pub(crate) const fn kademlia(&self) -> &Kad<TKadStore> {
+        &self.kademlia
     }
 
-    pub(crate) fn bootstrap(&mut self, mode: BootstrapMode) -> Result<(), KadError> {
-        self.kademlia.bootstrap(mode)
+    pub(crate) fn kademlia_mut(&mut self) -> &mut Kad<TKadStore> {
+        &mut self.kademlia
+    }
+
+    #[allow(dead_code)]
+    pub(crate) const fn identify(&self) -> &Identify {
+        &self.identify
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn identify_mut(&mut self) -> &mut Identify {
+        &mut self.identify
     }
 }
 
