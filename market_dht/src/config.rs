@@ -2,11 +2,14 @@ use crate::boot_nodes::BootNodes;
 use crate::multiaddr;
 use crate::Multiaddr;
 
+const BRIDGE_THREAD_NAME: &str = "coordinator_netbridge_thread";
+
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Config {
     pub(crate) boot_nodes: Option<BootNodes>,
     pub(crate) listener: Multiaddr,
+    pub(crate) thread_name: String,
 }
 
 impl Config {
@@ -21,6 +24,10 @@ impl Config {
     pub const fn listener(&self) -> &Multiaddr {
         &self.listener
     }
+
+    pub fn thread_name(&self) -> &str {
+        &self.thread_name
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +35,7 @@ impl Config {
 pub struct ConfigBuilder {
     boot_nodes: Option<BootNodes>,
     listener: Option<Multiaddr>,
+    thread_name: Option<String>,
 }
 
 impl ConfigBuilder {
@@ -35,6 +43,7 @@ impl ConfigBuilder {
         Self {
             boot_nodes: None,
             listener: None,
+            thread_name: None,
         }
     }
 
@@ -48,12 +57,20 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn with_thread_name(mut self, thread_name: String) -> Self {
+        self.thread_name = Some(thread_name);
+        self
+    }
+
     pub fn build(self) -> Config {
         Config {
             boot_nodes: self.boot_nodes,
             listener: self
                 .listener
                 .unwrap_or(multiaddr!(Ip4([0, 0, 0, 0]), Tcp(0u16))),
+            thread_name: self
+                .thread_name
+                .unwrap_or_else(|| BRIDGE_THREAD_NAME.to_owned()),
         }
     }
 }

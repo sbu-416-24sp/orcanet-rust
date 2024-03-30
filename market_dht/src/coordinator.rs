@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use futures::StreamExt;
-use libp2p::{kad::store::MemoryStore, swarm::SwarmEvent, Swarm};
+use libp2p::{kad::store::MemoryStore, swarm::SwarmEvent, Multiaddr, Swarm};
 use log::{error, info, warn};
 use tokio::{
     sync::{mpsc, oneshot::Sender},
@@ -14,6 +14,7 @@ use crate::{
         kademlia::{BootstrapMode, KadHandler},
         MarketBehaviour, MarketBehaviourEvent,
     },
+    boot_nodes::BootNodes,
     config::Config,
     peer::Peer,
     req_res::{RequestData, RequestHandler, ResponseData},
@@ -28,9 +29,13 @@ pub(crate) struct Coordinator {
 }
 
 impl Coordinator {
-    pub(crate) fn new(mut swarm: Swarm<MarketBehaviour<MemoryStore>>, config: Config) -> Self {
-        swarm.listen_on(config.listener).expect("listen_on to work");
-        if let Some(boot_nodes) = config.boot_nodes {
+    pub(crate) fn new(
+        mut swarm: Swarm<MarketBehaviour<MemoryStore>>,
+        listen_addr: Multiaddr,
+        boot_nodes: Option<BootNodes>,
+    ) -> Self {
+        swarm.listen_on(listen_addr).expect("listen_on to work");
+        if let Some(boot_nodes) = boot_nodes {
             swarm
                 .behaviour_mut()
                 .kademlia_mut()

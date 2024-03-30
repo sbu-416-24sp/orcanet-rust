@@ -107,7 +107,7 @@ impl KadHandler {
                             "Bootstrap query {qid} timed out with peer {peer} and {num_remaining} remaining"
                         );
                     } else {
-                        error!("Bootstrap query {qid} timed out with peer {peer}",);
+                        error!("Bootstrap query {qid} timed out with peer {peer}");
                     }
                 }
             },
