@@ -64,5 +64,6 @@ fn main() {
         "peer4".to_owned(),
     )
     .unwrap();
+    thread::sleep(Duration::from_secs(3));
     thread::sleep(Duration::from_secs(7777777));
 }

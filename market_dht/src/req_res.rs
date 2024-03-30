@@ -1,29 +1,31 @@
+use anyhow::Result;
 use libp2p::{Multiaddr, PeerId};
 use tokio::sync::oneshot::{self, error::RecvError};
 
+pub(crate) type Response = Result<ResponseData>;
+pub(crate) type Request = (RequestData, RequestHandler);
+
 #[derive(Debug)]
 pub(crate) struct ResponseHandler {
-    inner: oneshot::Receiver<ResponseData>,
+    inner: oneshot::Receiver<Response>,
 }
 
 impl ResponseHandler {
-    pub(crate) async fn get_response_data(self) -> Result<ResponseData, RecvError> {
-        self.inner.await
+    pub(crate) async fn get_response_data(self) -> Response {
+        self.inner.await?
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct RequestHandler {
-    pub(crate) request_data: RequestData,
-    inner: oneshot::Sender<ResponseData>,
+    inner: oneshot::Sender<Response>,
 }
 
 impl RequestHandler {
-    pub(crate) fn new(request_data: RequestData) -> (Self, ResponseHandler) {
+    pub(crate) fn new() -> (Self, ResponseHandler) {
         let (response_sender, response_receiver) = tokio::sync::oneshot::channel();
         (
             Self {
-                request_data,
                 inner: response_sender,
             },
             ResponseHandler {
@@ -32,7 +34,7 @@ impl RequestHandler {
         )
     }
 
-    pub(crate) fn respond(self, response: ResponseData) {
+    pub(crate) fn respond(self, response: Response) {
         self.inner
             .send(response)
             .expect("it to send since oneshot client should not have dropped")
@@ -45,6 +47,7 @@ pub(crate) enum RequestData {
     GetAllListeners,
     GetConnectedPeers,
     IsConnectedTo(PeerId),
+    KadRequest(KadRequestData),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -53,6 +56,17 @@ pub enum ResponseData {
     // NOTE: the vec is useful for now when we add functionality for users being able to add
     // listeners?
     GetAllListeners { listeners: Vec<Multiaddr> },
-    GetConnectedPeers,
+    GetConnectedPeers { connected_peers: Vec<PeerId> },
     IsConnectedTo { is_connected: bool },
+    KadResponse(KadResponseData),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum KadRequestData {
+    GetClosestLocalPeers { key: Vec<u8> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum KadResponseData {
+    GetClosestLocalPeers { peers: Vec<PeerId> },
 }

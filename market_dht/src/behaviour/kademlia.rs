@@ -4,17 +4,17 @@ use libp2p::{
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour, InboundRequest, QueryId, QueryResult,
+        Behaviour as KadBehaviour, InboundRequest, KBucketKey, QueryId, QueryResult, RecordKey,
     },
     swarm::NetworkBehaviour,
-    StreamProtocol,
+    PeerId, StreamProtocol,
 };
 use log::{error, info, warn};
 use thiserror::Error;
 
 use crate::{
     boot_nodes::BootNodes,
-    request::{RequestData, RequestHandler},
+    req_res::{self, KadRequestData, KadResponseData, RequestData, RequestHandler, ResponseData},
 };
 
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
@@ -26,6 +26,25 @@ pub(crate) struct KadHandler {
 }
 
 impl KadHandler {
+    pub(crate) async fn handle_kad_request<TKadStore: KadStore>(
+        &mut self,
+        kad: &mut Kad<TKadStore>,
+        request_handler: RequestHandler,
+        request: KadRequestData,
+    ) {
+        match request {
+            KadRequestData::GetClosestLocalPeers { key } => {
+                let peers = kad
+                    .kad
+                    .get_closest_local_peers(&key.into())
+                    .map(|key| key.into_preimage())
+                    .collect::<Vec<PeerId>>();
+                request_handler.respond(Ok(ResponseData::KadResponse(
+                    KadResponseData::GetClosestLocalPeers { peers },
+                )));
+            }
+        }
+    }
     pub(crate) fn handle_kad_event<TKadStore: KadStore>(
         &mut self,
         kad: &mut Kad<TKadStore>,

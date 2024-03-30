@@ -16,7 +16,7 @@ use crate::{
     },
     config::Config,
     peer::Peer,
-    request::{RequestData, RequestHandler, ResponseData},
+    req_res::{RequestData, RequestHandler, ResponseData},
 };
 
 const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(60 * 30);
@@ -80,7 +80,7 @@ impl Coordinator {
                 }
                 request = request_rx.recv() => {
                     if let Some(request) = request {
-                        self.handle_request(request).await;
+                        self.handle_request(request.0, request.1).await;
                     } else {
                         error!("request receiver channel closed, shutting down coordinator");
                         break;
@@ -93,16 +93,28 @@ impl Coordinator {
         }
     }
 
-    async fn handle_request(&mut self, request: RequestHandler) {
-        match request.request_data {
+    async fn handle_request(&mut self, request_data: RequestData, request_handler: RequestHandler) {
+        match request_data {
             RequestData::GetAllListeners => {
                 let listeners = self.swarm.listeners().cloned().collect::<Vec<_>>();
-                request.respond(ResponseData::GetAllListeners { listeners });
+                request_handler.respond(Ok(ResponseData::GetAllListeners { listeners }));
             }
-            RequestData::GetConnectedPeers => todo!(),
+            RequestData::GetConnectedPeers => {
+                let connected_peers = self.swarm.connected_peers().cloned().collect::<Vec<_>>();
+                request_handler.respond(Ok(ResponseData::GetConnectedPeers { connected_peers }));
+            }
             RequestData::IsConnectedTo(peer_id) => {
                 let is_connected = self.swarm.is_connected(&peer_id);
-                request.respond(ResponseData::IsConnectedTo { is_connected });
+                request_handler.respond(Ok(ResponseData::IsConnectedTo { is_connected }));
+            }
+            RequestData::KadRequest(request) => {
+                self.kad_handler
+                    .handle_kad_request(
+                        self.swarm.behaviour_mut().kademlia_mut(),
+                        request_handler,
+                        request,
+                    )
+                    .await;
             }
         }
     }
