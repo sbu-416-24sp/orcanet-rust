@@ -101,11 +101,11 @@ impl Coordinator {
         match request_data {
             RequestData::GetAllListeners => {
                 let listeners = self.swarm.listeners().cloned().collect::<Vec<_>>();
-                request_handler.respond(Ok(ResponseData::GetAllListeners { listeners }));
+                request_handler.respond(Ok(ResponseData::AllListeners { listeners }));
             }
             RequestData::GetConnectedPeers => {
                 let connected_peers = self.swarm.connected_peers().cloned().collect::<Vec<_>>();
-                request_handler.respond(Ok(ResponseData::GetConnectedPeers { connected_peers }));
+                request_handler.respond(Ok(ResponseData::ConnectedPeers { connected_peers }));
             }
             RequestData::IsConnectedTo(peer_id) => {
                 let is_connected = self.swarm.is_connected(&peer_id);

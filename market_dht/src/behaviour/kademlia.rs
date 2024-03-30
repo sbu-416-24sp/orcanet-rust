@@ -4,8 +4,8 @@ use libp2p::{
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour, GetClosestPeersError, GetClosestPeersOk, InboundRequest,
-        ProgressStep, QueryId, QueryResult, QueryStats,
+        Behaviour as KadBehaviour, GetClosestPeersError, GetClosestPeersOk, GetRecordOk,
+        InboundRequest, PeerRecord, ProgressStep, QueryId, QueryResult, QueryStats,
     },
     swarm::NetworkBehaviour,
     PeerId, StreamProtocol,
@@ -35,17 +35,21 @@ impl KadHandler {
         request: KadRequestData,
     ) {
         match request {
-            KadRequestData::GetClosestLocalPeers { key } => {
+            KadRequestData::ClosestLocalPeers { key } => {
                 let peers = kad
                     .get_closest_local_peers(&key.into())
                     .map(|key| key.into_preimage())
                     .collect::<Vec<PeerId>>();
                 request_handler.respond(Ok(ResponseData::KadResponse(
-                    KadResponseData::GetClosestLocalPeers { peers },
+                    KadResponseData::ClosestLocalPeers { peers },
                 )));
             }
-            KadRequestData::GetClosestPeers { key } => {
+            KadRequestData::ClosestPeers { key } => {
                 let qid = kad.get_closest_peers(key);
+                self.pending_queries.insert(qid, request_handler);
+            }
+            KadRequestData::GetFile { key } => {
+                let qid = kad.get_record(key.into());
                 self.pending_queries.insert(qid, request_handler);
             }
         }
@@ -124,9 +128,12 @@ impl KadHandler {
                 if step.last {
                     let response = {
                         match result {
-                            Ok(GetClosestPeersOk { key, peers }) => Ok(ResponseData::KadResponse(
-                                KadResponseData::GetClosestPeers { key, peers },
-                            )),
+                            Ok(GetClosestPeersOk { key, peers }) => {
+                                Ok(ResponseData::KadResponse(KadResponseData::ClosestPeers {
+                                    key,
+                                    peers,
+                                }))
+                            }
                             Err(err) => Err(err.into()),
                         }
                     };
@@ -136,7 +143,27 @@ impl KadHandler {
             QueryResult::GetProviders(_) => todo!(),
             QueryResult::StartProviding(_) => todo!(),
             QueryResult::RepublishProvider(_) => todo!(),
-            QueryResult::GetRecord(_) => todo!(),
+            QueryResult::GetRecord(record) => {
+                match record {
+                    Ok(ok) => match ok {
+                        GetRecordOk::FoundRecord(PeerRecord { peer, record }) => {
+                            info!("Record found for peer {peer:?} with record {record:?}");
+                            get_and_send!(
+                                self.pending_queries,
+                                qid,
+                                Ok(ResponseData::KadResponse(KadResponseData::GetFile { peer }))
+                            );
+                        }
+                        GetRecordOk::FinishedWithNoAdditionalRecord { cache_candidates } => {
+                            todo!()
+                        }
+                    },
+                    Err(err) => {
+                        error!("Error getting record: {err}");
+                        get_and_send!(self.pending_queries, qid, Err(err.into()));
+                    }
+                };
+            }
             QueryResult::PutRecord(_) => todo!(),
             QueryResult::RepublishRecord(_) => todo!(),
         }
@@ -153,17 +180,36 @@ impl KadHandler {
             InboundRequest::GetProvider {
                 num_closer_peers,
                 num_provider_peers,
-            } => todo!(),
-            InboundRequest::AddProvider { record } => todo!(),
+            } => {
+                info!(
+                    "GetProvider request handled. Number of closest peers found: {}. Number of provider peers found: {}",
+                    num_closer_peers, num_provider_peers
+                );
+            }
+            InboundRequest::AddProvider { .. } => {
+                info!("AddProvider request handled");
+            }
             InboundRequest::GetRecord {
                 num_closer_peers,
                 present_locally,
-            } => todo!(),
+            } => {
+                let present_locally = {
+                    if present_locally {
+                        "We have the record locally!"
+                    } else {
+                        "We don't have the record locally. Asking other closest peers..."
+                    }
+                };
+                info!(
+                    "GetRecord request handled. Number of closest peers found: {}. {}",
+                    num_closer_peers, present_locally
+                );
+            }
             InboundRequest::PutRecord {
-                source,
-                connection,
-                record,
-            } => todo!(),
+                source, connection, ..
+            } => {
+                info!("[ConnId {connection}] - Record put request received from peer {source}");
+            }
         }
     }
 }

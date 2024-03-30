@@ -51,24 +51,26 @@ pub(crate) enum RequestData {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum KadRequestData {
-    GetClosestLocalPeers { key: Vec<u8> },
-    GetClosestPeers { key: Vec<u8> },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ResponseData {
     // NOTE: the vec is useful for now when we add functionality for users being able to add
     // listeners?
-    GetAllListeners { listeners: Vec<Multiaddr> },
-    GetConnectedPeers { connected_peers: Vec<PeerId> },
+    AllListeners { listeners: Vec<Multiaddr> },
+    ConnectedPeers { connected_peers: Vec<PeerId> },
     IsConnectedTo { is_connected: bool },
     KadResponse(KadResponseData),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum KadRequestData {
+    ClosestLocalPeers { key: Vec<u8> },
+    ClosestPeers { key: Vec<u8> },
+    GetFile { key: Vec<u8> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum KadResponseData {
-    GetClosestLocalPeers { peers: Vec<PeerId> },
-    GetClosestPeers { key: Vec<u8>, peers: Vec<PeerId> },
+    ClosestLocalPeers { peers: Vec<PeerId> },
+    ClosestPeers { key: Vec<u8>, peers: Vec<PeerId> },
+    GetFile { peer: Option<PeerId> },
 }

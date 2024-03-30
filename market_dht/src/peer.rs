@@ -58,6 +58,15 @@ impl Peer {
     }
 
     #[inline(always)]
+    pub async fn get_file(&self, key: Cow<'_, Vec<u8>>) -> Response {
+        let key = get_owned_key(key);
+        send!(
+            self,
+            RequestData::KadRequest(KadRequestData::GetFile { key })
+        )
+    }
+
+    #[inline(always)]
     async fn send_request(&self, request_data: RequestData) -> Response {
         let (request_handler, response_handler) = RequestHandler::new();
         self.sender.send((request_data, request_handler))?;
