@@ -45,6 +45,19 @@ impl Peer {
         .await
     }
 
+    pub async fn get_closest_peers(&self, key: Cow<'_, Vec<u8>>) -> Response {
+        let key = {
+            match key {
+                Cow::Borrowed(bo) => bo.to_owned(),
+                Cow::Owned(owned) => owned,
+            }
+        };
+        self.send_request(RequestData::KadRequest(KadRequestData::GetClosestPeers {
+            key,
+        }))
+        .await
+    }
+
     async fn send_request(&self, request_data: RequestData) -> Response {
         let (request_handler, response_handler) = RequestHandler::new();
         self.sender.send((request_data, request_handler))?;

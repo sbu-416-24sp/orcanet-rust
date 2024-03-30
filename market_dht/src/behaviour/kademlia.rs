@@ -4,15 +4,17 @@ use libp2p::{
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour, InboundRequest, QueryId, QueryResult,
+        Behaviour as KadBehaviour, GetClosestPeersError, GetClosestPeersOk, InboundRequest,
+        ProgressStep, QueryId, QueryResult, QueryStats,
     },
     swarm::NetworkBehaviour,
     PeerId, StreamProtocol,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use thiserror::Error;
 
 use crate::{
+    behaviour::kademlia::macros::get_and_send,
     boot_nodes::BootNodes,
     req_res::{KadRequestData, KadResponseData, RequestHandler, ResponseData},
 };
@@ -28,20 +30,23 @@ pub(crate) struct KadHandler {
 impl KadHandler {
     pub(crate) async fn handle_kad_request<TKadStore: KadStore>(
         &mut self,
-        kad: &mut Kad<TKadStore>,
+        Kad { kad }: &mut Kad<TKadStore>,
         request_handler: RequestHandler,
         request: KadRequestData,
     ) {
         match request {
             KadRequestData::GetClosestLocalPeers { key } => {
                 let peers = kad
-                    .kad
                     .get_closest_local_peers(&key.into())
                     .map(|key| key.into_preimage())
                     .collect::<Vec<PeerId>>();
                 request_handler.respond(Ok(ResponseData::KadResponse(
                     KadResponseData::GetClosestLocalPeers { peers },
                 )));
+            }
+            KadRequestData::GetClosestPeers { key } => {
+                let qid = kad.get_closest_peers(key);
+                self.pending_queries.insert(qid, request_handler);
             }
         }
     }
@@ -60,7 +65,7 @@ impl KadHandler {
                 stats,
                 step,
             } => {
-                self.handle_outbound_query(kad, id, result);
+                self.handle_outbound_query(kad, id, result, stats, step);
             }
             kad::Event::RoutingUpdated {
                 peer, addresses, ..
@@ -87,7 +92,10 @@ impl KadHandler {
         kad: &mut Kad<TKadStore>,
         qid: kad::QueryId,
         result: QueryResult,
+        stats: QueryStats,
+        step: ProgressStep,
     ) {
+        debug!("Query {} progressed with stats: {:?}", qid, stats);
         match result {
             QueryResult::Bootstrap(res) => match res {
                 Ok(kad::BootstrapOk {
@@ -111,7 +119,20 @@ impl KadHandler {
                     }
                 }
             },
-            QueryResult::GetClosestPeers(_) => todo!(),
+            QueryResult::GetClosestPeers(result) => {
+                // NOTE: maybe only care for the last part of the step?
+                if step.last {
+                    let response = {
+                        match result {
+                            Ok(GetClosestPeersOk { key, peers }) => Ok(ResponseData::KadResponse(
+                                KadResponseData::GetClosestPeers { key, peers },
+                            )),
+                            Err(err) => Err(err.into()),
+                        }
+                    };
+                    get_and_send!(self.pending_queries, qid, response);
+                }
+            }
             QueryResult::GetProviders(_) => todo!(),
             QueryResult::StartProviding(_) => todo!(),
             QueryResult::RepublishProvider(_) => todo!(),
@@ -192,3 +213,14 @@ pub(crate) enum BootstrapMode {
 }
 
 impl KadStore for MemoryStore {}
+
+mod macros {
+    macro_rules! get_and_send {
+        ($map: expr, $qid: expr, $map_type: expr) => {
+            if let Some(handler) = $map.remove(&$qid) {
+                handler.respond($map_type);
+            }
+        };
+    }
+    pub(super) use get_and_send;
+}

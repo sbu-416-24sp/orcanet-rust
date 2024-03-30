@@ -15,12 +15,11 @@ use crate::{
         MarketBehaviour, MarketBehaviourEvent,
     },
     boot_nodes::BootNodes,
-    config::Config,
     peer::Peer,
     req_res::{RequestData, RequestHandler, ResponseData},
 };
 
-const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(60 * 30);
+const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(60 * 10);
 
 pub(crate) struct Coordinator {
     swarm: Swarm<MarketBehaviour<MemoryStore>>,
@@ -153,6 +152,15 @@ impl Coordinator {
                     }
                 };
                 warn!("[ConnId {connection_id}] - Connection closed with peer: {peer_id}. Number of established connections: {num_established}. Cause: {cause}");
+                // TODO: something we need to focus on when we allow user to use more listening
+                // addresses maybe?
+                if num_established == 0 {
+                    self.swarm
+                        .behaviour_mut()
+                        .kademlia_mut()
+                        .kad_mut()
+                        .remove_peer(&peer_id);
+                }
             }
             SwarmEvent::IncomingConnection {
                 connection_id,

@@ -19,7 +19,6 @@ fn main() {
             .build(),
     )
     .unwrap();
-    thread::sleep(Duration::from_secs(3));
     let peer1_id = peer1.id();
     let peer2 = spawn_bridge(
         Config::builder()
@@ -34,7 +33,6 @@ fn main() {
     )
     .unwrap();
 
-    thread::sleep(Duration::from_secs(5));
     let peer3 = spawn_bridge(
         Config::builder()
             .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(3333u16)))
@@ -48,7 +46,7 @@ fn main() {
     )
     .unwrap();
 
-    thread::sleep(Duration::from_secs(3));
+    thread::sleep(Duration::from_secs(2));
     let peer3_id = peer3.id();
     let peer4 = spawn_bridge(
         Config::builder()
@@ -62,10 +60,15 @@ fn main() {
             .build(),
     )
     .unwrap();
-    thread::sleep(Duration::from_secs(3));
+    thread::sleep(Duration::from_secs(2));
     Runtime::new().unwrap().block_on(async {
         let peers = peer4
             .get_closest_local_peers(Cow::Owned(peer3_id.to_bytes()))
+            .await
+            .unwrap();
+        println!("{:?}", peers);
+        let peers = peer4
+            .get_closest_peers(Cow::Owned(peer3_id.to_bytes()))
             .await
             .unwrap();
         println!("{:?}", peers);

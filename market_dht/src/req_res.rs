@@ -53,6 +53,7 @@ pub(crate) enum RequestData {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum KadRequestData {
     GetClosestLocalPeers { key: Vec<u8> },
+    GetClosestPeers { key: Vec<u8> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -69,4 +70,5 @@ pub enum ResponseData {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum KadResponseData {
     GetClosestLocalPeers { peers: Vec<PeerId> },
+    GetClosestPeers { key: Vec<u8>, peers: Vec<PeerId> },
 }
