@@ -4,7 +4,7 @@ use libp2p::{
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour, InboundRequest, KBucketKey, QueryId, QueryResult, RecordKey,
+        Behaviour as KadBehaviour, InboundRequest, QueryId, QueryResult,
     },
     swarm::NetworkBehaviour,
     PeerId, StreamProtocol,
@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::{
     boot_nodes::BootNodes,
-    req_res::{self, KadRequestData, KadResponseData, RequestData, RequestHandler, ResponseData},
+    req_res::{KadRequestData, KadResponseData, RequestHandler, ResponseData},
 };
 
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");

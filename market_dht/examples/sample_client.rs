@@ -1,9 +1,7 @@
-use std::{
-    thread::{self},
-    time::Duration,
-};
+use std::{borrow::Cow, thread, time::Duration};
 
 use market_dht::{config::Config, multiaddr, net::spawn_bridge};
+use tokio::runtime::Runtime;
 use tracing_log::LogTracer;
 
 fn main() {
@@ -65,5 +63,12 @@ fn main() {
     )
     .unwrap();
     thread::sleep(Duration::from_secs(3));
+    Runtime::new().unwrap().block_on(async {
+        let peers = peer4
+            .get_closest_local_peers(Cow::Owned(peer3_id.to_bytes()))
+            .await
+            .unwrap();
+        println!("{:?}", peers);
+    });
     thread::sleep(Duration::from_secs(7777777));
 }

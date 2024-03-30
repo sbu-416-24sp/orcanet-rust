@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use tokio::sync::mpsc;
 
-use crate::req_res::{Request, RequestData, RequestHandler, Response};
+use crate::req_res::{KadRequestData, Request, RequestData, RequestHandler, Response};
 use crate::PeerId;
 
 #[derive(Debug)]
@@ -28,6 +30,19 @@ impl Peer {
 
     pub async fn get_connected_peers(&self) -> Response {
         self.send_request(RequestData::GetConnectedPeers).await
+    }
+
+    pub async fn get_closest_local_peers(&self, key: Cow<'_, Vec<u8>>) -> Response {
+        let key = {
+            match key {
+                Cow::Borrowed(bo) => bo.to_owned(),
+                Cow::Owned(owned) => owned,
+            }
+        };
+        self.send_request(RequestData::KadRequest(
+            KadRequestData::GetClosestLocalPeers { key },
+        ))
+        .await
     }
 
     async fn send_request(&self, request_data: RequestData) -> Response {

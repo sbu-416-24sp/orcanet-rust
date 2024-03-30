@@ -1,6 +1,6 @@
 use anyhow::Result;
 use libp2p::{Multiaddr, PeerId};
-use tokio::sync::oneshot::{self, error::RecvError};
+use tokio::sync::oneshot::{self};
 
 pub(crate) type Response = Result<ResponseData>;
 pub(crate) type Request = (RequestData, RequestHandler);
@@ -51,6 +51,11 @@ pub(crate) enum RequestData {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum KadRequestData {
+    GetClosestLocalPeers { key: Vec<u8> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ResponseData {
     // NOTE: the vec is useful for now when we add functionality for users being able to add
@@ -62,11 +67,6 @@ pub enum ResponseData {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum KadRequestData {
-    GetClosestLocalPeers { key: Vec<u8> },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum KadResponseData {
+pub enum KadResponseData {
     GetClosestLocalPeers { peers: Vec<PeerId> },
 }
