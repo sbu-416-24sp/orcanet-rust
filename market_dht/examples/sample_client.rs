@@ -67,8 +67,9 @@ fn main() {
             .await
             .unwrap();
         println!("{:?}", peers);
+        let peer4_id = peer4.id();
         let peers = peer4
-            .get_closest_peers(Cow::Owned(peer3_id.to_bytes()))
+            .get_closest_peers(Cow::Owned(peer4_id.to_bytes()))
             .await
             .unwrap();
         println!("{:?}", peers);
