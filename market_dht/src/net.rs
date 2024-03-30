@@ -9,7 +9,7 @@ use thiserror::Error;
 use tokio::{runtime::Runtime, sync::oneshot};
 
 use crate::{
-    behaviour::{MarketBehaviour, IDENTIFY_PROTOCOL_NAME, KAD_PROTOCOL_NAME},
+    behaviour::{ident::IDENTIFY_PROTOCOL_NAME, kademlia::KAD_PROTOCOL_NAME, MarketBehaviour},
     config::Config,
     coordinator::Coordinator,
     peer::Peer,
