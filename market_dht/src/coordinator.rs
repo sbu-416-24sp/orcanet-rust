@@ -9,13 +9,13 @@ use tokio::{
 };
 
 use crate::{
-    behaviour::{BootstrapMode, MarketBehaviour, MarketBehaviourEvent},
+    behaviour::{kademlia::BootstrapMode, MarketBehaviour, MarketBehaviourEvent},
     config::Config,
     peer::Peer,
     request::Request,
 };
 
-const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(5);
+const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(60 * 30);
 
 pub(crate) struct Coordinator {
     swarm: Swarm<MarketBehaviour<MemoryStore>>,
@@ -126,18 +126,11 @@ impl Coordinator {
             }
             SwarmEvent::OutgoingConnectionError {
                 connection_id,
-                peer_id,
+                peer_id: Some(peer_id),
                 error,
             } => {
-                let peer_id = {
-                    if let Some(peer_id) = peer_id {
-                        format!(" to {peer_id} ")
-                    } else {
-                        " ".to_owned()
-                    }
-                };
                 error!(
-                    "[ConnId {connection_id}] - Outgoing connection{peer_id}failed with {error}"
+                    "[ConnId {connection_id}] - Outgoing connection to {peer_id} failed with {error}"
                 );
             }
             SwarmEvent::NewListenAddr {
@@ -167,7 +160,13 @@ impl Coordinator {
                 warn!("[ConnId {connection_id}] - Dialing peer: {:?}", peer_id);
             }
             SwarmEvent::NewExternalAddrCandidate { address } => {
+                // TODO: this will be useful when we deal with NAT remotely since upnp emits a
+                // SwarmEvent::ExternalAddressConfirmed event in which we will use to actually add
+                // the address in I think
                 self.swarm.add_external_address(address);
+            }
+            SwarmEvent::ExternalAddrExpired { address } => {
+                self.swarm.remove_external_address(&address);
             }
             _ => {
                 error!("Unhandled swarm event: {:?}", event);
