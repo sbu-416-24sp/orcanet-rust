@@ -1,7 +1,9 @@
 use std::borrow::Cow;
+use std::net::Ipv4Addr;
 
 use tokio::sync::mpsc;
 
+use crate::coordinator::{FileMetadata, SupplierInfo};
 use crate::req_res::{KadRequestData, Request, RequestData, RequestHandler, Response};
 use crate::PeerId;
 
@@ -44,7 +46,7 @@ impl Peer {
         let key = get_owned_key(key);
         send!(
             self,
-            RequestData::KadRequest(KadRequestData::GetClosestLocalPeers { key })
+            RequestData::KadRequest(KadRequestData::ClosestLocalPeers { key })
         )
     }
 
@@ -53,16 +55,43 @@ impl Peer {
         let key = get_owned_key(key);
         send!(
             self,
-            RequestData::KadRequest(KadRequestData::GetClosestPeers { key })
+            RequestData::KadRequest(KadRequestData::ClosestPeers { key })
         )
     }
 
     #[inline(always)]
-    pub async fn get_file(&self, key: Cow<'_, Vec<u8>>) -> Response {
-        let key = get_owned_key(key);
+    pub async fn register_file(
+        &self,
+        file_hash: Cow<'_, Vec<u8>>,
+        ip: impl Into<Ipv4Addr>,
+        port: u16,
+        price: i32,
+        username: String,
+    ) -> Response {
+        // NOTE: the price is i32 because the protobuf file specified i32 for some reason
+        let file_hash = get_owned_key(file_hash);
+        let supplier_info = SupplierInfo {
+            ip: ip.into(),
+            port,
+            price,
+            username,
+        };
+        let file_metadata = FileMetadata {
+            file_hash,
+            supplier_info,
+        };
         send!(
             self,
-            RequestData::KadRequest(KadRequestData::GetFile { key })
+            RequestData::KadRequest(KadRequestData::RegisterFile { file_metadata })
+        )
+    }
+
+    #[inline(always)]
+    pub async fn check_holders(&self, file_hash: Cow<'_, Vec<u8>>) -> Response {
+        let file_hash = get_owned_key(file_hash);
+        send!(
+            self,
+            RequestData::KadRequest(KadRequestData::GetProviders { key: file_hash })
         )
     }
 

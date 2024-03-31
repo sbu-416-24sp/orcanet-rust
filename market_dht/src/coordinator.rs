@@ -1,8 +1,9 @@
-use std::time::Duration;
+use std::{collections::HashMap, net::Ipv4Addr, time::Duration};
 
 use futures::StreamExt;
 use libp2p::{kad::store::MemoryStore, swarm::SwarmEvent, Multiaddr, Swarm};
 use log::{error, info, warn};
+use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot::Sender},
     time,
@@ -25,6 +26,7 @@ pub(crate) struct Coordinator {
     swarm: Swarm<MarketBehaviour<MemoryStore>>,
     kad_handler: KadHandler,
     identify_handler: IdentifyHandler,
+    market_map: HashMap<FileHash, SupplierInfo>,
 }
 
 impl Coordinator {
@@ -45,15 +47,17 @@ impl Coordinator {
             swarm,
             kad_handler: Default::default(),
             identify_handler: Default::default(),
+            market_map: Default::default(),
         }
     }
 
     fn handle_event(&mut self, event: MarketBehaviourEvent<MemoryStore>) {
         match event {
-            MarketBehaviourEvent::Kademlia(event) => {
-                self.kad_handler
-                    .handle_kad_event(self.swarm.behaviour_mut().kademlia_mut(), event);
-            }
+            MarketBehaviourEvent::Kademlia(event) => self.kad_handler.handle_kad_event(
+                self.swarm.behaviour_mut().kademlia_mut(),
+                event,
+                &mut self.market_map,
+            ),
             MarketBehaviourEvent::Identify(event) => self
                 .identify_handler
                 .handle_identify_event(event, self.swarm.behaviour_mut().kademlia_mut()),
@@ -117,6 +121,7 @@ impl Coordinator {
                         self.swarm.behaviour_mut().kademlia_mut(),
                         request_handler,
                         request,
+                        &mut self.market_map,
                     )
                     .await;
             }
@@ -232,4 +237,20 @@ impl Coordinator {
             }
         }
     }
+}
+
+pub(crate) type FileHash = Vec<u8>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct FileMetadata {
+    pub(crate) file_hash: FileHash,
+    pub(crate) supplier_info: SupplierInfo,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub(crate) struct SupplierInfo {
+    pub(crate) ip: Ipv4Addr,
+    pub(crate) port: u16,
+    pub(crate) price: i32,
+    pub(crate) username: String,
 }

@@ -16,6 +16,7 @@ use crate::{
 };
 
 const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
+const ONE_HOUR: Duration = Duration::from_secs(60 * 60);
 
 pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
     let swarm = libp2p::SwarmBuilder::with_new_identity()
@@ -33,6 +34,8 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
             // TODO: maybe configure something?
             let mut config = KadConfig::default();
             config.set_protocol_names(vec![KAD_PROTOCOL_NAME]);
+            config.set_provider_publication_interval(None);
+            config.set_provider_record_ttl(Some(ONE_HOUR));
             let kad_behaviour =
                 KadBehaviour::with_config(peer_id, MemoryStore::new(peer_id), config);
             let config = IdentifyConfig::new(IDENTIFY_PROTOCOL_NAME.to_string(), key.public());

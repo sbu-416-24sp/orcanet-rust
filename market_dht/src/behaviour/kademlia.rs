@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
+use anyhow::anyhow;
 use libp2p::{
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        Behaviour as KadBehaviour, GetClosestPeersError, GetClosestPeersOk, GetRecordOk,
-        InboundRequest, PeerRecord, ProgressStep, QueryId, QueryResult, QueryStats,
+        AddProviderError, AddProviderOk, Behaviour as KadBehaviour, GetClosestPeersError,
+        GetClosestPeersOk, GetProvidersOk, GetRecordOk, InboundRequest, PeerRecord, ProgressStep,
+        QueryId, QueryResult, QueryStats,
     },
     swarm::NetworkBehaviour,
     PeerId, StreamProtocol,
@@ -14,8 +16,9 @@ use log::{debug, error, info, warn};
 use thiserror::Error;
 
 use crate::{
-    behaviour::kademlia::macros::get_and_send,
+    behaviour::kademlia::macros::send_kad_response,
     boot_nodes::BootNodes,
+    coordinator::{FileHash, FileMetadata, SupplierInfo},
     req_res::{KadRequestData, KadResponseData, RequestHandler, ResponseData},
 };
 
@@ -33,6 +36,7 @@ impl KadHandler {
         Kad { kad }: &mut Kad<TKadStore>,
         request_handler: RequestHandler,
         request: KadRequestData,
+        market_map: &mut HashMap<FileHash, SupplierInfo>,
     ) {
         match request {
             KadRequestData::ClosestLocalPeers { key } => {
@@ -48,8 +52,21 @@ impl KadHandler {
                 let qid = kad.get_closest_peers(key);
                 self.pending_queries.insert(qid, request_handler);
             }
-            KadRequestData::GetFile { key } => {
-                let qid = kad.get_record(key.into());
+            KadRequestData::RegisterFile { file_metadata } => {
+                // TODO: do something about the cloning here
+                let key = file_metadata.file_hash;
+                match kad.start_providing(key.clone().into()) {
+                    Ok(qid) => {
+                        self.pending_queries.insert(qid, request_handler);
+                        market_map.insert(key, file_metadata.supplier_info);
+                    }
+                    Err(err) => {
+                        send_kad_response!(request_handler, err.into());
+                    }
+                }
+            }
+            KadRequestData::GetProviders { key } => {
+                let qid = kad.get_providers(key.into());
                 self.pending_queries.insert(qid, request_handler);
             }
         }
@@ -58,6 +75,7 @@ impl KadHandler {
         &mut self,
         kad: &mut Kad<TKadStore>,
         KadEvent::Kad(event): KadEvent<TKadStore>,
+        market_map: &mut HashMap<FileHash, SupplierInfo>,
     ) {
         match event {
             kad::Event::InboundRequest { request } => {
@@ -69,7 +87,7 @@ impl KadHandler {
                 stats,
                 step,
             } => {
-                self.handle_outbound_query(kad, id, result, stats, step);
+                self.handle_outbound_query(kad, id, result, stats, step, market_map);
             }
             kad::Event::RoutingUpdated {
                 peer, addresses, ..
@@ -82,6 +100,8 @@ impl KadHandler {
             kad::Event::ModeChanged { new_mode } => {
                 info!("Kademlia mode changed to {}", new_mode);
             }
+            // TODO: maybe need the rest of these events later on with upnp and autonat?
+            //
             // kad::Event::UnroutablePeer { peer } => {
             //     error!("Peer {} is unroutable", peer);
             // }
@@ -98,6 +118,7 @@ impl KadHandler {
         result: QueryResult,
         stats: QueryStats,
         step: ProgressStep,
+        market_map: &mut HashMap<FileHash, SupplierInfo>,
     ) {
         debug!("Query {} progressed with stats: {:?}", qid, stats);
         match result {
@@ -137,35 +158,55 @@ impl KadHandler {
                             Err(err) => Err(err.into()),
                         }
                     };
-                    get_and_send!(self.pending_queries, qid, response);
+                    send_kad_response!(self.pending_queries, qid, response);
                 }
             }
-            QueryResult::GetProviders(_) => todo!(),
-            QueryResult::StartProviding(_) => todo!(),
-            QueryResult::RepublishProvider(_) => todo!(),
-            QueryResult::GetRecord(record) => {
-                match record {
-                    Ok(ok) => match ok {
-                        GetRecordOk::FoundRecord(PeerRecord { peer, record }) => {
-                            info!("Record found for peer {peer:?} with record {record:?}");
-                            get_and_send!(
-                                self.pending_queries,
-                                qid,
-                                Ok(ResponseData::KadResponse(KadResponseData::GetFile { peer }))
-                            );
-                        }
-                        GetRecordOk::FinishedWithNoAdditionalRecord { cache_candidates } => {
-                            todo!()
-                        }
-                    },
-                    Err(err) => {
-                        error!("Error getting record: {err}");
-                        get_and_send!(self.pending_queries, qid, Err(err.into()));
+            QueryResult::GetProviders(result) => match result {
+                Ok(ok_res) => match ok_res {
+                    GetProvidersOk::FoundProviders { key, providers } => {
+                        send_kad_response!(
+                            self.pending_queries,
+                            qid,
+                            Ok(ResponseData::KadResponse(KadResponseData::GetProviders {
+                                key: key.to_vec(),
+                                providers
+                            }))
+                        );
                     }
-                };
-            }
-            QueryResult::PutRecord(_) => todo!(),
-            QueryResult::RepublishRecord(_) => todo!(),
+                    // TODO: maybe do something with the below event
+                    GetProvidersOk::FinishedWithNoAdditionalRecord { closest_peers } => todo!(),
+                },
+                Err(err) => {
+                    error!("GetProviders query failed with error: {}", err);
+                    send_kad_response!(self.pending_queries, qid, Err(err.into()));
+                }
+            },
+            QueryResult::StartProviding(result) => match result {
+                Ok(AddProviderOk { key }) => {
+                    info!("StartProviding query succeeded for key: {:?}", key);
+                    send_kad_response!(
+                        self.pending_queries,
+                        qid,
+                        Ok(ResponseData::KadResponse(KadResponseData::RegisterFile {
+                            key: key.to_vec()
+                        }))
+                    );
+                }
+                Err(AddProviderError::Timeout { key }) => {
+                    error!("StartProviding query timed out for key: {:?}", key);
+                    market_map.remove(&key.to_vec());
+                    send_kad_response!(
+                        self.pending_queries,
+                        qid,
+                        Err(AddProviderError::Timeout { key }.into())
+                    );
+                }
+            },
+            // QueryResult::RepublishProvider(_) => todo!(),
+            // QueryResult::GetRecord(_) => {}
+            // QueryResult::PutRecord(_) => todo!(),
+            // QueryResult::RepublishRecord(_) => todo!(),
+            _ => {}
         }
     }
 
@@ -189,27 +230,9 @@ impl KadHandler {
             InboundRequest::AddProvider { .. } => {
                 info!("AddProvider request handled");
             }
-            InboundRequest::GetRecord {
-                num_closer_peers,
-                present_locally,
-            } => {
-                let present_locally = {
-                    if present_locally {
-                        "We have the record locally!"
-                    } else {
-                        "We don't have the record locally. Asking other closest peers..."
-                    }
-                };
-                info!(
-                    "GetRecord request handled. Number of closest peers found: {}. {}",
-                    num_closer_peers, present_locally
-                );
-            }
-            InboundRequest::PutRecord {
-                source, connection, ..
-            } => {
-                info!("[ConnId {connection}] - Record put request received from peer {source}");
-            }
+            // InboundRequest::GetRecord { .. } => {}
+            // InboundRequest::PutRecord { .. } => {}
+            _ => {}
         }
     }
 }
@@ -261,12 +284,15 @@ pub(crate) enum BootstrapMode {
 impl KadStore for MemoryStore {}
 
 mod macros {
-    macro_rules! get_and_send {
-        ($map: expr, $qid: expr, $map_type: expr) => {
+    macro_rules! send_kad_response {
+        ($map: expr, $qid: expr, $request_handler: expr) => {
             if let Some(handler) = $map.remove(&$qid) {
-                handler.respond($map_type);
+                handler.respond($request_handler);
             }
         };
+        ($request_handler: expr, $err: expr) => {
+            $request_handler.respond(Err($err));
+        };
     }
-    pub(super) use get_and_send;
+    pub(super) use send_kad_response;
 }

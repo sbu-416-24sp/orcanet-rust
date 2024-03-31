@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = { version = "1.0.81" }
 libp2p = { version = "0.53.2", features = [
+  "cbor",
   "dns",
   "kad",
   "noise",

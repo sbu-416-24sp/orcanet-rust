@@ -1,6 +1,10 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use libp2p::{Multiaddr, PeerId};
 use tokio::sync::oneshot::{self};
+
+use crate::coordinator::FileMetadata;
 
 pub(crate) type Response = Result<ResponseData>;
 pub(crate) type Request = (RequestData, RequestHandler);
@@ -41,7 +45,7 @@ impl RequestHandler {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub(crate) enum RequestData {
     GetAllListeners,
@@ -50,7 +54,7 @@ pub(crate) enum RequestData {
     KadRequest(KadRequestData),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ResponseData {
     // NOTE: the vec is useful for now when we add functionality for users being able to add
@@ -61,16 +65,30 @@ pub enum ResponseData {
     KadResponse(KadResponseData),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub(crate) enum KadRequestData {
     ClosestLocalPeers { key: Vec<u8> },
     ClosestPeers { key: Vec<u8> },
-    GetFile { key: Vec<u8> },
+    RegisterFile { file_metadata: FileMetadata },
+    GetProviders { key: Vec<u8> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum KadResponseData {
-    ClosestLocalPeers { peers: Vec<PeerId> },
-    ClosestPeers { key: Vec<u8>, peers: Vec<PeerId> },
-    GetFile { peer: Option<PeerId> },
+    ClosestLocalPeers {
+        peers: Vec<PeerId>,
+    },
+    ClosestPeers {
+        key: Vec<u8>,
+        peers: Vec<PeerId>,
+    },
+    RegisterFile {
+        key: Vec<u8>,
+    },
+    GetProviders {
+        key: Vec<u8>,
+        providers: HashSet<PeerId>,
+    },
 }
