@@ -135,6 +135,11 @@ impl Coordinator {
                     self.swarm.behaviour_mut().file_req_res_mut(),
                 );
             }
+            RequestData::GetLocalSupplierInfo { file_hash } => {
+                request_handler.respond(Ok(ResponseData::GetLocalSupplierInfo {
+                    supplier_info: self.market_map.get(&file_hash).cloned(),
+                }));
+            }
         }
     }
 

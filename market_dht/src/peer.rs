@@ -98,7 +98,7 @@ impl Peer {
         )?;
         if let ResponseData::KadResponse(KadResponseData::GetProviders { key, providers }) = res {
             // NOTE: maybe refactor later
-            let mut resp_providers = vec![];
+            let mut resp_providers = Vec::with_capacity(providers.len() + 1);
             for provider in providers {
                 if let Ok(ResponseData::ReqResResponse(FileReqResResponseData::GetSupplierInfo {
                     supplier_info,
@@ -112,9 +112,18 @@ impl Peer {
                     resp_providers.push((provider, supplier_info));
                 }
             }
+            if let Ok(ResponseData::GetLocalSupplierInfo {
+                supplier_info: Some(info),
+            }) = send!(
+                self,
+                RequestData::GetLocalSupplierInfo {
+                    file_hash: FileHash(key)
+                }
+            ) {
+                resp_providers.push((self.id, info));
+            }
             Ok(ResponseData::ReqResResponse(
                 FileReqResResponseData::GetSuppliers {
-                    key,
                     suppliers: resp_providers,
                 },
             ))

@@ -125,8 +125,8 @@ pub(crate) struct FileMetadata {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SupplierInfo {
-    pub(crate) ip: Ipv4Addr,
-    pub(crate) port: u16,
-    pub(crate) price: i64,
-    pub(crate) username: String,
+    pub ip: Ipv4Addr,
+    pub port: u16,
+    pub price: i64,
+    pub username: String,
 }

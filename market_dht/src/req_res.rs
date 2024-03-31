@@ -4,7 +4,7 @@ use anyhow::Result;
 use libp2p::{Multiaddr, PeerId};
 use tokio::sync::oneshot::{self};
 
-use crate::behaviour::file_req_res::{FileMetadata, SupplierInfo};
+use crate::behaviour::file_req_res::{FileHash, FileMetadata, SupplierInfo};
 
 pub(crate) type Response = Result<ResponseData>;
 pub(crate) type Request = (RequestData, RequestHandler);
@@ -51,10 +51,13 @@ pub(crate) enum RequestData {
     GetAllListeners,
     GetConnectedPeers,
     IsConnectedTo(PeerId),
+    GetLocalSupplierInfo { file_hash: FileHash },
     KadRequest(KadRequestData),
     ReqResRequest(FileReqResRequestData),
 }
 
+// FIXIT: this is probably bad since now the end user can also see some of the response data that
+// is potential junk for matching that they won't touch
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ResponseData {
@@ -65,6 +68,7 @@ pub enum ResponseData {
     IsConnectedTo { is_connected: bool },
     KadResponse(KadResponseData),
     ReqResResponse(FileReqResResponseData),
+    GetLocalSupplierInfo { supplier_info: Option<SupplierInfo> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,7 +112,6 @@ pub enum FileReqResResponseData {
         supplier_info: SupplierInfo,
     },
     GetSuppliers {
-        key: Vec<u8>,
         suppliers: Vec<(PeerId, SupplierInfo)>,
     },
 }

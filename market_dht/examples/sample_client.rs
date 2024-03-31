@@ -93,7 +93,15 @@ fn main() {
         tokio::time::sleep(Duration::from_secs(2)).await;
         println!(
             "{:?}",
-            peer2.check_holders(Cow::Owned(sha_hash.to_vec())).await
+            peer4
+                .register_file(
+                    Cow::Owned(sha_hash.to_vec()),
+                    [190, 32, 11, 23],
+                    9003,
+                    300,
+                    "obama".to_string()
+                )
+                .await
         );
     });
     thread::sleep(Duration::from_secs(7777777));

@@ -162,6 +162,7 @@ impl KadHandler {
             QueryResult::GetProviders(result) => match result {
                 Ok(ok_res) => match ok_res {
                     GetProvidersOk::FoundProviders { key, providers } => {
+                        info!("GetProviders query succeeded for key {key:?}!");
                         send_response!(
                             self.pending_queries,
                             qid,
@@ -174,6 +175,7 @@ impl KadHandler {
                     // TODO: maybe do something with the below event; i don't undderstand if it'll
                     // be useful atm
                     GetProvidersOk::FinishedWithNoAdditionalRecord { .. } => {
+                        warn!("GetProviders query finished with no additional record");
                         send_response!(
                             self.pending_queries,
                             qid,
@@ -207,6 +209,14 @@ impl KadHandler {
                         qid,
                         Err(AddProviderError::Timeout { key }.into())
                     );
+                }
+            },
+            QueryResult::RepublishProvider(result) => match result {
+                Ok(AddProviderOk { key }) => {
+                    info!("Successfully republished the key {key:?}!");
+                }
+                Err(AddProviderError::Timeout { key }) => {
+                    error!("Timed out! Failed to republish the key {key:?}!");
                 }
             },
             _ => {}

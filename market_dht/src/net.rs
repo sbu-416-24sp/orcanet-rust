@@ -22,6 +22,7 @@ use crate::{
 
 const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 const ONE_HOUR: Duration = Duration::from_secs(60 * 60);
+const FIVE_MINS: Duration = Duration::from_secs(60 * 5);
 
 pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
     let swarm = libp2p::SwarmBuilder::with_new_identity()
@@ -39,7 +40,8 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
             // TODO: maybe configure something?
             let mut config = KadConfig::default();
             config.set_protocol_names(vec![KAD_PROTOCOL_NAME]);
-            config.set_provider_publication_interval(None);
+            // NOTE: skeptical here?
+            config.set_provider_publication_interval(Some(FIVE_MINS));
             config.set_provider_record_ttl(Some(ONE_HOUR));
             let kad_behaviour =
                 KadBehaviour::with_config(peer_id, MemoryStore::new(peer_id), config);
@@ -68,6 +70,7 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
             });
         })
         .expect("it to spawn the network bridge thread");
+    // FIXIT: this is a blocking call and panics the thread if ran in an asynchronous context
     let peer = ready_rx.blocking_recv().unwrap();
     Ok(peer)
 }
