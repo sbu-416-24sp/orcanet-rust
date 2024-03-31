@@ -68,10 +68,10 @@ impl Peer {
         file_hash: Cow<'_, Vec<u8>>,
         ip: impl Into<Ipv4Addr>,
         port: u16,
-        price: i32,
+        price: i64,
         username: String,
     ) -> Response {
-        // NOTE: the price is i32 because the protobuf file specified i32 for some reason
+        // NOTE: the price is i64 because the protobuf file specified i64 for some reason
         let file_hash = get_owned_key(file_hash);
         let supplier_info = SupplierInfo {
             ip: ip.into(),

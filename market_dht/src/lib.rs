@@ -10,6 +10,7 @@
 pub use libp2p::multiaddr::multiaddr;
 pub use libp2p::Multiaddr;
 pub use libp2p::PeerId;
+pub use req_res::{FileReqResResponseData, KadResponseData, ResponseData};
 
 pub mod boot_nodes;
 pub mod config;

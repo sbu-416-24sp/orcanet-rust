@@ -127,6 +127,6 @@ pub(crate) struct FileMetadata {
 pub struct SupplierInfo {
     pub(crate) ip: Ipv4Addr,
     pub(crate) port: u16,
-    pub(crate) price: i32,
+    pub(crate) price: i64,
     pub(crate) username: String,
 }
