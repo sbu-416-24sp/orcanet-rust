@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 
 use tokio::sync::mpsc;
 
-use crate::coordinator::{FileMetadata, SupplierInfo};
+use crate::behaviour::file_req_res::{FileMetadata, SupplierInfo};
 use crate::req_res::{KadRequestData, Request, RequestData, RequestHandler, Response};
 use crate::PeerId;
 

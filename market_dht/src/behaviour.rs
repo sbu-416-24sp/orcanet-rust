@@ -48,5 +48,6 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
     }
 }
 
+pub(crate) mod file_req_res;
 pub(crate) mod ident;
 pub(crate) mod kademlia;

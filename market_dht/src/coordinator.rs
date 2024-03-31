@@ -1,9 +1,8 @@
-use std::{collections::HashMap, net::Ipv4Addr, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use futures::StreamExt;
 use libp2p::{kad::store::MemoryStore, swarm::SwarmEvent, Multiaddr, Swarm};
 use log::{error, info, warn};
-use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot::Sender},
     time,
@@ -11,6 +10,7 @@ use tokio::{
 
 use crate::{
     behaviour::{
+        file_req_res::{FileHash, SupplierInfo},
         ident::IdentifyHandler,
         kademlia::{BootstrapMode, KadHandler},
         MarketBehaviour, MarketBehaviourEvent,
@@ -237,20 +237,4 @@ impl Coordinator {
             }
         }
     }
-}
-
-pub(crate) type FileHash = Vec<u8>;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct FileMetadata {
-    pub(crate) file_hash: FileHash,
-    pub(crate) supplier_info: SupplierInfo,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) struct SupplierInfo {
-    pub(crate) ip: Ipv4Addr,
-    pub(crate) port: u16,
-    pub(crate) price: i32,
-    pub(crate) username: String,
 }

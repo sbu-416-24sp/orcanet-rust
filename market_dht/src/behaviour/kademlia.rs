@@ -18,9 +18,10 @@ use thiserror::Error;
 use crate::{
     behaviour::kademlia::macros::send_kad_response,
     boot_nodes::BootNodes,
-    coordinator::{FileHash, FileMetadata, SupplierInfo},
     req_res::{KadRequestData, KadResponseData, RequestHandler, ResponseData},
 };
+
+use super::file_req_res::{FileHash, SupplierInfo};
 
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
 pub(crate) trait KadStore: RecordStore + Send + Sync + 'static {}
@@ -31,7 +32,7 @@ pub(crate) struct KadHandler {
 }
 
 impl KadHandler {
-    pub(crate) async fn handle_kad_request<TKadStore: KadStore>(
+    pub(crate) fn handle_kad_request<TKadStore: KadStore>(
         &mut self,
         Kad { kad }: &mut Kad<TKadStore>,
         request_handler: RequestHandler,
