@@ -128,146 +128,194 @@
 
 
 # Market DHT
-**CURRENT ISSUES:
-- bootstrapping race condition somewhere
-- quoram fails
-- get_record succeeds for a created hash but crashes DHT server after
-- nodes aren't storing information about each other's nodes (bootnodes) 
 
-CUSTOM market DHT opposed to using IPFS-kad
-- **command**
-	- *imports*
-		- std::nte::Ipv4Addr
-		- anyhow::Result
-		- cid::Cid
-		- futures::channel::oneshot
-		- libp2p::{multiaddr, peerid}
-		- create::file::FileMetadata
-	- *Type Definitions*
-		- CommandCallback
-			- tuple containing Command and 'oneshot::Sender' (single prod and consumer channel --> each channel instance transports only a single message) for sending result of command
-		- CommandResult
-			- representing result of a command where Result contains CommandOk
-	- *CommandOk*
-		- enum for a result of a command sent to DHT
-			- Listen - return address of where peer is now listening
-			- Bootstrap - return peerId from libp2p swarm bootstrap request and num_remaining (u32)
-			- Dial - return peerId we successfully dialed
-			- Register - return CID of file
-			- GetFile - takes file_cid (file user requested), metadata of file, owner_peer id that we get record from
-			- GetClosestPeers - takes CID of file user requests and list of closest peers
-			- GetLocalPeerID - return local node's peer ID
-	- ***NOTES:***
-		- start_providing vs put_record or possible both depending peer nodes team implementation
-		- chuck over file eventually
-- **file**
-	- utilities for handling files
-	- *new_cidv0*
-		- create new CIDv0 generated from file that's inserted
-		- takes in:
-			- data - byte slice for data 
-			- return - 'result' containing CID or Error
-	- *FileMetaData*
-		- Struct 
-			- #[derive()]
-				- debug, clone, copy, partialEq, eq
-				- *Serialize/Deserialize* - 'serde' crate and allows instances of struct to be de/serialized into formats like JSON
-			- IPv4 address of peer storing file: Ipv4Addr
-			- port on which peer is serving file: u16
-			- price/mb: u64
-		- Impl
-			- constructors and getters
+CUSTOM market DHT opposed to using IPFS-kad 
+Behavior contains most of the logic
+- ***Behavior***
+	- **ident**
+		- set up identify handler using libp2p network framework
+		- use kademlia from [Behavior.rs]
+		- *handle_identify_event*
+			- takes in 3 parameters
+				- mutable reference to instance
+				- IdentifyEvent enum to find Identify event
+				- mutable ref to Kad DHT
+			- *received event*
+				- extract peer id, listen addrs, and protocols
+				- if peer supports Kad, iterate through listen addresses and add them to the routing table
+			- *sent event*
+			- *pushed event*
+			- *error event*
+				- the previous three ^^^ sends log messages and errors depending on the peer id 
+		- *Identify Struct* 
+			- defined using NetworkBehavior derive macro
+			- wrapper around IdentifyBehavior
+			- *Impl*
+				- new 
+					- new instance of Identify that takes in IdentifyBehavior and return Identify Struct
+	- **kademlia**
+		- utilities
+			- create a new custom protocol name that all peer IDs would contain (orcanet/kad/1.0.0)
+			- define traits *KadStore* will inherit
+				- RecordStore, send/sync for KadStore to be send safely between threads and accessed concurrently, static lifetime (during of the program)
+		- *Kad Struct*
+			- kad network behavior with generic store 'TKadStore'
+			- *impl*
+				- *constructor*
+				- *bootstrap*
+					- determies if bootstrap with a predefined list of nodes or without
+					- if yes:
+						- add addresses of boot notes to Kad DHT
+					- call bootstrap on KadBehavior instance
+		- *KadHandler Struct*
+			- maps Kad query IDs to request handler instances
+			- *Impl*
+				- *handle_kad_request*
+					- takes in: self ref to instance, ref to Kad struct, request handler, and enum struct of which Kad data to get
+					- *ClosestLocalPeers*
+						- query Kad for closest local peers given key and returns list of peers
+					- *ClosestPeers*
+						- query Kad for closest peers to a given key and store request handler for later
+					- *GetFile*
+						- query kad to get record given key and store request handler for later
+				- *handle_kad_event*
+					- takes in self ref, ref kad struct, and KadEvent enum for a specific event
+					- *InboundRequest*
+						- call [handle_inbound_request]
+					- *OutboundQueryProgressed*
+						- call [handle_outbound_query]
+					- *RoutingUpdated*
+						- logs warning message for routing table update
+					- *ModeChanged*
+						- when Kad mode has changed (server/client)
+				- *handle_outbound_query*
+					- takes in: self ref, mutable kad instance, query id, result, query stats, step of the query
+					- Query results:
+						- *Bootstrap, GetClosestPeers, and GetRecord
+						- **TODO**: getproviders, start providing, republish provider
+				- *handle_inbound_request
+					- Requests
+						- *FindNode, GetProvider, AddProvider, GetRecord, PutRecord*
+				- 
 - **lib**
 	- **NOTE: possibly add more extensions for more protocols later**
 	- same compiler attrs plus a few more
 	- export items from bridge and command for users and file
-
-
-**MIGHT HAVE TO DO A RESET ON THE LAST 3 FILES**
-- **DHT CLIENT**
-	- import dependencies
-	- *Dht Client*
-		- Struct
-			- #[derive()] debug
-			- sender: Arc<MutexM<Sender<CommandCallback<
-		- Impl
+- **behavior.rs**
+	- *MarketBehavior Struct*
+		- combined behavior of Kad DHT and identify protocol
+		- *impl*
+			- *constructor*
+			- un/mutable getters for kad and identify instances
+- **boot_nodes.rs**
+	- *BootNode struct*
+		- contain addr and peer id
+		- *impl*
 			- constructor
-			- *listen_on*
-				- async method that sends listening request to listen on given a MultiAddr
-				- return CommandResult
-			- *bootstrap*
-				- **NOTE: This is most likely a source of problems**
-				- async method to send bootstrap request to connect to user-provided bootnodes
-				- takes an iterator that contains tuples of (PeerId, Multiaddr)
-				- return result for success or failure
-			- *dial*
-				- connect to specific peer given PeerId and Multiaddr
-				- oneshot channel is created for receiving result
-				- command, peerid, and addr sent through DHT server
-				- await for operation to finish 
-				- return Command success or failure
-			- *register*
-				- register file metadata into DHT using CID and allows file to be seen by other peers on the network
-				- convert file_cid to cid and send command to DHT server with file CID, IP, port, and price
-				- await for operation to finish
-				- return Command success or failure
-			- *get_file*
-				- get file metadata given CID with command to the DHT server
-				- return Command success or failure
-			- *get_closest_peers*
-				- find closest peers given CID for content discovery
-				- similar to get_file but a different command
-			- *get_local_peer_id*
-				- similar to ^^^^^ but different command
-- **mod**
-	- Bridge for Dht Client API with Dht Server
-	- *Import dependencies
-	- *bridge*
-		- factory for creating DhtClient and DhtServer and establish connection
-		- takes size cmd_buffer to determine how many commands server can buffer
-		- returns tuple (DhtClient, DhtServer) containing init DHT client and server and will show error if needed
-		- inits a 'swarm' instance with all configs needed 
-			- new identity, tokio, tcp, dns, behavior, swarm config
-		- create channel with sender/receiver for communication and inits Dht client/server with them
-- **DHT SERVER**
-	- **NOTE: PROB GONNA HAVE TO RESET THIS**
-	- handles commands from client by directing it to actual [libp2p] swarm
-	- *import dependencies*
-	- *DhtServer Struct*
-		- swarm<Behavior<MemoryStore< type - configured with DHT behavior using in-memory store
-		- cmd_Receiver - used to receive cmds from clients ()
-			- mpsc::Receiver<CommandCallBack< - mpsc = multi-producer, single-consumer (multiple clients send cmds to single server)
-		- pending_queries - HashMap mapping queryId to CommandResultSender to keep track of DHT quereies 
-		- pending_dials - similar to ^^^ but tracks ongoing direct connections to peers mapped by PeerId
-		- pending_listeners - similar to ^^^ but tracks listeners waiting for specific events mapped by ListenerId
-	- *impl DhtServer*
-		- *constructor*
-		- *run*
-			- DHT server main loop until cmd receiver or swarm stops
-			- async wait for cmds or events from swarm
-		- *handle_swarm_event*
-			- handle libp2p swarm events
-			- matches different events and executes logic
-			- **NOTE: BOOTSTRAP NOT WORKING AS INTENDED RN SO HOLD OFF ON THIS**
-		- *handle_cmd*
-			- handles cmds received from clients
-			- process different types of cmds and executes logic
-				- *Listen* - tell nodes to start listening on specified address
-					- stores listenerID in pending_listeners map
-				- *Bootstrap* - initiate bootstrap process for DHT
-					- for each bootstrap node, add address to libp2p swarm 
-					- stores queryID and sender channel in pending_query map 
-				- *Dial* - establish connection with specific peer
-					- add peer's address to Swarm to dial
-					- store sender channel in pending_dials map
-				- *Register* - store k,v pair in DHT
-					- create record with CID, IP, port, and price/mb and try to store into DHT
-					- stores queryID and sender channel into pending_queries 
-				- *GetFile* - get value from DHT with key
-					- makes key from given CID to get record
-					- stores queryID and sender channel in pending_queries
-				- *GetClosestPeers* - find closest to given key in DHT
-					- makes key from CID and finds closest peers
-					- stores queryID and sender channel in pending_queries
-				- *GetLocalPeerId* 
-					- get local peerID from Swarm and send back to caller through sender channel
+		- *impl Display for Bootnode*
+			- format as a string to print out
+		- *impl From<(Multiaddr, peerid) for Bootnode*
+			- create bootnode from tuple, simpliy creation of Bootnode instances
+		- *impl a,b TryFrom <a str, b str> for Bootnode*
+			- creat boot node from tuple of string slices (addr and peer id)
+		
+	- *BootNodes struct*
+		- wrapper around Vec<BootNode.
+		- *impl*
+			- *constructor*
+				- takes in: iterator of items to be converted to BootNode instances collected into Vec<Bootnode.
+				- returns errors of boot nodes are empty
+			- *iter*
+				- iterator over boot node references
+		- *impl From<BootNodes for Vec<BootNode*
+			- converts bootnodes to vec<bootnode.
+		- *impl Deref for BootNodes*
+			- obtain reference to underlying slice of BootNode instances
+		- *impl IntoIterator for BootNodes*
+			- convert BootNOdes into an iterator 
+		- *Impl TryFrom for BootNOdes*
+			- convert vector type T to BootNodes
+	- *BootNodesIter struct*
+		- customer iterator struct for iterating over references of BootNode instances
+		- *impl*
+			- Iterator for BootNodesIter
+				- specify type 'a BootNode, and advance iterator to next element as an Option containing ref to BootNode 
+				- return None when nothing else to iterate
+- **config.rs**
+	- *Config Struct*
+		- takes in optional collection of bootstrap nodes, listener address, thread name
+		- *impl*
+			- *builder*
+				- returns ConfigBuilder instance
+			- *getters for boot_nodes, listener, thread_name*
+	- *ConfigBuilder Struct*
+		- same fields as config but all fields as 'Options' to incrementally build Config Struct
+		- *impl*
+			- *constructor and setters with_boot_nodes, with_listener, with_thread_name*
+			- *build*
+				- create Config instance from builder 
+				- have default values for listener and thread name if not provided
+- **coordinator.rs**
+	- *coordinator struct*
+		- takes in: swarm object from market behavior and memory store (manage network behavior and state), kad handler instance and identify handler
+		- *impl*
+			- *constructor*
+				- create swarm by listening to provided address and if bootstrap nodes are provided, bootstrap into Kad DHT
+			- *handle_event*
+				- matches market behavior event to Kad or Identify handler
+			- *handle_bootstrap_refresh*
+				- refresh Kad DHT bootstrap without additional nodes
+			- *handle_request*
+				- match request_data with type of request
+					- get all listeners, get connected peers, is connected to, kad request
+			- *handle_swarm_event*
+				- match event with different swarm events
+					- behavior is taken from handle_event method above ^^^
+					- connection establish, connection closed, incoming connection, incoming connection error, outgoing connection error, new listen addr, expired listen addr, listener closed, clistener error, dialing, new external addr candidate, external addr expired
+			- *run*
+				- async function that takes in mut self, and sender to notify when coordinator is ready
+				- creates an unbounded channel for requests, a peer object with local peer id (sender gets the local peer), and timer for bootstrap refresh
+				- a loop that handles bootstrap refreshes, incoming requests, and swarm events
+- **net.rs**
+	- initialize network bridge with a new thread and return a Peer handle to interact with it with a 'NetworkBridgeError' enum
+	- *spawn_bridge*
+		- init a new swarm with a new key pair
+			- with tokio, with tcp, with dns, 
+			- with behavior (closure that recieves node's pub key)
+				- pub key to peer id, init kad DHT config with list of protocol names, kad behavior with kad config and memory store for records, identify config and behavior
+				- kad and identify behavior combined to define market behavior
+		- has idle connection timeout for swarm
+		- create new oneshot channel to signal when network bridge is ready
+		- destructure Config struct to get boot nodes, listener, thread name
+		- build a new thread with specified name and blocks on async block to create a new [Coordinator] with initialized swarm
+			- when coordinator ready then peer instance is sent
+- **peers.rs**
+	- define functionality for a network peer
+	- *peer struct*
+		- takes in peerId and sender part of a channel
+		- *impl*
+			- *constructor*
+			- *accessor for peer id*
+			- *async network communication methods that use a custom 'send' macro to send requests
+				- is connected to, get all listeners, get connected peers, get closest local peers, get closest peers, get file
+			- *send_request*
+				- async method to send requests through the channel and wait for a response
+			- *get_owned_key*
+				- takes Cow (clone-on-write) pointer and returned owned Vec<u8.
+- **req_res.rs**
+	- req/res for p2p network communication
+	- *ResponseHandler struct*
+		- takes a oneshot receiver for receiving responses
+		- *impl*
+			- *get_response_data*
+				- waits for response from oneshot channel
+	- *RequestHandler struct*
+		- takes oneshot sender for sending response back to requester
+		- *impl*
+			- *constructor*
+				- return tuple of reponse handler and response sender
+			- *respond*
+				- request handler sends response through channel
+	- *Enums*
+		- Request data, response data, kad request data, kad response data
+
