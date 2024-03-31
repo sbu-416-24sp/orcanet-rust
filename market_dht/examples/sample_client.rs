@@ -77,8 +77,24 @@ fn main() {
             .unwrap();
         println!("{:?}", peers);
         println!("{peer4_id}");
-        println!("{:?}", peer4.get_file(Cow::Owned(vec![0])).await);
-        println!("{:?}", peer4.get_file(Cow::Owned(vec![0])).await);
+        let sha_hash = [33u8; 32];
+        println!(
+            "{:?}",
+            peer4
+                .register_file(
+                    Cow::Owned(sha_hash.to_vec()),
+                    [190, 32, 11, 23],
+                    9003,
+                    300,
+                    "obama".to_string()
+                )
+                .await
+        );
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        println!(
+            "{:?}",
+            peer2.check_holders(Cow::Owned(sha_hash.to_vec())).await
+        );
     });
     thread::sleep(Duration::from_secs(7777777));
 }

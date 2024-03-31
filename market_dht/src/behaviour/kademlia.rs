@@ -173,8 +173,17 @@ impl KadHandler {
                             }))
                         );
                     }
-                    // TODO: maybe do something with the below event
-                    GetProvidersOk::FinishedWithNoAdditionalRecord { closest_peers } => todo!(),
+                    // TODO: maybe do something with the below event; i don't undderstand if it'll
+                    // be useful atm
+                    GetProvidersOk::FinishedWithNoAdditionalRecord { .. } => {
+                        send_kad_response!(
+                            self.pending_queries,
+                            qid,
+                            Err(anyhow!(
+                                "GetProviders query finished with no additional record"
+                            ))
+                        );
+                    }
                 },
                 Err(err) => {
                     error!("GetProviders query failed with error: {}", err);
