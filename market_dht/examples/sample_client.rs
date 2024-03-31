@@ -1,116 +1,108 @@
-use std::{
-    env,
-    thread::{self},
-    time::Duration,
-};
+use std::{borrow::Cow, thread, time::Duration};
 
-use anyhow::Result;
-
-use libp2p::{Multiaddr, PeerId};
-use log::info;
-use market_dht::{bridge, CommandOk};
-use tokio::{
-    runtime::Runtime,
-    sync::{
-        mpsc,
-        oneshot::{self, Receiver, Sender},
-    },
-    time::sleep,
-};
+use market_dht::{config::Config, multiaddr, net::spawn_bridge};
+use tokio::runtime::Runtime;
 use tracing_log::LogTracer;
 
-fn spawner(
-    sender: Sender<(PeerId, Multiaddr)>,
-    receiver: Receiver<(PeerId, Multiaddr)>,
-    block: bool,
-    listen_addr: Option<&str>,
-    thread_name: &str,
-) -> Result<()> {
-    let (client, mut server) = bridge(16)?;
-    let args: Vec<String> = env::args().collect();
-    thread::scope(|s| {
-        let _ = thread::Builder::new()
-            .name(thread_name.to_owned() + "server_runner")
-            .spawn_scoped(s, move || {
-                Runtime::new()
-                    .unwrap()
-                    .block_on(async move { server.run().await })
-                    .unwrap();
-            });
-        let _ = thread::Builder::new()
-            .name(thread_name.to_owned() + "client_runner")
-            .spawn_scoped(s, move || {
-                Runtime::new().unwrap().block_on(async move {
-                    let res = client
-                        .listen_on(
-                            listen_addr
-                                .unwrap_or("/ip4/0.0.0.0/tcp/0")
-                                .parse::<Multiaddr>()
-                                .unwrap(),
-                        )
-                        .await
-                        .unwrap();
-                    if let CommandOk::AddListener { addr, listener_id } = res {
-                        let peer_id = client.get_peer_id();
-                        sender.send((peer_id, addr.clone())).unwrap();
-                        let (other_peer_id, other_addr) = receiver.await.unwrap();
-                        if block {
-                            sleep(Duration::from_secs(999999)).await;
-                        } else {
-                            info!("Peer ID: {:?}", peer_id);
-                            info!("Addr: {:?}", addr);
-                            info!("Other Peer ID: {:?}", other_peer_id);
-                            info!("Other Peer Addr: {:?}", other_addr);
-                            client
-                                .dial_peer_with_id_addr(other_peer_id, other_addr)
-                                .await
-                                .unwrap();
-                            sleep(Duration::from_secs(9999999)).await;
-                        }
-                    }
-                });
-            });
-    });
-    Ok(())
-}
-
-fn main() -> Result<()> {
-    LogTracer::init()?;
+fn main() {
+    LogTracer::init().unwrap();
     let subscriber = tracing_subscriber::fmt()
         .compact()
-        .with_line_number(true)
         .with_thread_names(true)
+        .with_line_number(true)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
-    let (sender_1, receiver_1) = oneshot::channel();
-    let (sender_2, receiver_2) = oneshot::channel();
-    thread::scope(|s| {
-        let _ = thread::Builder::new()
-            .name("thread_actual_caller".to_owned())
-            .spawn_scoped(s, move || {
-                spawner(
-                    sender_1,
-                    receiver_2,
-                    false,
-                    Some("/ip4/127.0.0.1/tcp/6669"),
-                    "thread_actual_caller",
-                )
-                .unwrap();
-            })
+    let peer1 = spawn_bridge(
+        Config::builder()
+            .with_thread_name("peer1".to_owned())
+            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(5555u16)))
+            .build(),
+    )
+    .unwrap();
+
+    let peer1_id = peer1.id();
+    thread::sleep(Duration::from_secs(1));
+    let peer2 = spawn_bridge(
+        Config::builder()
+            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(1234u16)))
+            .with_thread_name("peer2".to_owned())
+            .with_boot_nodes(
+                vec![("/ip4/127.0.0.1/tcp/5555".to_owned(), peer1_id.to_string())]
+                    .try_into()
+                    .unwrap(),
+            )
+            .build(),
+    )
+    .unwrap();
+
+    thread::sleep(Duration::from_secs(1));
+    let peer3 = spawn_bridge(
+        Config::builder()
+            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(1233u16)))
+            .with_thread_name("peer3".to_owned())
+            .with_boot_nodes(
+                vec![("/ip4/127.0.0.1/tcp/5555".to_owned(), peer1_id.to_string())]
+                    .try_into()
+                    .unwrap(),
+            )
+            .build(),
+    )
+    .unwrap();
+
+    thread::sleep(Duration::from_secs(1));
+    let peer3_id = peer3.id();
+    let peer4 = spawn_bridge(
+        Config::builder()
+            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(22222u16)))
+            .with_thread_name("peer4".to_owned())
+            .with_boot_nodes(
+                vec![("/ip4/127.0.0.1/tcp/1233".to_owned(), peer3_id.to_string())]
+                    .try_into()
+                    .unwrap(),
+            )
+            .build(),
+    )
+    .unwrap();
+    thread::sleep(Duration::from_secs(2));
+    Runtime::new().unwrap().block_on(async {
+        let peers = peer4
+            .get_closest_local_peers(Cow::Owned(peer3_id.to_bytes()))
+            .await
             .unwrap();
-        let _ = thread::Builder::new()
-            .name("thread_big_listener".to_owned())
-            .spawn_scoped(s, move || {
-                spawner(
-                    sender_2,
-                    receiver_1,
-                    true,
-                    Some("/ip4/127.0.0.1/tcp/1234"),
-                    "thread_big_listener",
-                )
-                .unwrap();
-            })
+        println!("{:?}", peers);
+        let peer4_id = peer4.id();
+        let peers = peer4
+            .get_closest_peers(Cow::Owned(peer4_id.to_bytes()))
+            .await
             .unwrap();
+        println!("{:?}", peers);
+        println!("{peer4_id}");
+        let sha_hash = [33u8; 32];
+        println!(
+            "{:?}",
+            peer4
+                .register_file(
+                    Cow::Owned(sha_hash.to_vec()),
+                    [190, 32, 11, 23],
+                    9003,
+                    300,
+                    "obama".to_string()
+                )
+                .await
+        );
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        println!(
+            "{:?}",
+            peer4
+                .register_file(
+                    Cow::Owned(sha_hash.to_vec()),
+                    [190, 32, 11, 23],
+                    9003,
+                    300,
+                    "obama".to_string()
+                )
+                .await
+        );
     });
-    Ok(())
+    thread::sleep(Duration::from_secs(7777777));
 }

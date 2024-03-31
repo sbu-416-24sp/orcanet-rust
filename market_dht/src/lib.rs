@@ -1,16 +1,22 @@
-//! # A library for providing an interface to the Orcanet Kademlia DHT
 #![warn(
     missing_debug_implementations,
     // missing_docs,
     // clippy::missing_errors_doc,
     // clippy::missing_panics_doc,
-    // clippy::missing_const_for_fn
+    clippy::missing_const_for_fn,
 )]
 #![deny(unsafe_code, unreachable_pub)]
 
-pub use bridge::*;
-pub use command::{CommandOk, CommandResult};
+pub use libp2p::multiaddr::{multiaddr, Protocol};
+pub use libp2p::Multiaddr;
+pub use libp2p::PeerId;
+pub use req_res::{FileReqResResponseData, KadResponseData, ResponseData};
 
-mod bridge;
-pub(crate) mod command;
-pub mod file;
+pub mod boot_nodes;
+pub mod config;
+pub mod net;
+pub mod peer;
+
+mod behaviour;
+mod coordinator;
+mod req_res;
