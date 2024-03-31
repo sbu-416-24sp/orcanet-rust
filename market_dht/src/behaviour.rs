@@ -50,7 +50,31 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
     pub(crate) fn identify_mut(&mut self) -> &mut Identify {
         &mut self.identify
     }
+
+    #[allow(dead_code)]
+    pub(crate) const fn file_req_res(&self) -> &FileReqResBehaviour {
+        &self.file_req_res
+    }
+
+    pub(crate) fn file_req_res_mut(&mut self) -> &mut FileReqResBehaviour {
+        &mut self.file_req_res
+    }
 }
+
+mod macros {
+    macro_rules! send_response {
+        ($map: expr, $qid: expr, $msg: expr) => {
+            if let Some(handler) = $map.remove(&$qid) {
+                handler.respond($msg);
+            }
+        };
+        ($request_handler: expr, $err: expr) => {
+            $request_handler.respond(Err($err));
+        };
+    }
+    pub(super) use send_response;
+}
+use macros::send_response;
 
 pub(crate) mod file_req_res;
 pub(crate) mod ident;

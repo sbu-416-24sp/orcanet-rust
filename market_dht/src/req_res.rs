@@ -4,7 +4,7 @@ use anyhow::Result;
 use libp2p::{Multiaddr, PeerId};
 use tokio::sync::oneshot::{self};
 
-use crate::behaviour::file_req_res::FileMetadata;
+use crate::behaviour::file_req_res::{FileMetadata, SupplierInfo};
 
 pub(crate) type Response = Result<ResponseData>;
 pub(crate) type Request = (RequestData, RequestHandler);
@@ -52,6 +52,7 @@ pub(crate) enum RequestData {
     GetConnectedPeers,
     IsConnectedTo(PeerId),
     KadRequest(KadRequestData),
+    ReqResRequest(FileReqResRequestData),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +64,7 @@ pub enum ResponseData {
     ConnectedPeers { connected_peers: Vec<PeerId> },
     IsConnectedTo { is_connected: bool },
     KadResponse(KadResponseData),
+    ReqResResponse(FileReqResResponseData),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,5 +92,23 @@ pub enum KadResponseData {
     GetProviders {
         key: Vec<u8>,
         providers: HashSet<PeerId>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub(crate) enum FileReqResRequestData {
+    GetSupplierInfo { file_hash: Vec<u8>, peer_id: PeerId },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FileReqResResponseData {
+    GetSupplierInfo {
+        supplier_info: SupplierInfo,
+    },
+    GetSuppliers {
+        key: Vec<u8>,
+        suppliers: Vec<(PeerId, SupplierInfo)>,
     },
 }

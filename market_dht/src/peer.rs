@@ -4,7 +4,10 @@ use std::net::Ipv4Addr;
 use tokio::sync::mpsc;
 
 use crate::behaviour::file_req_res::{FileHash, FileMetadata, SupplierInfo};
-use crate::req_res::{KadRequestData, Request, RequestData, RequestHandler, Response};
+use crate::req_res::{
+    FileReqResRequestData, FileReqResResponseData, KadRequestData, KadResponseData, Request,
+    RequestData, RequestHandler, Response, ResponseData,
+};
 use crate::PeerId;
 
 use self::macros::send;
@@ -89,10 +92,35 @@ impl Peer {
     #[inline(always)]
     pub async fn check_holders(&self, file_hash: Cow<'_, Vec<u8>>) -> Response {
         let file_hash = get_owned_key(file_hash);
-        send!(
+        let res = send!(
             self,
             RequestData::KadRequest(KadRequestData::GetProviders { key: file_hash })
-        )
+        )?;
+        if let ResponseData::KadResponse(KadResponseData::GetProviders { key, providers }) = res {
+            // NOTE: maybe refactor later
+            let mut resp_providers = vec![];
+            for provider in providers {
+                if let Ok(ResponseData::ReqResResponse(FileReqResResponseData::GetSupplierInfo {
+                    supplier_info,
+                })) = send!(
+                    self,
+                    RequestData::ReqResRequest(FileReqResRequestData::GetSupplierInfo {
+                        file_hash: key.clone(),
+                        peer_id: provider
+                    })
+                ) {
+                    resp_providers.push((provider, supplier_info));
+                }
+            }
+            Ok(ResponseData::ReqResResponse(
+                FileReqResResponseData::GetSuppliers {
+                    key,
+                    suppliers: resp_providers,
+                },
+            ))
+        } else {
+            panic!("Unexpected response");
+        }
     }
 
     #[inline(always)]

@@ -10,7 +10,7 @@ use tokio::{
 
 use crate::{
     behaviour::{
-        file_req_res::{FileHash, SupplierInfo},
+        file_req_res::{FileHash, FileReqResHandler, SupplierInfo},
         ident::IdentifyHandler,
         kademlia::{BootstrapMode, KadHandler},
         MarketBehaviour, MarketBehaviourEvent,
@@ -26,6 +26,7 @@ pub(crate) struct Coordinator {
     swarm: Swarm<MarketBehaviour<MemoryStore>>,
     kad_handler: KadHandler,
     identify_handler: IdentifyHandler,
+    file_req_res_handler: FileReqResHandler,
     market_map: HashMap<FileHash, SupplierInfo>,
 }
 
@@ -47,21 +48,26 @@ impl Coordinator {
             swarm,
             kad_handler: Default::default(),
             identify_handler: Default::default(),
+            file_req_res_handler: Default::default(),
             market_map: Default::default(),
         }
     }
 
     fn handle_event(&mut self, event: MarketBehaviourEvent<MemoryStore>) {
         match event {
-            MarketBehaviourEvent::Kademlia(event) => self.kad_handler.handle_kad_event(
-                self.swarm.behaviour_mut().kademlia_mut(),
-                event,
-                &mut self.market_map,
-            ),
+            MarketBehaviourEvent::Kademlia(event) => self
+                .kad_handler
+                .handle_kad_event(event, &mut self.market_map),
             MarketBehaviourEvent::Identify(event) => self
                 .identify_handler
                 .handle_identify_event(event, self.swarm.behaviour_mut().kademlia_mut()),
-            MarketBehaviourEvent::FileReqRes(event) => todo!(),
+            MarketBehaviourEvent::FileReqRes(event) => {
+                self.file_req_res_handler.handle_event(
+                    event,
+                    &mut self.market_map,
+                    self.swarm.behaviour_mut().file_req_res_mut(),
+                );
+            }
         }
     }
 
@@ -122,6 +128,13 @@ impl Coordinator {
                 request,
                 &mut self.market_map,
             ),
+            RequestData::ReqResRequest(request) => {
+                self.file_req_res_handler.handle_request(
+                    request,
+                    request_handler,
+                    self.swarm.behaviour_mut().file_req_res_mut(),
+                );
+            }
         }
     }
 

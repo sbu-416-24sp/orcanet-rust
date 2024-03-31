@@ -5,9 +5,8 @@ use libp2p::{
     kad::{
         self,
         store::{MemoryStore, RecordStore},
-        AddProviderError, AddProviderOk, Behaviour as KadBehaviour, GetClosestPeersError,
-        GetClosestPeersOk, GetProvidersOk, GetRecordOk, InboundRequest, PeerRecord, ProgressStep,
-        QueryId, QueryResult, QueryStats,
+        AddProviderError, AddProviderOk, Behaviour as KadBehaviour, GetClosestPeersOk,
+        GetProvidersOk, InboundRequest, ProgressStep, QueryId, QueryResult, QueryStats,
     },
     swarm::NetworkBehaviour,
     PeerId, StreamProtocol,
@@ -16,7 +15,7 @@ use log::{debug, error, info, warn};
 use thiserror::Error;
 
 use crate::{
-    behaviour::kademlia::macros::send_kad_response,
+    behaviour::send_response,
     boot_nodes::BootNodes,
     req_res::{KadRequestData, KadResponseData, RequestHandler, ResponseData},
 };
@@ -62,7 +61,7 @@ impl KadHandler {
                         market_map.insert(key, file_metadata.supplier_info);
                     }
                     Err(err) => {
-                        send_kad_response!(request_handler, err.into());
+                        send_response!(request_handler, err.into());
                     }
                 }
             }
@@ -74,7 +73,6 @@ impl KadHandler {
     }
     pub(crate) fn handle_kad_event<TKadStore: KadStore>(
         &mut self,
-        kad: &mut Kad<TKadStore>,
         KadEvent::Kad(event): KadEvent<TKadStore>,
         market_map: &mut HashMap<FileHash, SupplierInfo>,
     ) {
@@ -88,7 +86,7 @@ impl KadHandler {
                 stats,
                 step,
             } => {
-                self.handle_outbound_query(kad, id, result, stats, step, market_map);
+                self.handle_outbound_query(id, result, stats, step, market_map);
             }
             kad::Event::RoutingUpdated {
                 peer, addresses, ..
@@ -112,9 +110,8 @@ impl KadHandler {
         }
     }
 
-    fn handle_outbound_query<TKadStore: KadStore>(
+    fn handle_outbound_query(
         &mut self,
-        kad: &mut Kad<TKadStore>,
         qid: kad::QueryId,
         result: QueryResult,
         stats: QueryStats,
@@ -159,13 +156,13 @@ impl KadHandler {
                             Err(err) => Err(err.into()),
                         }
                     };
-                    send_kad_response!(self.pending_queries, qid, response);
+                    send_response!(self.pending_queries, qid, response);
                 }
             }
             QueryResult::GetProviders(result) => match result {
                 Ok(ok_res) => match ok_res {
                     GetProvidersOk::FoundProviders { key, providers } => {
-                        send_kad_response!(
+                        send_response!(
                             self.pending_queries,
                             qid,
                             Ok(ResponseData::KadResponse(KadResponseData::GetProviders {
@@ -177,7 +174,7 @@ impl KadHandler {
                     // TODO: maybe do something with the below event; i don't undderstand if it'll
                     // be useful atm
                     GetProvidersOk::FinishedWithNoAdditionalRecord { .. } => {
-                        send_kad_response!(
+                        send_response!(
                             self.pending_queries,
                             qid,
                             Err(anyhow!(
@@ -188,13 +185,13 @@ impl KadHandler {
                 },
                 Err(err) => {
                     error!("GetProviders query failed with error: {}", err);
-                    send_kad_response!(self.pending_queries, qid, Err(err.into()));
+                    send_response!(self.pending_queries, qid, Err(err.into()));
                 }
             },
             QueryResult::StartProviding(result) => match result {
                 Ok(AddProviderOk { key }) => {
                     info!("StartProviding query succeeded for key: {:?}", key);
-                    send_kad_response!(
+                    send_response!(
                         self.pending_queries,
                         qid,
                         Ok(ResponseData::KadResponse(KadResponseData::RegisterFile {
@@ -205,17 +202,13 @@ impl KadHandler {
                 Err(AddProviderError::Timeout { key }) => {
                     error!("StartProviding query timed out for key: {:?}", key);
                     market_map.remove(&FileHash(key.to_vec()));
-                    send_kad_response!(
+                    send_response!(
                         self.pending_queries,
                         qid,
                         Err(AddProviderError::Timeout { key }.into())
                     );
                 }
             },
-            // QueryResult::RepublishProvider(_) => todo!(),
-            // QueryResult::GetRecord(_) => {}
-            // QueryResult::PutRecord(_) => todo!(),
-            // QueryResult::RepublishRecord(_) => todo!(),
             _ => {}
         }
     }
@@ -292,17 +285,3 @@ pub(crate) enum BootstrapMode {
 }
 
 impl KadStore for MemoryStore {}
-
-mod macros {
-    macro_rules! send_kad_response {
-        ($map: expr, $qid: expr, $request_handler: expr) => {
-            if let Some(handler) = $map.remove(&$qid) {
-                handler.respond($request_handler);
-            }
-        };
-        ($request_handler: expr, $err: expr) => {
-            $request_handler.respond(Err($err));
-        };
-    }
-    pub(super) use send_kad_response;
-}
