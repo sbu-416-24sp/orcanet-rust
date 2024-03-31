@@ -38,7 +38,7 @@ fn main() {
     thread::sleep(Duration::from_secs(1));
     let peer3 = spawn_bridge(
         Config::builder()
-            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(3333u16)))
+            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(1233u16)))
             .with_thread_name("peer3".to_owned())
             .with_boot_nodes(
                 vec![("/ip4/127.0.0.1/tcp/5555".to_owned(), peer1_id.to_string())]
@@ -56,7 +56,7 @@ fn main() {
             .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(22222u16)))
             .with_thread_name("peer4".to_owned())
             .with_boot_nodes(
-                vec![("/ip4/127.0.0.1/tcp/3333".to_owned(), peer3_id.to_string())]
+                vec![("/ip4/127.0.0.1/tcp/1233".to_owned(), peer3_id.to_string())]
                     .try_into()
                     .unwrap(),
             )

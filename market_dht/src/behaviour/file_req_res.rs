@@ -72,7 +72,12 @@ impl FileReqResHandler {
             request_response::Event::OutboundFailure {
                 request_id, error, ..
             } => {
-                error!("Outbound failure: {}", error);
+                match &error {
+                    request_response::OutboundFailure::DialFailure => {}
+                    err => {
+                        error!("Outbound failure: {}", err);
+                    }
+                }
                 send_response!(self.pending_requests, request_id, Err(error.into()));
             }
             request_response::Event::InboundFailure {

@@ -8,6 +8,7 @@ use market_proto::market_proto_rpc::market_server::MarketServer;
 use market_server::{cli::Cli, market_service::MarketService};
 use tokio::runtime::Runtime;
 use tonic::transport::Server;
+use tracing::info;
 
 fn main() -> Result<()> {
     tracing_log::LogTracer::init()?;
@@ -56,6 +57,7 @@ fn main() -> Result<()> {
     let market_listen_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), market_port);
     let market_service = MarketService::new(peer);
 
+    info!("Market is listening on {}", market_listen_addr);
     Runtime::new()
         .unwrap()
         .block_on(
