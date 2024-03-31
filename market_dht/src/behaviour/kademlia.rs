@@ -56,7 +56,7 @@ impl KadHandler {
             KadRequestData::RegisterFile { file_metadata } => {
                 // TODO: do something about the cloning here
                 let key = file_metadata.file_hash;
-                match kad.start_providing(key.clone().into()) {
+                match kad.start_providing(key.0.clone().into()) {
                     Ok(qid) => {
                         self.pending_queries.insert(qid, request_handler);
                         market_map.insert(key, file_metadata.supplier_info);
@@ -204,7 +204,7 @@ impl KadHandler {
                 }
                 Err(AddProviderError::Timeout { key }) => {
                     error!("StartProviding query timed out for key: {:?}", key);
-                    market_map.remove(&key.to_vec());
+                    market_map.remove(&FileHash(key.to_vec()));
                     send_kad_response!(
                         self.pending_queries,
                         qid,

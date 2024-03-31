@@ -4,7 +4,7 @@ use anyhow::Result;
 use libp2p::{Multiaddr, PeerId};
 use tokio::sync::oneshot::{self};
 
-use crate::coordinator::FileMetadata;
+use crate::behaviour::file_req_res::FileMetadata;
 
 pub(crate) type Response = Result<ResponseData>;
 pub(crate) type Request = (RequestData, RequestHandler);

@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 
 use tokio::sync::mpsc;
 
-use crate::behaviour::file_req_res::{FileMetadata, SupplierInfo};
+use crate::behaviour::file_req_res::{FileHash, FileMetadata, SupplierInfo};
 use crate::req_res::{KadRequestData, Request, RequestData, RequestHandler, Response};
 use crate::PeerId;
 
@@ -77,7 +77,7 @@ impl Peer {
             username,
         };
         let file_metadata = FileMetadata {
-            file_hash,
+            file_hash: FileHash(file_hash),
             supplier_info,
         };
         send!(

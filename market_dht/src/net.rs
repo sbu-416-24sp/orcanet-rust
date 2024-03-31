@@ -9,7 +9,12 @@ use thiserror::Error;
 use tokio::{runtime::Runtime, sync::oneshot};
 
 use crate::{
-    behaviour::{ident::IDENTIFY_PROTOCOL_NAME, kademlia::KAD_PROTOCOL_NAME, MarketBehaviour},
+    behaviour::{
+        file_req_res::{FileReqResBehaviour, FILE_REQ_RES_PROTOCOL},
+        ident::IDENTIFY_PROTOCOL_NAME,
+        kademlia::KAD_PROTOCOL_NAME,
+        MarketBehaviour,
+    },
     config::Config,
     coordinator::Coordinator,
     peer::Peer,
@@ -40,7 +45,8 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
                 KadBehaviour::with_config(peer_id, MemoryStore::new(peer_id), config);
             let config = IdentifyConfig::new(IDENTIFY_PROTOCOL_NAME.to_string(), key.public());
             let identify_behaviour = IdentifyBehaviour::new(config);
-            MarketBehaviour::new(kad_behaviour, identify_behaviour)
+            let file_req_res = FileReqResBehaviour::new(FILE_REQ_RES_PROTOCOL, Default::default());
+            MarketBehaviour::new(kad_behaviour, identify_behaviour, file_req_res)
         })
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
         .with_swarm_config(|c| c.with_idle_connection_timeout(KEEP_ALIVE_TIMEOUT))

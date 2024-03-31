@@ -61,6 +61,7 @@ impl Coordinator {
             MarketBehaviourEvent::Identify(event) => self
                 .identify_handler
                 .handle_identify_event(event, self.swarm.behaviour_mut().kademlia_mut()),
+            MarketBehaviourEvent::FileReqRes(event) => todo!(),
         }
     }
 
@@ -88,7 +89,7 @@ impl Coordinator {
                 }
                 request = request_rx.recv() => {
                     if let Some(request) = request {
-                        self.handle_request(request.0, request.1).await;
+                        self.handle_request(request.0, request.1);
                     } else {
                         error!("request receiver channel closed, shutting down coordinator");
                         break;
@@ -101,7 +102,7 @@ impl Coordinator {
         }
     }
 
-    async fn handle_request(&mut self, request_data: RequestData, request_handler: RequestHandler) {
+    fn handle_request(&mut self, request_data: RequestData, request_handler: RequestHandler) {
         match request_data {
             RequestData::GetAllListeners => {
                 let listeners = self.swarm.listeners().cloned().collect::<Vec<_>>();
@@ -115,16 +116,12 @@ impl Coordinator {
                 let is_connected = self.swarm.is_connected(&peer_id);
                 request_handler.respond(Ok(ResponseData::IsConnectedTo { is_connected }));
             }
-            RequestData::KadRequest(request) => {
-                self.kad_handler
-                    .handle_kad_request(
-                        self.swarm.behaviour_mut().kademlia_mut(),
-                        request_handler,
-                        request,
-                        &mut self.market_map,
-                    )
-                    .await;
-            }
+            RequestData::KadRequest(request) => self.kad_handler.handle_kad_request(
+                self.swarm.behaviour_mut().kademlia_mut(),
+                request_handler,
+                request,
+                &mut self.market_map,
+            ),
         }
     }
 

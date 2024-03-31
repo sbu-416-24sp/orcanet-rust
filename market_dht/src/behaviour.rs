@@ -4,6 +4,7 @@ use libp2p::{
 };
 
 use self::{
+    file_req_res::FileReqResBehaviour,
     ident::Identify,
     kademlia::{Kad, KadStore},
 };
@@ -14,6 +15,7 @@ use self::{
 pub(crate) struct MarketBehaviour<TKadStore: KadStore> {
     kademlia: Kad<TKadStore>,
     identify: Identify,
+    file_req_res: FileReqResBehaviour,
 }
 
 impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
@@ -21,10 +23,12 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
     pub(crate) const fn new(
         kademlia: KadBehaviour<TKadStore>,
         identify: IdentifyBehaviour,
+        file_req_res: FileReqResBehaviour,
     ) -> Self {
         Self {
             kademlia: Kad::new(kademlia),
             identify: Identify::new(identify),
+            file_req_res,
         }
     }
 
