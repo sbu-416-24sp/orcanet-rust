@@ -37,13 +37,13 @@ impl Coordinator {
     ) -> Result<Self, CoordinatorError> {
         swarm
             .listen_on(listen_addr)
-            .map_err(|err| CoordinatorError::SpawnError(err.to_string()));
+            .map_err(|err| CoordinatorError::SpawnError(err.to_string()))?;
         if let Some(boot_nodes) = boot_nodes {
             swarm
                 .behaviour_mut()
                 .kademlia_mut()
                 .bootstrap(BootstrapMode::WithNodes(boot_nodes))
-                .map_err(|err| CoordinatorError::SpawnError(err.to_string()));
+                .map_err(|err| CoordinatorError::SpawnError(err.to_string()))?;
         }
         Ok(Self {
             swarm,
