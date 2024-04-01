@@ -108,9 +108,21 @@ impl FileAccessType {
             .await?;
 
         // read the chunk into the buffer
-        file.read(&mut buffer).await?;
-
-        // return the buffer
-        Ok(Some(buffer))
+        let res = file.read_exact(&mut buffer).await;
+        match res {
+            Ok(_) => Ok(Some(buffer)),
+            Err(e) => {
+                if e.kind() == io::ErrorKind::UnexpectedEof {
+                    // read until the end of the file
+                    file.seek(SeekFrom::Start(desired_chunk * Self::CHUNK_SIZE))
+                        .await?;
+                    let mut buffer = vec![];
+                    file.read_to_end(&mut buffer).await?;
+                    Ok(Some(buffer))
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
     }
 }
