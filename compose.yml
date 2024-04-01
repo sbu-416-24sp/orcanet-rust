@@ -4,15 +4,16 @@ services:
       context: .
       dockerfile: docker/producer/Dockerfile
     ports:
-      - "8080:8080"
+      - '${ORCA_HTTP_PORT}:${ORCA_HTTP_PORT}'
     environment:
-      - ORCA_MARKET=market:50051
-      - ORCA_IP=127.0.0.1
+      - ORCA_MARKET_ADDRESS=market:50051
     volumes:
       - ./files:/files
     depends_on:
       market:
         condition: service_started
+    env_file:
+      - .env
 
   market:
     build:

@@ -34,9 +34,10 @@ RUN apt-get update && apt-get install -y \
 COPY --from=build /orcanet-rust/peer-node .
 
 # Environment variables
-ENV ORCA_MARKET localhost:50051
-ENV ORCA_IP 127.0.0.1
+ENV ORCA_MARKET_ADDRESS localhost:50051
+ENV ORCA_EXTERNAL_IP 127.0.0.1
+ENV ORCA_HTTP_PORT 8080
 
 # Run the binary
-CMD if [ -z "$ORCA_IP" ]; then ./peer-node -m $ORCA_MARKET -p; \
-    else ./peer-node -m $ORCA_MARKET -i $ORCA_IP -p; fi
+CMD if [ -z "$ORCA_EXTERNAL_IP" ]; then ./peer-node -p -m $ORCA_MARKET_ADDRESS --port $ORCA_HTTP_PORT; \
+    else ./peer-node -p -m $ORCA_MARKET_ADDRESS --port $ORCA_HTTP_PORT --ip $ORCA_EXTERNAL_IP ; fi
