@@ -51,11 +51,46 @@ impl Configurations {
       match serde_json::to_string(&self) {
         Ok(default_config_json) => {
           // Write the string to the file.
-          std::fs::write("config.json", default_config_json)?;
+          match std::fs::write("config.json", default_config_json) {
+            Ok(_) => {
+              return;
+            }
+            Err(_) => {
+              eprintln!("Failed to write to file");
+            }
+          }
         }
         Err(_) => {
-          return;
+          eprintln!("Failed to serialize configuration");
         }
       }
+    }
+
+    pub fn get_market(&self) -> Vec<String> {
+      self.market.clone()
+    }
+
+    pub fn get_files(&self) -> Vec<String> {
+      self.files.clone()
+    }
+
+    pub fn add_market(&mut self, market: String) {
+      self.market.push(market);
+      self.write();
+    }
+
+    pub fn add_file(&mut self, file: String) {
+      self.files.push(file);
+      self.write();
+    }
+
+    pub fn remove_market(&mut self, market: String) {
+      self.market.retain(|x| x != &market);
+      self.write();
+    }
+
+    pub fn remove_file(&mut self, file: String) {
+      self.files.retain(|x| x != &file);
+      self.write();
     }
 }

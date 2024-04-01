@@ -20,8 +20,9 @@ fn cli() -> Command {
                 .arg_required_else_help(true)
                 .subcommand(
                     Command::new("register")
-                        .about("Registers with a market server")
+                        .about("Registers with all known market servers")
                         .arg(arg!(<SERVER> "The market to target"))
+                        // TODO: ADD FILTER MECHANISM
                         .arg_required_else_help(true),
                 )
                 .subcommand(
@@ -32,7 +33,7 @@ fn cli() -> Command {
                             Arg::new("all")
                                 .short('a')
                                 .long("all")
-                                .help("Register all files in the current directory")
+                                .help("Register all files in the specified directory")
                                 .required(false),
                         ),
                 ),
@@ -54,6 +55,23 @@ fn cli() -> Command {
                         .arg_required_else_help(true),
                 ),
         )
+        .subcommand(
+          Command::new("market")
+              .about("market commands")
+              .arg_required_else_help(true)
+              .subcommand(
+                  Command::new("add")
+                      .about("Adds a new market server")
+                      .arg(arg!(<MARKET_URL> "The new").required(true))
+                      .arg_required_else_help(true),
+              )
+              .subcommand(
+                  Command::new("ls")
+                      .about("Lists all market servers")
+                      .arg(arg!(<FILE_HASH> "The hash of the file to download").required(true))
+                      .arg_required_else_help(true),
+              ),
+      )
 }
 
 #[tokio::main]
@@ -88,10 +106,19 @@ async fn main() -> Result<()> {
                 _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
             }
         }
-        _ => {
-            eprintln!("Error: Unrecognized subcommand or missing required arguments.");
-            std::process::exit(1); // Exit with non-zero status to indicate error
-        }
+        Some(("market", consumer_matches)) => {
+          match consumer_matches.subcommand() {
+              Some(("add", add_matches)) => {
+
+              }
+              _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
+          }
+      }
+      _ => {
+          eprintln!("Error: Unrecognized subcommand or missing required arguments.");
+          std::process::exit(1); // Exit with non-zero status to indicate error
+      }
+
     }
     Ok(())
 }
