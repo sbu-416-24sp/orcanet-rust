@@ -16,6 +16,14 @@ To run the consumer:
 cargo run -- -f <file_hash>
 ```
 
+#### Docker
+We also provide a Docker compose file to easily run the producer and market server together. To run it:
+```bash
+docker-compose build
+docker-compose up
+```
+This will automatically mount the local `files` directory to the producer container and expose the producer HTTP and market server gRPC ports.
+
 ### Features / To-Do
 - [x] gRPC Client for Market Server
 - [x] HTTP Server and Client for File Transfer
@@ -24,7 +32,7 @@ cargo run -- -f <file_hash>
 - [x] Automatic file hashing and registration for Producer
 - [x] File chunking and reassembly
 - [ ] Extend CLI to allow producer and consumer to be utilized simultaneously
-- [ ] Automatic IP address discovery
+- [x] Automatic IP address discovery
 - [ ] Producer selection algorithm
 - [ ] Payment verification
 - [ ] File upload
