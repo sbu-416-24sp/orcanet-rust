@@ -1,0 +1,24 @@
+services:
+  producer:
+    build:
+      context: .
+      dockerfile: docker/producer/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - ORCA_MARKET=market:50051
+      - ORCA_IP=127.0.0.1
+    volumes:
+      - ./files:/files
+    depends_on:
+      market:
+        condition: service_started
+
+  market:
+    build:
+      context: .
+      dockerfile: docker/market/Dockerfile
+    expose:
+      - "50051"
+    ports:
+      - "50051:50051"
