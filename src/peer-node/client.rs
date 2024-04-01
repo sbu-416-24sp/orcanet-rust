@@ -62,21 +62,25 @@ fn cli() -> Command {
               .subcommand(
                   Command::new("add")
                       .about("Adds a new market server")
-                      .arg(arg!(<MARKET_URL> "The new").required(true))
+                      .arg(arg!(<MARKET_URL> "The new market server to add").required(true))
                       .arg_required_else_help(true),
               )
               .subcommand(
+                Command::new("rm")
+                    .about("Removes a market server")
+                    .arg(arg!(<MARKET_URL> "The market server to remove").required(true))
+                    .arg_required_else_help(true),
+            )
+              .subcommand(
                   Command::new("ls")
                       .about("Lists all market servers")
-                      .arg(arg!(<FILE_HASH> "The hash of the file to download").required(true))
-                      .arg_required_else_help(true),
               ),
       )
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let config = store::Configurations::new();
+    let mut config = store::Configurations::new();
 
     let matches = cli().get_matches();
     match matches.subcommand() {
@@ -109,7 +113,18 @@ async fn main() -> Result<()> {
         Some(("market", consumer_matches)) => {
           match consumer_matches.subcommand() {
               Some(("add", add_matches)) => {
-
+                  let market_url = match add_matches.get_one::<String>("MARKET_URL").map(|s| s.as_str()) {
+                      Some(url) => url,
+                      _ => unreachable!(),
+                  };
+                  config.add_market(market_url.to_string());
+              }
+              Some(("ls", _)) => {
+                  // Add your implementation for the ls subcommand here
+                  config.get_market();
+                  for market in config.get_market() {
+                      println!("{}", market);
+                  }
               }
               _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
           }

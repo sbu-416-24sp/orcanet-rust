@@ -85,7 +85,9 @@ impl Configurations {
     }
 
     pub fn remove_market(&mut self, market: String) {
+      // if market is not in the list, panic
       self.market.retain(|x| x != &market);
+      
       self.write();
     }
 
