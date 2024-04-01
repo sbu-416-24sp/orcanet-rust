@@ -80,7 +80,7 @@ fn main() {
         let sha_hash = [33u8; 32];
         println!(
             "{:?}",
-            peer4
+            peer3
                 .register_file(
                     Cow::Owned(sha_hash.to_vec()),
                     [190, 32, 11, 23],
@@ -102,6 +102,16 @@ fn main() {
                     "obama".to_string()
                 )
                 .await
+        );
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        println!(
+            "{:?}",
+            peer1.check_holders(Cow::Owned(sha_hash.to_vec())).await
+        );
+        tokio::time::sleep(Duration::from_secs(20)).await;
+        println!(
+            "{:?}",
+            peer1.check_holders(Cow::Owned(sha_hash.to_vec())).await
         );
     });
     thread::sleep(Duration::from_secs(7777777));

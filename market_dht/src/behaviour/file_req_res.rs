@@ -5,10 +5,13 @@ use libp2p::{
     swarm::NetworkBehaviour,
     StreamProtocol,
 };
-use log::{error, info};
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 
-use crate::req_res::{FileReqResRequestData, FileReqResResponseData, RequestHandler, ResponseData};
+use crate::{
+    coordinator::MarketMap,
+    req_res::{FileReqResRequestData, FileReqResResponseData, RequestHandler, ResponseData},
+};
 
 use super::macros::send_response;
 
@@ -37,7 +40,7 @@ impl FileReqResHandler {
     pub(crate) fn handle_event(
         &mut self,
         FileReqResBehaviourEvent::ReqRes(event): FileReqResBehaviourEvent,
-        market_map: &mut HashMap<FileHash, SupplierInfo>,
+        market_map: &mut MarketMap,
         FileReqResBehaviour { req_res }: &mut FileReqResBehaviour,
     ) {
         match event {
@@ -47,14 +50,15 @@ impl FileReqResHandler {
                     request,
                     channel,
                 } => {
-                    if let Some(supplier_info) = market_map.get(&request) {
-                        // NOTE: maybe in the future use Cow
-                        if req_res
-                            .send_response(channel, supplier_info.clone())
-                            .is_err()
-                        {
+                    if let Some(supplier_info) = market_map.get_if_not_expired(&request) {
+                        if req_res.send_response(channel, supplier_info).is_err() {
                             error!("[RequestId {request_id}] Failed to send response to {peer}!");
                         }
+                    } else {
+                        warn!(
+                            "File hash not found and a response was not sent: {:?}",
+                            request
+                        );
                     }
                 }
                 request_response::Message::Response {
@@ -72,12 +76,7 @@ impl FileReqResHandler {
             request_response::Event::OutboundFailure {
                 request_id, error, ..
             } => {
-                match &error {
-                    request_response::OutboundFailure::DialFailure => {}
-                    err => {
-                        error!("Outbound failure: {}", err);
-                    }
-                }
+                error!("Outbound failure: {}", error);
                 send_response!(self.pending_requests, request_id, Err(error.into()));
             }
             request_response::Event::InboundFailure {

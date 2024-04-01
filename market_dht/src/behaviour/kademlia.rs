@@ -17,10 +17,11 @@ use thiserror::Error;
 use crate::{
     behaviour::send_response,
     boot_nodes::BootNodes,
+    coordinator::MarketMap,
     req_res::{KadRequestData, KadResponseData, RequestHandler, ResponseData},
 };
 
-use super::file_req_res::{FileHash, SupplierInfo};
+use super::file_req_res::FileHash;
 
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
 pub(crate) trait KadStore: RecordStore + Send + Sync + 'static {}
@@ -36,7 +37,7 @@ impl KadHandler {
         Kad { kad }: &mut Kad<TKadStore>,
         request_handler: RequestHandler,
         request: KadRequestData,
-        market_map: &mut HashMap<FileHash, SupplierInfo>,
+        market_map: &mut MarketMap,
     ) {
         match request {
             KadRequestData::ClosestLocalPeers { key } => {
@@ -74,7 +75,7 @@ impl KadHandler {
     pub(crate) fn handle_kad_event<TKadStore: KadStore>(
         &mut self,
         KadEvent::Kad(event): KadEvent<TKadStore>,
-        market_map: &mut HashMap<FileHash, SupplierInfo>,
+        market_map: &mut MarketMap,
     ) {
         match event {
             kad::Event::InboundRequest { request } => {
@@ -116,7 +117,7 @@ impl KadHandler {
         result: QueryResult,
         stats: QueryStats,
         step: ProgressStep,
-        market_map: &mut HashMap<FileHash, SupplierInfo>,
+        market_map: &mut MarketMap,
     ) {
         debug!("Query {} progressed with stats: {:?}", qid, stats);
         match result {

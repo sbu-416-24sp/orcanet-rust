@@ -1,4 +1,7 @@
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 use thiserror::Error;
 
 use futures::StreamExt;
@@ -14,6 +17,7 @@ use crate::{
         MarketBehaviour, MarketBehaviourEvent,
     },
     boot_nodes::BootNodes,
+    net::PROVIDER_RECORD_TTL,
     req_res::{Request, RequestData, RequestHandler, ResponseData},
 };
 
@@ -24,7 +28,7 @@ pub(crate) struct Coordinator {
     kad_handler: KadHandler,
     identify_handler: IdentifyHandler,
     file_req_res_handler: FileReqResHandler,
-    market_map: HashMap<FileHash, SupplierInfo>,
+    market_map: MarketMap,
     request_receiver: mpsc::UnboundedReceiver<Request>,
 }
 
@@ -136,7 +140,7 @@ impl Coordinator {
             }
             RequestData::GetLocalSupplierInfo { file_hash } => {
                 request_handler.respond(Ok(ResponseData::GetLocalSupplierInfo {
-                    supplier_info: self.market_map.get(&file_hash).cloned(),
+                    supplier_info: self.market_map.get_if_not_expired(&file_hash),
                 }));
             }
         }
@@ -253,8 +257,42 @@ impl Coordinator {
     }
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct MarketMap {
+    inner: HashMap<FileHash, (SupplierInfo, CreationTime)>,
+}
+
+impl MarketMap {
+    pub(crate) fn remove(&mut self, file_hash: &FileHash) {
+        self.inner.remove(file_hash);
+    }
+
+    pub(crate) fn insert(&mut self, file_hash: FileHash, supplier_info: SupplierInfo) {
+        self.inner
+            .insert(file_hash, (supplier_info, CreationTime::now()));
+    }
+
+    pub(crate) fn get_if_not_expired(&mut self, file_hash: &FileHash) -> Option<SupplierInfo> {
+        if let Some((supplier_info, creation_time)) = self.inner.get(file_hash) {
+            let elapsed_time = Instant::now().duration_since(*creation_time);
+            if elapsed_time >= PROVIDER_RECORD_TTL {
+                self.inner.remove(file_hash);
+                None
+            } else {
+                // NOTE: okay to clone here since we just clone all the time
+                // but will prob refactor to not clone later
+                Some(supplier_info.clone())
+            }
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub(crate) enum CoordinatorError {
     #[error("Failed to spawn coordinator {0}")]
     SpawnError(String),
 }
+
+pub(crate) type CreationTime = Instant;

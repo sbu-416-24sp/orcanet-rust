@@ -21,7 +21,7 @@ use crate::{
 };
 
 const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
-const PROVIDER_RECORD_TTL: Duration = Duration::from_secs(60 * 60);
+pub(crate) const PROVIDER_RECORD_TTL: Duration = Duration::from_secs(60 * 60);
 const PROVIDER_REPUBLICATION: Duration = Duration::from_secs(60 * 5);
 
 pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
