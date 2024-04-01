@@ -9,7 +9,7 @@ use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    coordinator::MarketMap,
+    coordinator::LocalMarketMap,
     req_res::{FileReqResRequestData, FileReqResResponseData, RequestHandler, ResponseData},
 };
 
@@ -40,7 +40,7 @@ impl FileReqResHandler {
     pub(crate) fn handle_event(
         &mut self,
         FileReqResBehaviourEvent::ReqRes(event): FileReqResBehaviourEvent,
-        market_map: &mut MarketMap,
+        market_map: &mut LocalMarketMap,
         FileReqResBehaviour { req_res }: &mut FileReqResBehaviour,
     ) {
         match event {

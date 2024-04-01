@@ -28,7 +28,7 @@ pub(crate) struct Coordinator {
     kad_handler: KadHandler,
     identify_handler: IdentifyHandler,
     file_req_res_handler: FileReqResHandler,
-    market_map: MarketMap,
+    market_map: LocalMarketMap,
     request_receiver: mpsc::UnboundedReceiver<Request>,
 }
 
@@ -258,11 +258,11 @@ impl Coordinator {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct MarketMap {
+pub(crate) struct LocalMarketMap {
     inner: HashMap<FileHash, (SupplierInfo, CreationTime)>,
 }
 
-impl MarketMap {
+impl LocalMarketMap {
     pub(crate) fn remove(&mut self, file_hash: &FileHash) {
         self.inner.remove(file_hash);
     }

@@ -17,7 +17,7 @@ use thiserror::Error;
 use crate::{
     behaviour::send_response,
     boot_nodes::BootNodes,
-    coordinator::MarketMap,
+    coordinator::LocalMarketMap,
     req_res::{KadRequestData, KadResponseData, RequestHandler, ResponseData},
 };
 
@@ -37,7 +37,7 @@ impl KadHandler {
         Kad { kad }: &mut Kad<TKadStore>,
         request_handler: RequestHandler,
         request: KadRequestData,
-        market_map: &mut MarketMap,
+        market_map: &mut LocalMarketMap,
     ) {
         match request {
             KadRequestData::ClosestLocalPeers { key } => {
@@ -75,7 +75,7 @@ impl KadHandler {
     pub(crate) fn handle_kad_event<TKadStore: KadStore>(
         &mut self,
         KadEvent::Kad(event): KadEvent<TKadStore>,
-        market_map: &mut MarketMap,
+        market_map: &mut LocalMarketMap,
     ) {
         match event {
             kad::Event::InboundRequest { request } => {
@@ -117,7 +117,7 @@ impl KadHandler {
         result: QueryResult,
         stats: QueryStats,
         step: ProgressStep,
-        market_map: &mut MarketMap,
+        market_map: &mut LocalMarketMap,
     ) {
         debug!("Query {} progressed with stats: {:?}", qid, stats);
         match result {
