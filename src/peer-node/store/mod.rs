@@ -75,23 +75,35 @@ impl Configurations {
     }
 
     pub fn add_market(&mut self, market: String) {
+      if self.market.contains(&market) {
+        return;
+      }
       self.market.push(market);
       self.write();
     }
 
     pub fn add_file(&mut self, file: String) {
+      // check if file is already in the list
+      if self.files.contains(&file) {
+        return;
+      }
       self.files.push(file);
       self.write();
     }
 
     pub fn remove_market(&mut self, market: String) {
       // if market is not in the list, panic
+      if !self.market.contains(&market) {
+        panic!("Market URL [{}] not found", market);
+      }
       self.market.retain(|x| x != &market);
-      
       self.write();
     }
 
     pub fn remove_file(&mut self, file: String) {
+      if !self.files.contains(&file) {
+        panic!("Path [{}] not found", file);
+      }
       self.files.retain(|x| x != &file);
       self.write();
     }

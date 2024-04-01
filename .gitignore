@@ -2,3 +2,4 @@ target
 files/giraffe.mp4
 download/giraffe.mp4
 t-rust/target
+config.json

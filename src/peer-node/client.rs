@@ -119,6 +119,13 @@ async fn main() -> Result<()> {
                   };
                   config.add_market(market_url.to_string());
               }
+              Some(("rm", add_matches)) => {
+                let market_url = match add_matches.get_one::<String>("MARKET_URL").map(|s| s.as_str()) {
+                    Some(url) => url,
+                    _ => unreachable!(),
+                };
+                config.remove_market(market_url.to_string());
+            }
               Some(("ls", _)) => {
                   // Add your implementation for the ls subcommand here
                   config.get_market();
