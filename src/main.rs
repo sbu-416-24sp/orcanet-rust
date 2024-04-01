@@ -136,7 +136,7 @@ impl Server {
     }
 
     async fn server(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let addr = "127.0.0.1:50051".parse()?;
+        let addr = "0.0.0.0:50051".parse()?;
 
         let market_state = MarketState {
             market_data: self.market_data.clone(),
