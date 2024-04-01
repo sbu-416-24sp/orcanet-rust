@@ -16,7 +16,7 @@ pub async fn get_file_chunk(
     token: String,
     chunk: u64,
 ) -> Result<GetFileResponse> {
-    let start: Instant = Instant::now();
+    let start = Instant::now();
     // Get the link to the file
     let link = format!(
         "http://{}:{}/file/{}?chunk={}",
@@ -69,6 +69,6 @@ pub async fn get_file_chunk(
 
     download.write_all(&file).await?;
     let duration = start.elapsed();
-    println!("HTTP: Chunk [{}] saved to {} [{:?} ms]", chunk, file_name, duration.as_millis());
+    println!("HTTP: Chunk [{}] saved to {} [{} ms]", chunk, file_name, duration.as_millis());
     Ok(GetFileResponse::Token(auth_token.to_string()))
 }
