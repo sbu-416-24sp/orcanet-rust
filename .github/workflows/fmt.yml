@@ -10,6 +10,7 @@ env:
 jobs:
   format:
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, 'GITHUB ACTIONS') }}
     permissions: # Job-level permissions configuration starts here
       contents: write # 'write' access to repository contents
       pull-requests: write # 'write' access to pull requests
