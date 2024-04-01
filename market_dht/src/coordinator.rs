@@ -1,12 +1,10 @@
 use std::{collections::HashMap, time::Duration};
+use thiserror::Error;
 
 use futures::StreamExt;
 use libp2p::{kad::store::MemoryStore, swarm::SwarmEvent, Multiaddr, Swarm};
 use log::{error, info, warn};
-use tokio::{
-    sync::{mpsc, oneshot::Sender},
-    time,
-};
+use tokio::{sync::mpsc, time};
 
 use crate::{
     behaviour::{
@@ -16,8 +14,7 @@ use crate::{
         MarketBehaviour, MarketBehaviourEvent,
     },
     boot_nodes::BootNodes,
-    peer::Peer,
-    req_res::{RequestData, RequestHandler, ResponseData},
+    req_res::{Request, RequestData, RequestHandler, ResponseData},
 };
 
 const BOOTSTRAP_REFRESH_INTERVAL: Duration = Duration::from_secs(60 * 10);
@@ -28,6 +25,7 @@ pub(crate) struct Coordinator {
     identify_handler: IdentifyHandler,
     file_req_res_handler: FileReqResHandler,
     market_map: HashMap<FileHash, SupplierInfo>,
+    request_receiver: mpsc::UnboundedReceiver<Request>,
 }
 
 impl Coordinator {
@@ -35,21 +33,48 @@ impl Coordinator {
         mut swarm: Swarm<MarketBehaviour<MemoryStore>>,
         listen_addr: Multiaddr,
         boot_nodes: Option<BootNodes>,
-    ) -> Self {
-        swarm.listen_on(listen_addr).expect("listen_on to work");
+        request_receiver: mpsc::UnboundedReceiver<Request>,
+    ) -> Result<Self, CoordinatorError> {
+        swarm
+            .listen_on(listen_addr)
+            .map_err(|err| CoordinatorError::SpawnError(err.to_string()));
         if let Some(boot_nodes) = boot_nodes {
             swarm
                 .behaviour_mut()
                 .kademlia_mut()
                 .bootstrap(BootstrapMode::WithNodes(boot_nodes))
-                .expect("initial bootstrap to work");
+                .map_err(|err| CoordinatorError::SpawnError(err.to_string()));
         }
-        Self {
+        Ok(Self {
             swarm,
             kad_handler: Default::default(),
             identify_handler: Default::default(),
             file_req_res_handler: Default::default(),
             market_map: Default::default(),
+            request_receiver,
+        })
+    }
+
+    pub(crate) async fn run(mut self) {
+        let mut bootstrap_refresh_interval = time::interval(BOOTSTRAP_REFRESH_INTERVAL);
+
+        loop {
+            tokio::select! {
+                _ = bootstrap_refresh_interval.tick() => {
+                    self.handle_bootstrap_refresh();
+                }
+                request = self.request_receiver.recv() => {
+                    if let Some(request) = request {
+                        self.handle_request(request.0, request.1);
+                    } else {
+                        error!("request receiver channel closed, shutting down coordinator");
+                        break;
+                    }
+                }
+                swarm_event = self.swarm.select_next_some() => {
+                    self.handle_swarm_event(swarm_event).await;
+                }
+            }
         }
     }
 
@@ -79,32 +104,6 @@ impl Coordinator {
             .bootstrap(BootstrapMode::WithoutNodes)
         {
             error!("Failed to bootstrap peer: {}", err);
-        }
-    }
-
-    pub(crate) async fn run(mut self, ready_tx: Sender<Peer>) {
-        let (request_tx, mut request_rx) = mpsc::unbounded_channel();
-        let peer = Peer::new(request_tx, *self.swarm.local_peer_id());
-        let mut bootstrap_refresh_interval = time::interval(BOOTSTRAP_REFRESH_INTERVAL);
-        ready_tx.send(peer).unwrap();
-
-        loop {
-            tokio::select! {
-                _ = bootstrap_refresh_interval.tick() => {
-                    self.handle_bootstrap_refresh();
-                }
-                request = request_rx.recv() => {
-                    if let Some(request) = request {
-                        self.handle_request(request.0, request.1);
-                    } else {
-                        error!("request receiver channel closed, shutting down coordinator");
-                        break;
-                    }
-                }
-                swarm_event = self.swarm.select_next_some() => {
-                    self.handle_swarm_event(swarm_event).await;
-                }
-            }
         }
     }
 
@@ -252,4 +251,10 @@ impl Coordinator {
             }
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum CoordinatorError {
+    #[error("Failed to spawn coordinator {0}")]
+    SpawnError(String),
 }

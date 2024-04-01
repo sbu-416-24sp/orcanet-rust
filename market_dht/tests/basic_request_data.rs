@@ -4,6 +4,17 @@ use market_dht::{config::Config, multiaddr, net::spawn_bridge, ResponseData};
 use pretty_assertions::{self, assert_eq};
 use tokio::runtime::Runtime;
 
+#[tokio::test]
+async fn test_should_not_panic_in_async_context() {
+    let _ = spawn_bridge(
+        Config::builder()
+            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(4444u16)))
+            .with_thread_name("peer1".to_owned())
+            .build(),
+    )
+    .unwrap();
+}
+
 #[test]
 fn test_get_connected_peers() {
     let peer1 = spawn_bridge(

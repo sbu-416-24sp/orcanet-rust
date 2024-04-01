@@ -6,7 +6,7 @@ use libp2p::{
     noise, yamux,
 };
 use thiserror::Error;
-use tokio::{runtime::Runtime, sync::oneshot};
+use tokio::{runtime::Runtime, sync::mpsc};
 
 use crate::{
     behaviour::{
@@ -21,8 +21,8 @@ use crate::{
 };
 
 const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
-const ONE_HOUR: Duration = Duration::from_secs(60 * 60);
-const FIVE_MINS: Duration = Duration::from_secs(60 * 5);
+const PROVIDER_RECORD_TTL: Duration = Duration::from_secs(60 * 60);
+const PROVIDER_REPUBLICATION: Duration = Duration::from_secs(60 * 5);
 
 pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
     let swarm = libp2p::SwarmBuilder::with_new_identity()
@@ -41,8 +41,8 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
             let mut config = KadConfig::default();
             config.set_protocol_names(vec![KAD_PROTOCOL_NAME]);
             // NOTE: skeptical here?
-            config.set_provider_publication_interval(Some(FIVE_MINS));
-            config.set_provider_record_ttl(Some(ONE_HOUR));
+            config.set_provider_publication_interval(Some(PROVIDER_REPUBLICATION));
+            config.set_provider_record_ttl(Some(PROVIDER_RECORD_TTL));
             let kad_behaviour =
                 KadBehaviour::with_config(peer_id, MemoryStore::new(peer_id), config);
             let config = IdentifyConfig::new(IDENTIFY_PROTOCOL_NAME.to_string(), key.public());
@@ -53,7 +53,7 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
         .with_swarm_config(|c| c.with_idle_connection_timeout(KEEP_ALIVE_TIMEOUT))
         .build();
-    let (ready_tx, ready_rx) = oneshot::channel();
+
     // NOTE: this thread places the coordinator in a static context assuming the
     // thread lives for program life
     let Config {
@@ -61,18 +61,41 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
         listener,
         thread_name,
     } = config;
+    let peer_id = *swarm.local_peer_id();
+
+    let (receiver_tx, receiver_rx) = mpsc::unbounded_channel();
+    let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+
     thread::Builder::new()
         .name(thread_name)
         .spawn(move || {
             Runtime::new().unwrap().block_on(async move {
-                let coordinator = Coordinator::new(swarm, listener, boot_nodes);
-                coordinator.run(ready_tx).await;
+                match Coordinator::new(swarm, listener, boot_nodes, receiver_rx) {
+                    Ok(coordinator) => {
+                        ready_tx
+                            .send(Ok(()))
+                            .expect("the receiver to still be alive");
+                        drop(ready_tx);
+                        coordinator.run().await;
+                    }
+                    Err(err) => {
+                        ready_tx
+                            .send(Err(err))
+                            .expect("the receiver to still be alive");
+                    }
+                }
             });
         })
         .expect("it to spawn the network bridge thread");
-    // FIXIT: this is a blocking call and panics the thread if ran in an asynchronous context
-    let peer = ready_rx.blocking_recv().unwrap();
-    Ok(peer)
+    let res = ready_rx
+        .recv()
+        .map_err(|err| NetworkBridgeError::Init(err.to_string()))?;
+    if let Err(err) = res {
+        Err(NetworkBridgeError::Init(err.to_string()))
+    } else {
+        let peer = Peer::new(receiver_tx, peer_id);
+        Ok(peer)
+    }
 }
 
 #[derive(Debug, Error)]
