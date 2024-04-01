@@ -21,6 +21,11 @@ struct Args {
     /// Only used when running as a consumer
     #[arg(short, long)]
     file_hash: Option<String>,
+
+    /// IP address of the producer
+    /// If not provided, the producer will find its own public IP address
+    #[arg(short, long)]
+    ip: Option<String>,
 }
 
 #[tokio::main]
@@ -28,7 +33,7 @@ async fn main() -> Result<()> {
     let args: Args = Args::parse();
 
     match args.producer {
-        true => producer::run(args.market).await?,
+        true => producer::run(args.market, args.ip).await?,
         false => match args.file_hash {
             Some(file_hash) => consumer::run(args.market, file_hash).await?,
             None => return Err(anyhow!("No file hash provided")),

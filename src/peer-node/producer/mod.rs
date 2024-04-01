@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use crate::grpc::MarketClient;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
-pub async fn run(market: String) -> Result<()> {
+pub async fn run(market: String, ip: Option<String>) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
 
     // Load the files
@@ -23,6 +23,24 @@ pub async fn run(market: String) -> Result<()> {
         }
     });
 
+    // Get the public IP address
+    let ip = match ip {
+        Some(ip) => ip,
+        // Use the AWS checkip service to get the public IP address
+        None => match reqwest::get("http://checkip.amazonaws.com").await {
+            Ok(resp) => match resp.text().await {
+                Ok(text) => text.trim().to_string(),
+                Err(e) => {
+                    return Err(anyhow!("Failed to get public IP: {}", e));
+                }
+            },
+            Err(e) => {
+                return Err(anyhow!("Failed to get public IP: {}", e));
+            }
+        },
+    };
+    println!("Producer: IP address is {}", ip);
+
     // Register the files with the market service
     let hash = file_map.get_hashes().await;
     for hash in hash {
@@ -32,7 +50,7 @@ pub async fn run(market: String) -> Result<()> {
             .register_file(
                 "id".to_string(),
                 "name".to_string(),
-                "127.0.0.1".to_string(),
+                ip.clone(),
                 8080,
                 100,
                 hash,
