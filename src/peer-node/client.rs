@@ -7,7 +7,6 @@ use anyhow::{anyhow, Result};
 use clap::{arg, Arg, Command, Parser};
 // use config::{builder, Config, File, FileFormat};
 
-
 fn cli() -> Command {
     Command::new("peernode")
         .about("Orcanet Peernode CLI")
@@ -27,15 +26,13 @@ fn cli() -> Command {
                 )
                 .subcommand(
                     Command::new("add")
-                        .about("Registers a file with the market server")
-                        .arg(arg!(<FILE_NAME> "The file name to register").required(true))
+                        .about("Registers a dir/file with the market server")
                         .arg(
-                            Arg::new("all")
-                                .short('a')
-                                .long("all")
-                                .help("Register all files in the specified directory")
-                                .required(false),
-                        ),
+                            arg!(<FILE_NAME> "The file or directory name to register")
+                                .required(true),
+                        )
+                        .arg(arg!(<PRICE> "The price of the file").required(true))
+                        .arg_required_else_help(true),
                 ),
         )
         .subcommand(
@@ -56,26 +53,23 @@ fn cli() -> Command {
                 ),
         )
         .subcommand(
-          Command::new("market")
-              .about("market commands")
-              .arg_required_else_help(true)
-              .subcommand(
-                  Command::new("add")
-                      .about("Adds a new market server")
-                      .arg(arg!(<MARKET_URL> "The new market server to add").required(true))
-                      .arg_required_else_help(true),
-              )
-              .subcommand(
-                Command::new("rm")
-                    .about("Removes a market server")
-                    .arg(arg!(<MARKET_URL> "The market server to remove").required(true))
-                    .arg_required_else_help(true),
-            )
-              .subcommand(
-                  Command::new("ls")
-                      .about("Lists all market servers")
-              ),
-      )
+            Command::new("market")
+                .about("market commands")
+                .arg_required_else_help(true)
+                .subcommand(
+                    Command::new("add")
+                        .about("Adds a new market server")
+                        .arg(arg!(<MARKET_URL> "The new market server to add").required(true))
+                        .arg_required_else_help(true),
+                )
+                .subcommand(
+                    Command::new("rm")
+                        .about("Removes a market server")
+                        .arg(arg!(<MARKET_URL> "The market server to remove").required(true))
+                        .arg_required_else_help(true),
+                )
+                .subcommand(Command::new("ls").about("Lists all market servers")),
+        )
 }
 
 #[tokio::main]
@@ -87,12 +81,28 @@ async fn main() -> Result<()> {
         Some(("producer", producer_matches)) => {
             match producer_matches.subcommand() {
                 Some(("register", register_matches)) => {
-                    println!("Register command: {:?}", register_matches);
-                    // producer::run().await?;
+                    let server = match register_matches
+                        .get_one::<String>("SERVER")
+                        .map(|s| s.as_str())
+                    {
+                        Some(server) => server,
+                        _ => unreachable!(),
+                    };
+                    
                 }
                 Some(("add", add_matches)) => {
-                    println!("Add command: {:?}", add_matches);
-                    // Add your implementation for the add subcommand here
+                    let file_name = match add_matches
+                        .get_one::<String>("FILE_NAME")
+                        .map(|s| s.as_str())
+                    {
+                        Some(file_name) => file_name,
+                        _ => unreachable!(),
+                    };
+                    let price = match add_matches.get_one::<f64>("PRICE") {
+                        Some(price) => *price,
+                        _ => unreachable!(),
+                    };
+                    config.add_file(file_name.to_string(), price);
                 }
                 _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
             }
@@ -111,36 +121,41 @@ async fn main() -> Result<()> {
             }
         }
         Some(("market", consumer_matches)) => {
-          match consumer_matches.subcommand() {
-              Some(("add", add_matches)) => {
-                  let market_url = match add_matches.get_one::<String>("MARKET_URL").map(|s| s.as_str()) {
-                      Some(url) => url,
-                      _ => unreachable!(),
-                  };
-                  config.add_market(market_url.to_string());
-              }
-              Some(("rm", add_matches)) => {
-                let market_url = match add_matches.get_one::<String>("MARKET_URL").map(|s| s.as_str()) {
-                    Some(url) => url,
-                    _ => unreachable!(),
-                };
-                config.remove_market(market_url.to_string());
+            match consumer_matches.subcommand() {
+                Some(("add", add_matches)) => {
+                    let market_url = match add_matches
+                        .get_one::<String>("MARKET_URL")
+                        .map(|s| s.as_str())
+                    {
+                        Some(url) => url,
+                        _ => unreachable!(),
+                    };
+                    config.add_market(market_url.to_string());
+                }
+                Some(("rm", add_matches)) => {
+                    let market_url = match add_matches
+                        .get_one::<String>("MARKET_URL")
+                        .map(|s| s.as_str())
+                    {
+                        Some(url) => url,
+                        _ => unreachable!(),
+                    };
+                    config.remove_market(market_url.to_string());
+                }
+                Some(("ls", _)) => {
+                    // Add your implementation for the ls subcommand here
+                    config.get_market();
+                    for market in config.get_market() {
+                        println!("{}", market);
+                    }
+                }
+                _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
             }
-              Some(("ls", _)) => {
-                  // Add your implementation for the ls subcommand here
-                  config.get_market();
-                  for market in config.get_market() {
-                      println!("{}", market);
-                  }
-              }
-              _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
-          }
-      }
-      _ => {
-          eprintln!("Error: Unrecognized subcommand or missing required arguments.");
-          std::process::exit(1); // Exit with non-zero status to indicate error
-      }
-
+        }
+        _ => {
+            eprintln!("Error: Unrecognized subcommand or missing required arguments.");
+            std::process::exit(1); // Exit with non-zero status to indicate error
+        }
     }
     Ok(())
 }

@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
 
 use crate::grpc::orcanet::User;
+use std::time::Instant;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
-use std::time::Instant;
 
 pub enum GetFileResponse {
     Token(String),
@@ -69,6 +69,11 @@ pub async fn get_file_chunk(
 
     download.write_all(&file).await?;
     let duration = start.elapsed();
-    println!("HTTP: Chunk [{}] saved to {} [{:?} ms]", chunk, file_name, duration.as_millis());
+    println!(
+        "HTTP: Chunk [{}] saved to {} [{:?} ms]",
+        chunk,
+        file_name,
+        duration.as_millis()
+    );
     Ok(GetFileResponse::Token(auth_token.to_string()))
 }

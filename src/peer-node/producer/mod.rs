@@ -46,3 +46,31 @@ pub async fn run(market: String) -> Result<()> {
     Ok(())
 }
 
+pub async fn register(name: String, markets: Vec<String>, files: Vec<String>) {
+    for market in markets {
+        let mut client = MarketClient::new(market).await.unwrap();
+
+        for file in &files {
+            // check if this is a file or a directory
+            if std::fs::metadata(file).unwrap().is_dir() {
+                let mut file_map = files::FileMap::new();
+                file_map.add_all(file).await.unwrap();
+                let hash = file_map.get_hashes().await;
+                for hash in hash {}
+              }
+
+
+            // let hash = files::hash_file(file).await.unwrap();
+            // client
+            //     .register_file(
+            //         "id".to_string(),
+            //         "name".to_string(),
+            //         "127.0.0.1".to_string(),
+            //         8080,
+            //         100,
+            //         hash,
+            //     )
+                // .await?;
+        }
+    
+}}
