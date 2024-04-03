@@ -3,26 +3,29 @@ mod grpc;
 mod producer;
 mod store;
 
+use std::io::{self, Write};
+
 use anyhow::{anyhow, Result};
-use clap::{arg, Arg, Command, Parser};
-// use config::{builder, Config, File, FileFormat};
+use clap::{arg, Command};
+use store::Configurations;
 
 fn cli() -> Command {
     Command::new("peernode")
         .about("Orcanet Peernode CLI")
+        .no_binary_name(true)
+        .ignore_errors(true)
         .subcommand_required(true)
         .arg_required_else_help(true)
-        .allow_external_subcommands(true)
         .subcommand(
             Command::new("producer")
                 .about("Producer node commands")
+                .subcommand_required(true)
+                .ignore_errors(true)
                 .arg_required_else_help(true)
                 .subcommand(
                     Command::new("register")
                         .about("Registers with all known market servers")
-                        .arg(arg!(<SERVER> "The market to target"))
-                        // TODO: ADD FILTER MECHANISM
-                        .arg_required_else_help(true),
+                        .arg(arg!(<PORT> "The port to run the HTTP server on").required(false)),
                 )
                 .subcommand(
                     Command::new("add")
@@ -38,6 +41,8 @@ fn cli() -> Command {
         .subcommand(
             Command::new("consumer")
                 .about("Consumer node commands")
+                .subcommand_required(true)
+                .ignore_errors(true)
                 .arg_required_else_help(true)
                 .subcommand(
                     Command::new("upload")
@@ -56,6 +61,8 @@ fn cli() -> Command {
             Command::new("market")
                 .about("market commands")
                 .arg_required_else_help(true)
+                .subcommand_required(true)
+                .ignore_errors(true)
                 .subcommand(
                     Command::new("add")
                         .about("Adds a new market server")
@@ -73,22 +80,55 @@ fn cli() -> Command {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let mut config = store::Configurations::new();
+async fn main() {
+    println!("Orcanet Peernode CLI: Type 'help' for a list of commands");
+    let mut cli = cli();
+    let help = cli.render_help();
+    loop {
+        // Print command prompt and get command    
+        print!("> ");
+        io::stdout().flush().expect("Couldn't flush stdout");
+        let mut config = store::Configurations::new();
+        let market = "localhost:50051".to_string();
+        // take in user input, process it with cli, and then execute the command
+        // if the user wants to exit, break out of the loop
 
-    let matches = cli().get_matches();
+        // take in user input
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        let input = input.trim();
+
+        if input == "exit" {
+            break;
+        }
+
+        let matches = cli
+            .clone()
+            .get_matches_from(input.split_whitespace().collect::<Vec<&str>>());
+        match handle_arg_matches(matches, &mut config, market).await {
+            Ok(_) => {}
+            Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}\n{}", e, help),
+        };
+    }
+}
+
+async fn handle_arg_matches(
+    matches: clap::ArgMatches,
+    config: &mut Configurations,
+    market: String,
+) -> Result<()> {
     match matches.subcommand() {
         Some(("producer", producer_matches)) => {
             match producer_matches.subcommand() {
                 Some(("register", register_matches)) => {
-                    let server = match register_matches
-                        .get_one::<String>("SERVER")
-                        .map(|s| s.as_str())
-                    {
-                        Some(server) => server,
-                        _ => unreachable!(),
+                    // register files with the market service
+                    let port = match register_matches.get_one::<u16>("PORT") {
+                        Some(port) => *port,
+                        None => 8080,
                     };
-                    
+
+                    producer::register_files(market, config.get_files(), port).await?;
+                    Ok(())
                 }
                 Some(("add", add_matches)) => {
                     let file_name = match add_matches
@@ -98,13 +138,15 @@ async fn main() -> Result<()> {
                         Some(file_name) => file_name,
                         _ => unreachable!(),
                     };
-                    let price = match add_matches.get_one::<f64>("PRICE") {
+                    let price = match add_matches.get_one::<i64>("PRICE") {
                         Some(price) => *price,
                         _ => unreachable!(),
                     };
                     config.add_file(file_name.to_string(), price);
+                    Ok(())
                 }
-                _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
+                //  handle invalid subcommand
+                _ => Err(anyhow!("Invalid subcommand")),
             }
         }
         Some(("consumer", consumer_matches)) => {
@@ -112,12 +154,14 @@ async fn main() -> Result<()> {
                 Some(("upload", upload_matches)) => {
                     println!("Upload command: {:?}", upload_matches);
                     // Add your implementation for the upload subcommand here
+                    Ok(())
                 }
                 Some(("get", get_matches)) => {
                     println!("Get command: {:?}", get_matches);
                     // Add your implementation for the get subcommand here
+                    Ok(())
                 }
-                _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
+                _ => Err(anyhow!("Invalid subcommand")),
             }
         }
         Some(("market", consumer_matches)) => {
@@ -131,6 +175,7 @@ async fn main() -> Result<()> {
                         _ => unreachable!(),
                     };
                     config.add_market(market_url.to_string());
+                    Ok(())
                 }
                 Some(("rm", add_matches)) => {
                     let market_url = match add_matches
@@ -141,6 +186,7 @@ async fn main() -> Result<()> {
                         _ => unreachable!(),
                     };
                     config.remove_market(market_url.to_string());
+                    Ok(())
                 }
                 Some(("ls", _)) => {
                     // Add your implementation for the ls subcommand here
@@ -148,16 +194,14 @@ async fn main() -> Result<()> {
                     for market in config.get_market() {
                         println!("{}", market);
                     }
+                    Ok(())
                 }
-                _ => unreachable!(), // If arg_required_else_help is set to true, this should never happen
+                _ => Err(anyhow!("Invalid subcommand")),
             }
         }
-        _ => {
-            eprintln!("Error: Unrecognized subcommand or missing required arguments.");
-            std::process::exit(1); // Exit with non-zero status to indicate error
-        }
+        _ => Err(anyhow!("Invalid subcommand")),
     }
-    Ok(())
+    // Ok(())/
 }
 
 // #[tokio::main]

@@ -1,13 +1,13 @@
-use config::{builder, Config, File, FileFormat};
+use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use serde_json;
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct Configurations {
     name: String,
     market: Vec<String>,
-    files: HashMap<String, f64>,
+    files: HashMap<String, i64>,
     // wallet: String, // not sure about implementation details, will revisit later
 }
 
@@ -30,6 +30,7 @@ impl Configurations {
                 }
             }
             Err(e) => {
+                eprintln!("Failed to load configuration: {:?}", e);
                 return Self::default();
             }
         }
@@ -69,7 +70,7 @@ impl Configurations {
         self.market.clone()
     }
 
-    pub fn get_files(&self) -> HashMap<String, f64> {
+    pub fn get_files(&self) -> HashMap<String, i64> {
         self.files.clone()
     }
 
@@ -81,7 +82,7 @@ impl Configurations {
         self.write();
     }
 
-    pub fn add_file(&mut self, file: String, price : f64) {
+    pub fn add_file(&mut self, file: String, price: i64) {
         self.files.insert(file, price);
         self.write();
     }
