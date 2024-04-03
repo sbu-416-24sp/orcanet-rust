@@ -19,6 +19,15 @@ pub struct FileMap {
 
 pub type AsyncFileMap = Arc<FileMap>;
 
+pub fn hash_file(file: &mut File) -> Result<String> {
+    // Get the hash of a file
+    let mut sha256 = Sha256::new();
+    io::copy(file, &mut sha256)?;
+    let hash = sha256.finalize();
+    let hash = format!("{:x}", hash);
+    Ok(hash)
+}
+
 impl FileMap {
     pub fn default() -> Self {
         FileMap {
@@ -27,15 +36,33 @@ impl FileMap {
         }
     }
 
-    pub async fn new(prices: HashMap<String, i64>) -> Self {
-        let map = FileMap::default();
-        match map.add_all(prices).await {
-            Ok(_) => {}
-            Err(_) => {
-                eprintln!("Failed to add files to the map");
-            }
+    // pub async fn new(prices: HashMap<String, i64>) -> Self {
+    //     let map = FileMap::default();
+    //     match map.add_all(prices).await {
+    //         Ok(_) => {}
+    //         Err(_) => {
+    //             eprintln!("Failed to add files to the map");
+    //         }
+    //     }
+    //     map
+    // }
+    pub fn new(files: HashMap<String, PathBuf>, prices: HashMap<String, i64>) -> Self {
+        FileMap {
+            files: RwLock::new(files),
+            prices: RwLock::new(prices),
         }
-        map
+    }
+
+    pub async fn set(
+        &self,
+        files: HashMap<String, PathBuf>,
+        prices: HashMap<String, i64>,
+    ) -> Result<()> {
+        let mut file_map = self.files.write().await;
+        let mut price_map = self.prices.write().await;
+        *file_map = files;
+        *price_map = prices;
+        Ok(())
     }
 
     pub async fn add_file(&self, file_path: &str, price: i64) -> Result<String> {
@@ -45,7 +72,7 @@ impl FileMap {
 
         // Open the file
         let mut file = File::open(file_path)?;
-        let hash = self.hash_file(&mut file)?;
+        let hash = hash_file(&mut file)?;
         files.insert(hash.clone(), file_path.into());
         prices.insert(hash.clone(), price);
         Ok(hash)
@@ -61,7 +88,7 @@ impl FileMap {
             let file = File::open(path.clone());
             match file {
                 Ok(mut file) => {
-                    let hash = self.hash_file(&mut file)?;
+                    let hash = hash_file(&mut file)?;
                     files.insert(hash.clone(), path);
                     prices.insert(hash, price);
                 }
@@ -116,15 +143,6 @@ impl FileMap {
         let prices = self.prices.read().await;
 
         prices.clone()
-    }
-
-    // Get the hash of a file
-    fn hash_file(&self, file: &mut File) -> Result<String> {
-        let mut sha256 = Sha256::new();
-        io::copy(file, &mut sha256)?;
-        let hash = sha256.finalize();
-        let hash = format!("{:x}", hash);
-        Ok(hash)
     }
 }
 

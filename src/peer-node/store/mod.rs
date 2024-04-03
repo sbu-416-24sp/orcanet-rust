@@ -1,46 +1,69 @@
+use crate::grpc::MarketClient;
+use crate::producer;
+use anyhow::Result;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
+
+#[derive()]
+pub struct Configurations {
+    props: Properties,
+    file_map: producer::files::FileMap,
+    http_client: Option<tokio::task::JoinHandle<()>>,
+}
 
 #[derive(Serialize, Deserialize)]
-pub struct Configurations {
+pub struct Properties {
     name: String,
-    market: Vec<String>,
-    files: HashMap<String, i64>,
+    market: String,
+    files: HashMap<String, PathBuf>,
+    prices: HashMap<String, i64>,
     // wallet: String, // not sure about implementation details, will revisit later
 }
 
 impl Configurations {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let config = Config::builder()
             // .set_default("market", "localhost:50051")?
             .add_source(File::new("config", FileFormat::Json))
             .build();
 
-        match config {
+        let props = match config {
             Ok(config) => {
                 // lets try to deserialize the configuration
-                let config_data = config.try_deserialize::<Configurations>();
+                let config_data = config.try_deserialize::<Properties>();
                 match config_data {
                     Ok(config_data) => config_data,
                     Err(_) => {
-                        return Self::default();
+                        return Self::default().await;
                     }
                 }
             }
             Err(e) => {
                 eprintln!("Failed to load configuration: {:?}", e);
-                return Self::default();
+                return Self::default().await;
             }
+        };
+
+        let file_map = producer::files::FileMap::new(props.files.clone(), props.prices.clone()); 
+        Configurations {
+            props,
+            file_map,
+            http_client: None,
         }
     }
 
-    pub fn default() -> Self {
+    pub async fn default() -> Self {
         let default = Configurations {
-            name: "default".to_string(),
-            market: vec!["localhost:50051".to_string()],
-            files: HashMap::new(),
+            props: Properties {
+                name: "default".to_string(),
+                market: "localhost:50051".to_string(),
+                files: HashMap::new(),
+                prices: HashMap::new(),
+            },
+            file_map: producer::files::FileMap::default(),
+            http_client: None,
         };
         default.write();
         return default;
@@ -48,7 +71,7 @@ impl Configurations {
 
     pub fn write(&self) {
         // Serialize it to a JSON string.
-        match serde_json::to_string(&self) {
+        match serde_json::to_string(&self.props) {
             Ok(default_config_json) => {
                 // Write the string to the file.
                 match std::fs::write("config.json", default_config_json) {
@@ -66,42 +89,86 @@ impl Configurations {
         }
     }
 
-    pub fn get_market(&self) -> Vec<String> {
-        self.market.clone()
+    pub fn get_hash(&self, file_path: String) -> Result<String> {
+        // open the file
+        let mut file = std::fs::File::open(file_path)?;
+        // hash the file
+        let hash = producer::files::hash_file(&mut file)?;
+        Ok(hash)
     }
 
-    pub fn get_files(&self) -> HashMap<String, i64> {
-        self.files.clone()
+    pub fn get_market(&self) -> String {
+        self.props.market.clone()
     }
 
-    pub fn add_market(&mut self, market: String) {
-        if self.market.contains(&market) {
-            return;
-        }
-        self.market.push(market);
-        self.write();
+    pub fn get_files(&self) -> HashMap<String, PathBuf> {
+        self.props.files.clone()
+    }
+
+    pub fn get_prices(&self) -> HashMap<String, i64> {
+        self.props.prices.clone()
     }
 
     pub fn add_file(&mut self, file: String, price: i64) {
-        self.files.insert(file, price);
+        // hash the file
+        let hash = match self.get_hash(file.clone()) {
+            Ok(hash) => hash,
+            Err(_) => {
+                panic!("Failed to hash file");
+            }
+        };
+
+        self.props.files.insert(hash.clone(), PathBuf::from(file));
+        self.props.prices.insert(hash, price);
         self.write();
     }
 
-    pub fn remove_market(&mut self, market: String) {
-        // if market is not in the list, panic
-        if !self.market.contains(&market) {
-            panic!("Market URL [{}] not found", market);
-        }
-        self.market.retain(|x| x != &market);
-        self.write();
-    }
+    pub fn remove_file(&mut self, file_path: String) {
+        // get the hash of the file
+        let hash = match self.get_hash(file_path.clone()) {
+            Ok(hash) => hash,
+            Err(_) => {
+                panic!("Failed to hash file");
+            }
+        };
 
-    pub fn remove_file(&mut self, file: String) {
         // if file is not in the list, panic
-        if !self.files.contains_key(&file) {
-            panic!("File [{}] not found", file);
+        if !self.props.files.contains_key(&hash) || !self.props.prices.contains_key(&hash) {
+            panic!("File [{}] not found", file_path);
         }
-        self.files.remove(&file);
+        self.props.files.remove(&hash);
+        self.props.prices.remove(&hash);
         self.write();
     }
+
+    pub fn set_http_client(&mut self, http_client: tokio::task::JoinHandle<()>) {
+        self.http_client = Some(http_client);
+    }
+
+    pub async fn start_http_client(&mut self, port: u16) {
+        // stop the current http client
+        if let Some(http_client) = self.http_client.take() {
+            match producer::stop_server(http_client).await {
+                Ok(_) => {}
+                Err(_) => {
+                    eprintln!("Failed to stop HTTP server");
+                }
+            }
+        }
+
+        let join = producer::start_server(self.props.files.clone(), self.props.prices.clone(), port).await;
+        self.set_http_client(join);
+    }
+
+    pub async fn stop_http_client(&mut self) {
+        if let Some(http_client) = self.http_client.take() {
+            match producer::stop_server(http_client).await {
+                Ok(_) => {}
+                Err(_) => {
+                    eprintln!("Failed to stop HTTP server");
+                }
+            }
+        }
+    }
+
 }

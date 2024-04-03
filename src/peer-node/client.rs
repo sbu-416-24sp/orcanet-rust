@@ -3,9 +3,13 @@ mod grpc;
 mod producer;
 mod store;
 
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    sync::Arc,
+};
 
 use anyhow::{anyhow, Result};
+use axum::http::uri::Port;
 use clap::{arg, Command};
 use store::Configurations;
 
@@ -36,6 +40,21 @@ fn cli() -> Command {
                         )
                         .arg(arg!(<PRICE> "The price of the file").required(true))
                         .arg_required_else_help(true),
+                )
+                .subcommand(
+                    Command::new("rm")
+                        .about("Removes a file from the market server")
+                        .arg(arg!(<FILE_NAME> "The file to remove").required(true))
+                        .arg_required_else_help(true),
+                )
+                .subcommand(
+                  Command::new("restart")
+                    .about("Restarts the HTTP server")
+                    .arg(arg!(<PORT> "The port to run the HTTP server on").required(false)),
+                )
+                .subcommand(
+                    Command::new("kill")
+                        .about("Kills the HTTP server")
                 ),
         )
         .subcommand(
@@ -57,26 +76,6 @@ fn cli() -> Command {
                         .arg_required_else_help(true),
                 ),
         )
-        .subcommand(
-            Command::new("market")
-                .about("market commands")
-                .arg_required_else_help(true)
-                .subcommand_required(true)
-                .ignore_errors(true)
-                .subcommand(
-                    Command::new("add")
-                        .about("Adds a new market server")
-                        .arg(arg!(<MARKET_URL> "The new market server to add").required(true))
-                        .arg_required_else_help(true),
-                )
-                .subcommand(
-                    Command::new("rm")
-                        .about("Removes a market server")
-                        .arg(arg!(<MARKET_URL> "The market server to remove").required(true))
-                        .arg_required_else_help(true),
-                )
-                .subcommand(Command::new("ls").about("Lists all market servers")),
-        )
 }
 
 #[tokio::main]
@@ -84,11 +83,14 @@ async fn main() {
     println!("Orcanet Peernode CLI: Type 'help' for a list of commands");
     let mut cli = cli();
     let help = cli.render_help();
+
+    // Load the configuration
+    let mut config = store::Configurations::new().await;
+
     loop {
-        // Print command prompt and get command    
+        // Print command prompt and get command
         print!("> ");
         io::stdout().flush().expect("Couldn't flush stdout");
-        let mut config = store::Configurations::new();
         let market = "localhost:50051".to_string();
         // take in user input, process it with cli, and then execute the command
         // if the user wants to exit, break out of the loop
@@ -116,6 +118,7 @@ async fn handle_arg_matches(
     matches: clap::ArgMatches,
     config: &mut Configurations,
     market: String,
+    // file_map: Arc<producer::files::FileMap>,
 ) -> Result<()> {
     match matches.subcommand() {
         Some(("producer", producer_matches)) => {
@@ -126,8 +129,22 @@ async fn handle_arg_matches(
                         Some(port) => *port,
                         None => 8080,
                     };
-
-                    producer::register_files(market, config.get_files(), port).await?;
+                    producer::register_files(config.get_prices(), market).await?;
+                    config.start_http_client(port).await;
+                    Ok(())
+                }
+                Some(("restart", restart_matches)) => {
+                    // restart the HTTP server
+                    let port = match restart_matches.get_one::<u16>("PORT") {
+                        Some(port) => *port,
+                        None => 8080,
+                    };
+                    config.start_http_client(port).await;
+                    Ok(())
+                }
+                Some(("kill", _)) => {
+                    // kill the HTTP server
+                    config.stop_http_client().await;
                     Ok(())
                 }
                 Some(("add", add_matches)) => {
@@ -142,7 +159,18 @@ async fn handle_arg_matches(
                         Some(price) => *price,
                         _ => unreachable!(),
                     };
-                    config.add_file(file_name.to_string(), price);
+                    config.add_file(file_name.to_string(), price);                    
+                    Ok(())
+                }
+                Some(("rm", rm_matches)) => {
+                    let file_name = match rm_matches
+                        .get_one::<String>("FILE_NAME")
+                        .map(|s| s.as_str())
+                    {
+                        Some(file_name) => file_name,
+                        _ => unreachable!(),
+                    };
+                    config.remove_file(file_name.to_string());
                     Ok(())
                 }
                 //  handle invalid subcommand
@@ -164,57 +192,6 @@ async fn handle_arg_matches(
                 _ => Err(anyhow!("Invalid subcommand")),
             }
         }
-        Some(("market", consumer_matches)) => {
-            match consumer_matches.subcommand() {
-                Some(("add", add_matches)) => {
-                    let market_url = match add_matches
-                        .get_one::<String>("MARKET_URL")
-                        .map(|s| s.as_str())
-                    {
-                        Some(url) => url,
-                        _ => unreachable!(),
-                    };
-                    config.add_market(market_url.to_string());
-                    Ok(())
-                }
-                Some(("rm", add_matches)) => {
-                    let market_url = match add_matches
-                        .get_one::<String>("MARKET_URL")
-                        .map(|s| s.as_str())
-                    {
-                        Some(url) => url,
-                        _ => unreachable!(),
-                    };
-                    config.remove_market(market_url.to_string());
-                    Ok(())
-                }
-                Some(("ls", _)) => {
-                    // Add your implementation for the ls subcommand here
-                    config.get_market();
-                    for market in config.get_market() {
-                        println!("{}", market);
-                    }
-                    Ok(())
-                }
-                _ => Err(anyhow!("Invalid subcommand")),
-            }
-        }
         _ => Err(anyhow!("Invalid subcommand")),
     }
-    // Ok(())/
 }
-
-// #[tokio::main]
-// async fn main() -> Result<()> {
-//     let args: Args = Args::parse();
-
-//     match args.producer {
-//         true => producer::run(args.market).await?,
-//         false => match args.file_hash {
-//             Some(file_hash) => consumer::run(args.market, file_hash).await?,
-//             None => return Err(anyhow!("No file hash provided")),
-//         },
-//     }
-
-//     Ok(())
-// }
