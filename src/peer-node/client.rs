@@ -3,13 +3,9 @@ mod grpc;
 mod producer;
 mod store;
 
-use std::{
-    io::{self, Write},
-    sync::Arc,
-};
+use std::io::{self, Write};
 
 use anyhow::{anyhow, Result};
-use axum::http::uri::Port;
 use clap::{arg, Command};
 use store::Configurations;
 
@@ -25,7 +21,7 @@ fn cli() -> Command {
                 .about("Producer node commands")
                 .subcommand_required(true)
                 .ignore_errors(true)
-                .arg_required_else_help(true)
+                // .arg_required_else_help(true)
                 .subcommand(
                     Command::new("register")
                         .about("Registers with all known market servers")
@@ -61,6 +57,10 @@ fn cli() -> Command {
                     .about("Sets the port for the HTTP server")
                     .arg(arg!(<PORT> "The port to run the HTTP server on").required(true)),
                 )
+                .subcommand(
+                    Command::new("ls")
+                        .about("Lists all files registered with the market server")
+                )
                 ,
         )
         .subcommand(
@@ -82,6 +82,10 @@ fn cli() -> Command {
                         .arg_required_else_help(true),
                 ),
         )
+        .subcommand(
+            Command::new("exit")
+                .about("Exits the CLI") 
+        )
 }
 
 #[tokio::main]
@@ -92,7 +96,6 @@ async fn main() {
 
     // Load the configuration
     let mut config = store::Configurations::new().await;
-
     loop {
         // Print command prompt and get command
         print!("> ");
@@ -106,8 +109,8 @@ async fn main() {
         io::stdin().read_line(&mut input).unwrap();
         let input = input.trim();
 
-        if input == "exit" {
-            break;
+        if input == "exit"{
+          break;
         }
 
         let matches = cli
@@ -117,6 +120,7 @@ async fn main() {
             Ok(_) => {}
             Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}\n{}", e, help),
         };
+
     }
 }
 
@@ -173,7 +177,7 @@ async fn handle_arg_matches(
                             return Ok(());
                         }
                     };
-                    config.add_file(file_name.to_string(), price);                    
+                    config.add_file_path(file_name.to_string(), price);                    
                     Ok(())
                 }
                 Some(("rm", rm_matches)) => {
@@ -185,6 +189,15 @@ async fn handle_arg_matches(
                         _ => Err(anyhow!("Invalid file name"))?,
                     };
                     config.remove_file(file_name.to_string());
+                    Ok(())
+                }
+                Some(("ls", _)) => {
+                    let files = config.get_files();
+                    let prices = config.get_prices();
+
+                    for (hash, path) in files {
+                        println!("File: {}, Price: {}", path.to_string_lossy(), *prices.get(&hash).unwrap_or(&0));
+                    }
                     Ok(())
                 }
                 Some(("port", port_matches)) => {
@@ -213,6 +226,9 @@ async fn handle_arg_matches(
                 }
                 _ => Err(anyhow!("Invalid subcommand")),
             }
+        }
+        Some(("exit", _)) => {
+            Ok(())
         }
         _ => Err(anyhow!("Invalid subcommand")),
     }

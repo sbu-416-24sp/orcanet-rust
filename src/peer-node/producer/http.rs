@@ -167,16 +167,16 @@ async fn handle_file_request(
 }
 
 pub async fn run(files: AsyncFileMap, port: String) -> Result<(), Box<dyn std::error::Error>> {
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    println!("HTTP: Listening on {}", listener.local_addr()?);
+
     let app = Router::new()
         .route("/file/:file_hash", get(handle_file_request))
         .with_state(AppState {
             consumers: Arc::new(db::Consumers::new()),
             files,
         });
-
-    let addr = format!("0.0.0.0:{}", port);
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    println!("HTTP: Listening on {}", listener.local_addr()?);
 
     axum::serve(
         listener,
