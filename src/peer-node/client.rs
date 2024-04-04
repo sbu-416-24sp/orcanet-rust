@@ -90,7 +90,7 @@ async fn main() {
     let mut config = store::Configurations::new().await;
     loop {
         // Print command prompt and get command
-        print!("> ");
+        // print!("> ");
         io::stdout().flush().expect("Couldn't flush stdout");
         let market = "localhost:50051".to_string();
         // take in user input, process it with cli, and then execute the command
