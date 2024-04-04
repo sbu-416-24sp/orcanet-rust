@@ -166,7 +166,7 @@ async fn handle_file_request(
         .unwrap()
 }
 
-pub async fn run(files: AsyncFileMap, port: u16) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(files: AsyncFileMap, port: String) -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/file/:file_hash", get(handle_file_request))
         .with_state(AppState {

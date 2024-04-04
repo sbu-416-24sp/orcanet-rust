@@ -9,7 +9,6 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 #[derive()]
 pub struct Configurations {
     props: Properties,
-    file_map: producer::files::FileMap,
     http_client: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -19,6 +18,7 @@ pub struct Properties {
     market: String,
     files: HashMap<String, PathBuf>,
     prices: HashMap<String, i64>,
+    port: String,
     // wallet: String, // not sure about implementation details, will revisit later
 }
 
@@ -28,7 +28,6 @@ impl Configurations {
             // .set_default("market", "localhost:50051")?
             .add_source(File::new("config", FileFormat::Json))
             .build();
-
         let props = match config {
             Ok(config) => {
                 // lets try to deserialize the configuration
@@ -45,11 +44,8 @@ impl Configurations {
                 return Self::default().await;
             }
         };
-
-        let file_map = producer::files::FileMap::new(props.files.clone(), props.prices.clone()); 
         Configurations {
             props,
-            file_map,
             http_client: None,
         }
     }
@@ -61,8 +57,8 @@ impl Configurations {
                 market: "localhost:50051".to_string(),
                 files: HashMap::new(),
                 prices: HashMap::new(),
+                port: "8080".to_string(),
             },
-            file_map: producer::files::FileMap::default(),
             http_client: None,
         };
         default.write();
@@ -109,6 +105,15 @@ impl Configurations {
         self.props.prices.clone()
     }
 
+    pub fn get_port(&self) -> String {
+        self.props.port.clone()
+    }
+
+    pub fn set_port(&mut self, port: String) {
+        self.props.port = port;
+        self.write();
+    }
+
     pub fn add_file(&mut self, file: String, price: i64) {
         // hash the file
         let hash = match self.get_hash(file.clone()) {
@@ -145,7 +150,7 @@ impl Configurations {
         self.http_client = Some(http_client);
     }
 
-    pub async fn start_http_client(&mut self, port: u16) {
+    pub async fn start_http_client(&mut self, port: String) {
         // stop the current http client
         if let Some(http_client) = self.http_client.take() {
             match producer::stop_server(http_client).await {
@@ -156,8 +161,12 @@ impl Configurations {
             }
         }
 
+        // set the port
+        self.set_port(port.clone());
+
         let join = producer::start_server(self.props.files.clone(), self.props.prices.clone(), port).await;
         self.set_http_client(join);
+
     }
 
     pub async fn stop_http_client(&mut self) {

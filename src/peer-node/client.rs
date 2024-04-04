@@ -55,7 +55,13 @@ fn cli() -> Command {
                 .subcommand(
                     Command::new("kill")
                         .about("Kills the HTTP server")
-                ),
+                )
+                .subcommand(
+                  Command::new("port")
+                    .about("Sets the port for the HTTP server")
+                    .arg(arg!(<PORT> "The port to run the HTTP server on").required(true)),
+                )
+                ,
         )
         .subcommand(
             Command::new("consumer")
@@ -125,19 +131,19 @@ async fn handle_arg_matches(
             match producer_matches.subcommand() {
                 Some(("register", register_matches)) => {
                     // register files with the market service
-                    let port = match register_matches.get_one::<u16>("PORT") {
-                        Some(port) => *port,
-                        None => 8080,
+                    let port = match register_matches.get_one::<String>("PORT") {
+                        Some(port) => port.clone(),
+                        None => String::from("8080"),
                     };
-                    producer::register_files(config.get_prices(), market).await?;
+                    producer::register_files(config.get_prices(), market, port.clone()).await?;
                     config.start_http_client(port).await;
                     Ok(())
                 }
                 Some(("restart", restart_matches)) => {
                     // restart the HTTP server
-                    let port = match restart_matches.get_one::<u16>("PORT") {
-                        Some(port) => *port,
-                        None => 8080,
+                    let port = match restart_matches.get_one::<String>("PORT") {
+                        Some(port) => port.clone(),
+                        None => String::from("8080"),
                     };
                     config.start_http_client(port).await;
                     Ok(())
@@ -153,11 +159,19 @@ async fn handle_arg_matches(
                         .map(|s| s.as_str())
                     {
                         Some(file_name) => file_name,
-                        _ => unreachable!(),
+                        _ => Err(anyhow!("Invalid file name"))?,
                     };
-                    let price = match add_matches.get_one::<i64>("PRICE") {
-                        Some(price) => *price,
-                        _ => unreachable!(),
+                    let price = match add_matches.get_one::<String>("PRICE") {
+                        Some(price) => price,
+                        _ => Err(anyhow!("Invalid price"))?,
+                    };
+                    // get i64 price
+                    let price = match price.parse::<i64>() {
+                        Ok(price) => price,
+                        Err(_) => {
+                            eprintln!("Invalid price");
+                            return Ok(());
+                        }
                     };
                     config.add_file(file_name.to_string(), price);                    
                     Ok(())
@@ -168,9 +182,17 @@ async fn handle_arg_matches(
                         .map(|s| s.as_str())
                     {
                         Some(file_name) => file_name,
-                        _ => unreachable!(),
+                        _ => Err(anyhow!("Invalid file name"))?,
                     };
                     config.remove_file(file_name.to_string());
+                    Ok(())
+                }
+                Some(("port", port_matches)) => {
+                    let port = match port_matches.get_one::<String>("PORT") {
+                        Some(port) => port.clone(),
+                        None => String::from("8080"),
+                    };
+                    config.set_port(port);
                     Ok(())
                 }
                 //  handle invalid subcommand
