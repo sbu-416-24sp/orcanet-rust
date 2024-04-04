@@ -71,6 +71,12 @@ fn cli() -> Command {
                         .arg_required_else_help(true),
                 )
                 .subcommand(
+                    Command::new("ls")
+                        .about("Lists all producers with a file")
+                        .arg(arg!(<FILE_HASH> "The hash of the file to list").required(true))
+                        .arg_required_else_help(true),
+                )
+                .subcommand(
                     Command::new("get")
                         .about("Downloads a file from a producer")
                         .arg(arg!(<FILE_HASH> "The hash of the file to download").required(true))
@@ -210,13 +216,24 @@ async fn handle_arg_matches(
         Some(("consumer", consumer_matches)) => {
             match consumer_matches.subcommand() {
                 Some(("upload", upload_matches)) => {
-                    println!("Upload command: {:?}", upload_matches);
                     // Add your implementation for the upload subcommand here
                     Ok(())
                 }
+                Some(("ls", ls_matches)) => {
+                    let file_hash = match ls_matches.get_one::<String>("FILE_HASH") {
+                        Some(file_hash) => file_hash.clone(),
+                        None => Err(anyhow!("No file hash provided"))?,
+                    };
+                    consumer::list_producers(file_hash, market).await?;
+                    Ok(())
+                }
                 Some(("get", get_matches)) => {
-                    println!("Get command: {:?}", get_matches);
-                    // Add your implementation for the get subcommand here
+                    let file_hash = match get_matches.get_one::<String>("FILE_HASH") {
+                        Some(file_hash) => file_hash.clone(),
+
+                        None => Err(anyhow!("No file hash provided"))?,
+                    };
+                    consumer::run(market, file_hash).await?;
                     Ok(())
                 }
                 _ => Err(anyhow!("Invalid subcommand")),
