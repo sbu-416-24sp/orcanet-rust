@@ -47,8 +47,11 @@ pub async fn run(market: String) -> Result<()> {
     Ok(())
 }
 
-
-pub async fn start_server(files: HashMap<String, PathBuf>, prices: HashMap<String, i64>, port: String) -> tokio::task::JoinHandle<()> {
+pub async fn start_server(
+    files: HashMap<String, PathBuf>,
+    prices: HashMap<String, i64>,
+    port: String,
+) -> tokio::task::JoinHandle<()> {
     // Launch the HTTP server in the background
     let http_file_map = Arc::new(files::FileMap::new(files, prices));
     tokio::spawn(async move {

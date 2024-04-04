@@ -44,24 +44,19 @@ fn cli() -> Command {
                         .arg_required_else_help(true),
                 )
                 .subcommand(
-                  Command::new("restart")
-                    .about("Restarts the HTTP server")
-                    .arg(arg!(<PORT> "The port to run the HTTP server on").required(false)),
+                    Command::new("restart")
+                        .about("Restarts the HTTP server")
+                        .arg(arg!(<PORT> "The port to run the HTTP server on").required(false)),
+                )
+                .subcommand(Command::new("kill").about("Kills the HTTP server"))
+                .subcommand(
+                    Command::new("port")
+                        .about("Sets the port for the HTTP server")
+                        .arg(arg!(<PORT> "The port to run the HTTP server on").required(true)),
                 )
                 .subcommand(
-                    Command::new("kill")
-                        .about("Kills the HTTP server")
-                )
-                .subcommand(
-                  Command::new("port")
-                    .about("Sets the port for the HTTP server")
-                    .arg(arg!(<PORT> "The port to run the HTTP server on").required(true)),
-                )
-                .subcommand(
-                    Command::new("ls")
-                        .about("Lists all files registered with the market server")
-                )
-                ,
+                    Command::new("ls").about("Lists all files registered with the market server"),
+                ),
         )
         .subcommand(
             Command::new("consumer")
@@ -82,10 +77,7 @@ fn cli() -> Command {
                         .arg_required_else_help(true),
                 ),
         )
-        .subcommand(
-            Command::new("exit")
-                .about("Exits the CLI") 
-        )
+        .subcommand(Command::new("exit").about("Exits the CLI"))
 }
 
 #[tokio::main]
@@ -109,8 +101,8 @@ async fn main() {
         io::stdin().read_line(&mut input).unwrap();
         let input = input.trim();
 
-        if input == "exit"{
-          break;
+        if input == "exit" {
+            break;
         }
 
         let matches = cli
@@ -120,7 +112,6 @@ async fn main() {
             Ok(_) => {}
             Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}\n{}", e, help),
         };
-
     }
 }
 
@@ -177,7 +168,7 @@ async fn handle_arg_matches(
                             return Ok(());
                         }
                     };
-                    config.add_file_path(file_name.to_string(), price);                    
+                    config.add_file_path(file_name.to_string(), price);
                     Ok(())
                 }
                 Some(("rm", rm_matches)) => {
@@ -196,7 +187,11 @@ async fn handle_arg_matches(
                     let prices = config.get_prices();
 
                     for (hash, path) in files {
-                        println!("File: {}, Price: {}", path.to_string_lossy(), *prices.get(&hash).unwrap_or(&0));
+                        println!(
+                            "File: {}, Price: {}",
+                            path.to_string_lossy(),
+                            *prices.get(&hash).unwrap_or(&0)
+                        );
                     }
                     Ok(())
                 }
@@ -227,9 +222,7 @@ async fn handle_arg_matches(
                 _ => Err(anyhow!("Invalid subcommand")),
             }
         }
-        Some(("exit", _)) => {
-            Ok(())
-        }
+        Some(("exit", _)) => Ok(()),
         _ => Err(anyhow!("Invalid subcommand")),
     }
 }

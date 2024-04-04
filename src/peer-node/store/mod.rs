@@ -114,32 +114,32 @@ impl Configurations {
     }
 
     pub fn add_dir(&mut self, file_path: String, price: i64) -> Result<()> {
-      // assume that the file_path is a directory
-      // let dir_name = file_path.clone() + "/**/*";
-      // get all the files in the directory
-      for entry in fs::read_dir(file_path)? {
-          let path = entry?.path();
-          // convert the path to a string
-          let path_string = match path.to_str() {
-              Some(path) => path,
-              None => {
-                  panic!("Failed to convert path to string");
-              }
-          };
-          // check if this is a file or a directory
-          if path.is_dir() {
-              self.add_dir(path_string.to_owned(), price)?;
-          }
-          if path.is_file() {
-            self.add_file(path_string.to_owned(), price)
-          }
-      }
-      Ok(())
+        // assume that the file_path is a directory
+        // let dir_name = file_path.clone() + "/**/*";
+        // get all the files in the directory
+        for entry in fs::read_dir(file_path)? {
+            let path = entry?.path();
+            // convert the path to a string
+            let path_string = match path.to_str() {
+                Some(path) => path,
+                None => {
+                    panic!("Failed to convert path to string");
+                }
+            };
+            // check if this is a file or a directory
+            if path.is_dir() {
+                self.add_dir(path_string.to_owned(), price)?;
+            }
+            if path.is_file() {
+                self.add_file(path_string.to_owned(), price)
+            }
+        }
+        Ok(())
     }
 
     pub fn add_file(&mut self, file: String, price: i64) {
-          // hash the file
-          let hash = match self.get_hash(file.clone()) {
+        // hash the file
+        let hash = match self.get_hash(file.clone()) {
             Ok(hash) => hash,
             Err(_) => {
                 panic!("Failed to hash file");
@@ -150,7 +150,6 @@ impl Configurations {
         self.props.prices.insert(hash, price);
         // self.write();
     }
-
 
     pub fn add_file_path(&mut self, file: String, price: i64) {
         // check if this is a file or a directory
@@ -211,9 +210,9 @@ impl Configurations {
         // set the port
         self.set_port(port.clone());
 
-        let join = producer::start_server(self.props.files.clone(), self.props.prices.clone(), port).await;
+        let join =
+            producer::start_server(self.props.files.clone(), self.props.prices.clone(), port).await;
         self.set_http_client(join);
-
     }
 
     pub async fn stop_http_client(&mut self) {
@@ -226,5 +225,4 @@ impl Configurations {
             }
         }
     }
-
 }
