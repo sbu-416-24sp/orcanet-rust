@@ -4,6 +4,36 @@ use crate::grpc::MarketClient;
 
 use anyhow::Result;
 
+pub async fn list_producers(file_hash: String, market: String) -> Result<()> {
+    let mut client = MarketClient::new(market).await?;
+    let producers = client.check_holders(file_hash).await?;
+    for producer in producers.holders {
+        println!("Producer: {}:{}, Price: {}", producer.ip, producer.port, producer.price);
+    }
+    Ok(())
+}
+
+pub async fn get_file_chunk(producer: User, file_hash: String, token: String, chunk: u64) -> Result<String> {
+    match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
+        Ok(response) => {
+            match response {
+                http::GetFileResponse::Token(new_token) => {
+                    token = new_token;
+                }
+                http::GetFileResponse::Done => {
+                    println!("Consumer: File downloaded successfully");
+                }
+            }
+            chunk += 1;
+        }
+        Err(e) => {
+            eprintln!("Failed to download chunk {}: {}", chunk, e);
+        }
+    }
+    
+    Ok("urmom".to_string())
+} 
+
 pub async fn run(market: String, file_hash: String) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
 
