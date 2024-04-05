@@ -1,23 +1,20 @@
 pub mod http;
+pub mod encode;
 
 use std::io;
 
-use crate::grpc::{orcanet::User, MarketClient};
+use crate::grpc::{MarketClient};
 use anyhow::Result;
-use base64::{
-    alphabet,
-    engine::{self, general_purpose},
-    Engine as _,
-};
+
 
 pub async fn list_producers(file_hash: String, market: String) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
     let producers = client.check_holders(file_hash).await?;
     for producer in producers.holders {
         // serialize the producer struct to a string
-        let producer_str = serde_json::to_string(&producer)?;
-        let encoded_producer = general_purpose::STANDARD.encode(producer_str.as_bytes());
-        
+        // let producer_str = serde_json::to_string(&producer)?;
+        // let encoded_producer = general_purpose::STANDARD.encode(producer_str.as_bytes());
+        let encoded_producer = encode::encode_user(&producer);
 
         // let mut encoder = EncoderWriter::new(&mut encoded_producer, &STANDARD);
         // io::copy(&mut producer_str, &mut encoder)?;
