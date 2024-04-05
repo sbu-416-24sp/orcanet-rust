@@ -1,38 +1,61 @@
 pub mod http;
 
-use crate::grpc::MarketClient;
+use std::io;
 
+use crate::grpc::{orcanet::User, MarketClient};
 use anyhow::Result;
+use base64::{
+    alphabet,
+    engine::{self, general_purpose},
+    Engine as _,
+};
 
 pub async fn list_producers(file_hash: String, market: String) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
     let producers = client.check_holders(file_hash).await?;
     for producer in producers.holders {
-        println!("Producer: {}:{}, Price: {}", producer.ip, producer.port, producer.price);
+        // serialize the producer struct to a string
+        let producer_str = serde_json::to_string(&producer)?;
+        let encoded_producer = general_purpose::STANDARD.encode(producer_str.as_bytes());
+        
+
+        // let mut encoder = EncoderWriter::new(&mut encoded_producer, &STANDARD);
+        // io::copy(&mut producer_str, &mut encoder)?;
+        // let encoded_producer = match encoding::all::ISO_8859_1.encode(producer_str.as_str(), encoding::EncoderTrap::Strict){
+        //     Ok(encoded_producer) => encoded_producer,
+        //     Err(_) => {
+        //         eprintln!("Failed to encode producer");
+        //         continue;
+        //     }
+        // };
+        // for every field in the producer struct, convert it to a string
+        // and append it to the string
+        println!("Producer:\n  id: {}\n  Price: {}", encoded_producer, producer.price);
     }
     Ok(())
 }
 
-pub async fn get_file_chunk(producer: User, file_hash: String, token: String, chunk: u64) -> Result<String> {
-    match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
-        Ok(response) => {
-            match response {
-                http::GetFileResponse::Token(new_token) => {
-                    token = new_token;
-                }
-                http::GetFileResponse::Done => {
-                    println!("Consumer: File downloaded successfully");
-                }
-            }
-            chunk += 1;
-        }
-        Err(e) => {
-            eprintln!("Failed to download chunk {}: {}", chunk, e);
-        }
-    }
-    
-    Ok("urmom".to_string())
-} 
+// pub async fn get_file_chunk(producer: User, file_hash: String, token: String, chunk: u64) -> Result<String> {
+//     let mut Token = token;
+
+//     match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
+//         Ok(response) => {
+//             match response {
+//                 http::GetFileResponse::Token(new_token) => {
+//                     Token = new_token;
+//                 }
+//                 http::GetFileResponse::Done => {
+//                     println!("Consumer: File downloaded successfully");
+//                 }
+//             }
+//         }
+//         Err(e) => {
+//             eprintln!("Failed to download chunk {}: {}", chunk, e);
+//         }
+//     }
+
+//     Ok("urmom".to_string())
+// }
 
 pub async fn run(market: String, file_hash: String) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
