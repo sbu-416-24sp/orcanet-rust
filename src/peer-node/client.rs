@@ -3,7 +3,7 @@ mod grpc;
 mod producer;
 mod store;
 
-use std::{f32::consts::E, io::{self, Write}};
+use std::io::{self, Write};
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
