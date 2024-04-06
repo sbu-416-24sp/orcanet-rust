@@ -65,6 +65,19 @@ fn cli() -> Command {
                 .ignore_errors(true)
                 .arg_required_else_help(true)
                 .subcommand(
+                    Command::new("consumer")
+                        .about("Consumer node commands")
+                        .ignore_errors(true)
+                        .arg_required_else_help(true)
+                        .subcommand(
+                            Command::new("send")
+                                .about("transfer funds to another user")
+                                .arg(arg!(<AMOUNT> "The amount to transfer").required(true))
+                                .arg(arg!(<RECIPIENT> "The recipient of the funds").required(true))
+                                .arg_required_else_help(true),
+                        ),
+                )
+                .subcommand(
                     Command::new("upload")
                         .about("Uploads a file to a producer")
                         .arg(arg!(<FILE_NAME> "The file to upload").required(true))
@@ -80,7 +93,20 @@ fn cli() -> Command {
                     Command::new("get")
                         .about("Downloads a file from a producer")
                         .arg(arg!(<FILE_HASH> "The hash of the file to download").required(true))
-                        .arg_required_else_help(true),
+                        .arg(arg!(<PRODUCER> "The producer to download from").required(true))
+                        .arg(arg!(<CHUNK_NUM> "The chunk number to download").required(false))
+                        .arg(arg!(<CONTINUE> "Continue downloading a file").required(false)),
+                ),
+        )
+        .subcommand(
+            Command::new("market")
+                .about("Market node commands")
+                .subcommand_required(true)
+                .ignore_errors(true)
+                .subcommand(
+                    Command::new("set")
+                        .about("Sets the market to connect to")
+                        .arg(arg!(<MARKET> "The market to connect to").required(true)),
                 ),
         )
         .subcommand(Command::new("exit").about("Exits the CLI"))
@@ -94,11 +120,11 @@ async fn main() {
 
     // Load the configuration
     let mut config = store::Configurations::new().await;
+    let market = config.get_market();
+
     loop {
         // Print command prompt and get command
-        print!("> ");
         io::stdout().flush().expect("Couldn't flush stdout");
-        let market = "localhost:50051".to_string();
         // take in user input, process it with cli, and then execute the command
         // if the user wants to exit, break out of the loop
 
@@ -114,7 +140,7 @@ async fn main() {
         let matches = cli
             .clone()
             .get_matches_from(input.split_whitespace().collect::<Vec<&str>>());
-        match handle_arg_matches(matches, &mut config, market).await {
+        match handle_arg_matches(matches, &mut config, market.clone()).await {
             Ok(_) => {}
             Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}\n{}", e, help),
         };
@@ -125,7 +151,6 @@ async fn handle_arg_matches(
     matches: clap::ArgMatches,
     config: &mut Configurations,
     market: String,
-    // file_map: Arc<producer::files::FileMap>,
 ) -> Result<()> {
     match matches.subcommand() {
         Some(("producer", producer_matches)) => {
@@ -134,7 +159,7 @@ async fn handle_arg_matches(
                     // register files with the market service
                     let port = match register_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
-                        None => String::from("8080"),
+                        None => config.get_port(),
                     };
                     producer::register_files(config.get_prices(), market, port.clone()).await?;
                     config.start_http_client(port).await;
@@ -144,7 +169,7 @@ async fn handle_arg_matches(
                     // restart the HTTP server
                     let port = match restart_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
-                        None => String::from("8080"),
+                        None => config.get_port(),
                     };
                     config.start_http_client(port).await;
                     Ok(())
@@ -204,7 +229,7 @@ async fn handle_arg_matches(
                 Some(("port", port_matches)) => {
                     let port = match port_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
-                        None => String::from("8080"),
+                        None => Err(anyhow!("No port provided"))?,
                     };
                     config.set_port(port);
                     Ok(())
@@ -215,8 +240,12 @@ async fn handle_arg_matches(
         }
         Some(("consumer", consumer_matches)) => {
             match consumer_matches.subcommand() {
-                Some(("upload", upload_matches)) => {
+                Some(("upload", _upload_matches)) => {
                     // Add your implementation for the upload subcommand here
+                    Ok(())
+                }
+                Some(("send", _send_matches)) => {
+                    // Add your implementation for the send subcommand here
                     Ok(())
                 }
                 Some(("ls", ls_matches)) => {
@@ -230,15 +259,60 @@ async fn handle_arg_matches(
                 Some(("get", get_matches)) => {
                     let file_hash = match get_matches.get_one::<String>("FILE_HASH") {
                         Some(file_hash) => file_hash.clone(),
-
                         None => Err(anyhow!("No file hash provided"))?,
                     };
-                    consumer::run(market, file_hash).await?;
+                    let producer = match get_matches.get_one::<String>("PRODUCER") {
+                        Some(producer) => producer.clone(),
+                        None => Err(anyhow!("No producer provided"))?,
+                    };
+                    let chunk_num = match get_matches.get_one::<u64>("CHUNK_NUM") {
+                        Some(chunk_num) => *chunk_num,
+                        None => 0,
+                    };
+                    let continue_download = match get_matches.get_one::<bool>("CONTINUE") {
+                        Some(continue_download) => *continue_download,
+                        None => true,
+                    };
+                    let token = config.get_token(producer.clone());
+                    let ret_token = match consumer::get_file(
+                        producer.clone(),
+                        file_hash,
+                        token,
+                        chunk_num,
+                        continue_download,
+                    )
+                    .await
+                    {
+                        Ok(token) => token,
+                        Err(e) => {
+                            match e.to_string().as_str() {
+                                "Request failed with status code: 404" => {
+                                    println!("Consumer: File downloaded successfully");
+                                }
+                                _ => {
+                                    eprintln!("Failed to download chunk {}: {}", chunk_num, e);
+                                }
+                            };
+                            return Ok(());
+                        }
+                    };
+                    config.set_token(producer, ret_token);
                     Ok(())
                 }
                 _ => Err(anyhow!("Invalid subcommand")),
             }
         }
+        Some(("market", market_matches)) => match market_matches.subcommand() {
+            Some(("set", set_matches)) => {
+                let market = match set_matches.get_one::<String>("MARKET") {
+                    Some(market) => market.clone(),
+                    None => Err(anyhow!("No market provided"))?,
+                };
+                config.set_market(market);
+                Ok(())
+            }
+            _ => Err(anyhow!("Invalid subcommand")),
+        },
         Some(("exit", _)) => Ok(()),
         _ => Err(anyhow!("Invalid subcommand")),
     }

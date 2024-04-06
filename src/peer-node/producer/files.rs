@@ -12,6 +12,7 @@ use tokio::io::SeekFrom;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::RwLock;
 
+#[allow(dead_code)]
 pub struct FileMap {
     files: RwLock<HashMap<String, PathBuf>>,
     prices: RwLock<HashMap<String, i64>>,
@@ -27,7 +28,7 @@ pub fn hash_file(file: &mut File) -> Result<String> {
     let hash = format!("{:x}", hash);
     Ok(hash)
 }
-
+#[allow(dead_code)]
 impl FileMap {
     pub fn default() -> Self {
         FileMap {
@@ -36,16 +37,6 @@ impl FileMap {
         }
     }
 
-    // pub async fn new(prices: HashMap<String, i64>) -> Self {
-    //     let map = FileMap::default();
-    //     match map.add_all(prices).await {
-    //         Ok(_) => {}
-    //         Err(_) => {
-    //             eprintln!("Failed to add files to the map");
-    //         }
-    //     }
-    //     map
-    // }
     pub fn new(files: HashMap<String, PathBuf>, prices: HashMap<String, i64>) -> Self {
         FileMap {
             files: RwLock::new(files),
