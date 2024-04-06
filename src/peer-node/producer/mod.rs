@@ -67,11 +67,6 @@ pub async fn stop_server(join_handle: tokio::task::JoinHandle<()>) -> Result<()>
     Ok(())
 }
 
-// pub async fn create_market_client(market: String) -> Result<MarketClient> {
-//     let client = MarketClient::new(market).await?;
-//     Ok(client)
-// }
-
 pub async fn register_files(
     prices: HashMap<String, i64>,
     market: String,
