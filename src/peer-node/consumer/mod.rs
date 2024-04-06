@@ -34,6 +34,13 @@ pub async fn get_file_chunk(producer: User, file_hash: String, token: String, ch
     Ok("urmom".to_string())
 } 
 
+pub async fn upload_file(file_path: String, market: String) -> Result<()> {
+    let mut client = MarketClient::new(market).await?;
+    //let file_hash = client.upload_file(file_path).await?;
+    println!("File uploaded successfully, hash: {}", file_hash);
+    Ok(())
+}
+
 pub async fn run(market: String, file_hash: String) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
 
