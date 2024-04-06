@@ -65,6 +65,18 @@ fn cli() -> Command {
                 .ignore_errors(true)
                 .arg_required_else_help(true)
                 .subcommand(
+                  Command::new("consumer")
+                      .about("Consumer node commands")
+                      .ignore_errors(true)
+                      .arg_required_else_help(true)
+                      .subcommand(Command::new("send")
+                      .about("transfer funds to another user")
+                      .arg(arg!(<AMOUNT> "The amount to transfer").required(true))
+                      .arg(arg!(<RECIPIENT> "The recipient of the funds").required(true))
+                      .arg_required_else_help(true)
+                      )
+                    )
+                .subcommand(
                     Command::new("upload")
                         .about("Uploads a file to a producer")
                         .arg(arg!(<FILE_NAME> "The file to upload").required(true))
@@ -229,6 +241,10 @@ async fn handle_arg_matches(
             match consumer_matches.subcommand() {
                 Some(("upload", _upload_matches)) => {
                     // Add your implementation for the upload subcommand here
+                    Ok(())
+                }
+                Some(("send", _send_matches)) => {
+                    // Add your implementation for the send subcommand here
                     Ok(())
                 }
                 Some(("ls", ls_matches)) => {
