@@ -17,6 +17,7 @@ pub struct Properties {
     market: String,
     files: HashMap<String, PathBuf>,
     prices: HashMap<String, i64>,
+    tokens: HashMap<String, String>,
     port: String,
     // wallet: String, // not sure about implementation details, will revisit later
 }
@@ -56,6 +57,7 @@ impl Configurations {
                 market: "localhost:50051".to_string(),
                 files: HashMap::new(),
                 prices: HashMap::new(),
+                tokens: HashMap::new(),
                 port: "8080".to_string(),
             },
             http_client: None,
@@ -106,6 +108,23 @@ impl Configurations {
 
     pub fn get_port(&self) -> String {
         self.props.port.clone()
+    }
+
+    pub fn get_token(&mut self, producer_id: String) -> String {
+        match self.props.tokens.get(&producer_id).cloned() {
+            Some(token) => token,
+            None => {
+                let token = "token".to_string();
+                self.set_token(producer_id, token.clone());
+                self.write();
+                token
+            }
+        }
+    }
+
+    pub fn set_token(&mut self, producer_id: String, token: String) {
+        self.props.tokens.insert(producer_id, token);
+        self.write();
     }
 
     pub fn set_port(&mut self, port: String) {

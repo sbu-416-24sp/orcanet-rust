@@ -65,17 +65,18 @@ fn cli() -> Command {
                 .ignore_errors(true)
                 .arg_required_else_help(true)
                 .subcommand(
-                  Command::new("consumer")
-                      .about("Consumer node commands")
-                      .ignore_errors(true)
-                      .arg_required_else_help(true)
-                      .subcommand(Command::new("send")
-                      .about("transfer funds to another user")
-                      .arg(arg!(<AMOUNT> "The amount to transfer").required(true))
-                      .arg(arg!(<RECIPIENT> "The recipient of the funds").required(true))
-                      .arg_required_else_help(true)
-                      )
-                    )
+                    Command::new("consumer")
+                        .about("Consumer node commands")
+                        .ignore_errors(true)
+                        .arg_required_else_help(true)
+                        .subcommand(
+                            Command::new("send")
+                                .about("transfer funds to another user")
+                                .arg(arg!(<AMOUNT> "The amount to transfer").required(true))
+                                .arg(arg!(<RECIPIENT> "The recipient of the funds").required(true))
+                                .arg_required_else_help(true),
+                        ),
+                )
                 .subcommand(
                     Command::new("upload")
                         .about("Uploads a file to a producer")
@@ -92,7 +93,12 @@ fn cli() -> Command {
                     Command::new("get")
                         .about("Downloads a file from a producer")
                         .arg(arg!(<FILE_HASH> "The hash of the file to download").required(true))
-                        .arg_required_else_help(true),
+                        .arg(arg!(<PRODUCER> "The producer to download from").required(true))
+                        .arg(
+                            arg!(<CHUNK_NUM> "The chunk number to download")
+                                .required(false)
+                        )
+                        .arg(arg!(<CONTINUE> "Continue downloading a file").required(false)),
                 ),
         )
         .subcommand(
@@ -121,7 +127,6 @@ async fn main() {
 
     loop {
         // Print command prompt and get command
-        // print!("> ");
         io::stdout().flush().expect("Couldn't flush stdout");
         // take in user input, process it with cli, and then execute the command
         // if the user wants to exit, break out of the loop
@@ -149,7 +154,6 @@ async fn handle_arg_matches(
     matches: clap::ArgMatches,
     config: &mut Configurations,
     market: String,
-    // file_map: Arc<producer::files::FileMap>,
 ) -> Result<()> {
     match matches.subcommand() {
         Some(("producer", producer_matches)) => {
@@ -258,10 +262,44 @@ async fn handle_arg_matches(
                 Some(("get", get_matches)) => {
                     let file_hash = match get_matches.get_one::<String>("FILE_HASH") {
                         Some(file_hash) => file_hash.clone(),
-
                         None => Err(anyhow!("No file hash provided"))?,
                     };
-                    consumer::run(market, file_hash).await?;
+                    let producer = match get_matches.get_one::<String>("PRODUCER") {
+                        Some(producer) => producer.clone(),
+                        None => Err(anyhow!("No producer provided"))?,
+                    };
+                    let chunk_num = match get_matches.get_one::<u64>("CHUNK_NUM") {
+                        Some(chunk_num) => *chunk_num,
+                        None => 0,
+                    };
+                    let continue_download = match get_matches.get_one::<bool>("CONTINUE") {
+                        Some(continue_download) => *continue_download,
+                        None => true,
+                    };
+                    let token = config.get_token(producer.clone());
+                    let ret_token = match consumer::get_file(
+                        producer.clone(),
+                        file_hash,
+                        token,
+                        chunk_num,
+                        continue_download,
+                    )
+                    .await
+                    {
+                        Ok(token) => token,
+                        Err(e) => {
+                            match e.to_string().as_str() {
+                                "Request failed with status code: 404" => {
+                                    println!("Consumer: File downloaded successfully");
+                                }
+                                _ => {
+                                    eprintln!("Failed to download chunk {}: {}", chunk_num, e);
+                                }
+                            };
+                            return Ok(());
+                        }
+                    };
+                    config.set_token(producer, ret_token);
                     Ok(())
                 }
                 _ => Err(anyhow!("Invalid subcommand")),
