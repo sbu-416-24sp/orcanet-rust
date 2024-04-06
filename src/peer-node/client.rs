@@ -3,7 +3,7 @@ mod grpc;
 mod producer;
 mod store;
 
-use std::io::{self, Write};
+use std::{f32::consts::E, io::{self, Write}};
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
@@ -159,7 +159,7 @@ async fn handle_arg_matches(
                     // register files with the market service
                     let port = match register_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
-                        None => String::from("8080"),
+                        None => config.get_port(),
                     };
                     producer::register_files(config.get_prices(), market, port.clone()).await?;
                     config.start_http_client(port).await;
@@ -169,7 +169,7 @@ async fn handle_arg_matches(
                     // restart the HTTP server
                     let port = match restart_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
-                        None => String::from("8080"),
+                        None => config.get_port(),
                     };
                     config.start_http_client(port).await;
                     Ok(())
@@ -229,7 +229,7 @@ async fn handle_arg_matches(
                 Some(("port", port_matches)) => {
                     let port = match port_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
-                        None => String::from("8080"),
+                        None => Err(anyhow!("No port provided"))?,
                     };
                     config.set_port(port);
                     Ok(())
