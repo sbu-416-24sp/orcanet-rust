@@ -30,8 +30,8 @@ async fn main() -> Result<()> {
     match args.producer {
         true => producer::run(args.market).await?,
         false => match args.file_hash {
-            Some(file_hash) => consumer::run(args.market, file_hash).await?,
-            None => return Err(anyhow!("No file hash provided")),
+Some(file_hash) => consumer::run(args.market, file_hash).await?,
+None => return Err(anyhow!("No file hash provided")),
         },
     }
 
