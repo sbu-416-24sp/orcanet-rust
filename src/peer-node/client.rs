@@ -83,6 +83,17 @@ fn cli() -> Command {
                         .arg_required_else_help(true),
                 ),
         )
+        .subcommand(
+            Command::new("market")
+                .about("Market node commands")
+                .subcommand_required(true)
+                .ignore_errors(true)
+                .subcommand(
+                    Command::new("set")
+                        .about("Sets the market to connect to")
+                        .arg(arg!(<MARKET> "The market to connect to").required(true)),
+                ),
+        )
         .subcommand(Command::new("exit").about("Exits the CLI"))
 }
 
@@ -94,11 +105,12 @@ async fn main() {
 
     // Load the configuration
     let mut config = store::Configurations::new().await;
+    let market = config.get_market();
+
     loop {
         // Print command prompt and get command
         // print!("> ");
         io::stdout().flush().expect("Couldn't flush stdout");
-        let market = "localhost:50051".to_string();
         // take in user input, process it with cli, and then execute the command
         // if the user wants to exit, break out of the loop
 
@@ -114,7 +126,7 @@ async fn main() {
         let matches = cli
             .clone()
             .get_matches_from(input.split_whitespace().collect::<Vec<&str>>());
-        match handle_arg_matches(matches, &mut config, market).await {
+        match handle_arg_matches(matches, &mut config, market.clone()).await {
             Ok(_) => {}
             Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}\n{}", e, help),
         };
@@ -239,6 +251,17 @@ async fn handle_arg_matches(
                 _ => Err(anyhow!("Invalid subcommand")),
             }
         }
+        Some(("market", market_matches)) => match market_matches.subcommand() {
+            Some(("set", set_matches)) => {
+                let market = match set_matches.get_one::<String>("MARKET") {
+                    Some(market) => market.clone(),
+                    None => Err(anyhow!("No market provided"))?,
+                };
+                config.set_market(market);
+                Ok(())
+            }
+            _ => Err(anyhow!("Invalid subcommand")),
+        },
         Some(("exit", _)) => Ok(()),
         _ => Err(anyhow!("Invalid subcommand")),
     }

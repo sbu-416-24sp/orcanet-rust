@@ -3,7 +3,7 @@ use anyhow::Result;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 #[derive()]
 pub struct Configurations {
@@ -110,6 +110,11 @@ impl Configurations {
 
     pub fn set_port(&mut self, port: String) {
         self.props.port = port;
+        self.write();
+    }
+
+    pub fn set_market(&mut self, market: String) {
+        self.props.market = market;
         self.write();
     }
 

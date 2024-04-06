@@ -1,9 +1,6 @@
 use crate::grpc::orcanet::User;
 use anyhow::Result;
-use base64::{
-    engine::general_purpose,
-    Engine as _,
-};
+use base64::{engine::general_purpose, Engine as _};
 
 pub fn encode_user(user: &User) -> String {
     let user_str = serde_json::to_string(&user).unwrap();
