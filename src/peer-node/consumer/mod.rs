@@ -1,11 +1,8 @@
-pub mod http;
 pub mod encode;
+pub mod http;
 
-use std::io;
-
-use crate::grpc::{MarketClient};
+use crate::grpc::MarketClient;
 use anyhow::Result;
-
 
 pub async fn list_producers(file_hash: String, market: String) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
@@ -27,7 +24,10 @@ pub async fn list_producers(file_hash: String, market: String) -> Result<()> {
         // };
         // for every field in the producer struct, convert it to a string
         // and append it to the string
-        println!("Producer:\n  id: {}\n  Price: {}", encoded_producer, producer.price);
+        println!(
+            "Producer:\n  id: {}\n  Price: {}",
+            encoded_producer, producer.price
+        );
     }
     Ok(())
 }

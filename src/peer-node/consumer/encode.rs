@@ -1,10 +1,9 @@
-use base64::{
-  alphabet,
-  engine::{self, general_purpose},
-  Engine as _,
-};
 use crate::grpc::orcanet::User;
 use anyhow::Result;
+use base64::{
+    engine::general_purpose,
+    Engine as _,
+};
 
 pub fn encode_user(user: &User) -> String {
     let user_str = serde_json::to_string(&user).unwrap();
@@ -19,7 +18,7 @@ pub fn decode_user(encoded_user: String) -> Result<User> {
             Err(_) => {
                 return Err(anyhow::anyhow!("Failed to decode user"));
             }
-        }
+        },
         Err(_) => {
             return Err(anyhow::anyhow!("Failed to decode user"));
         }

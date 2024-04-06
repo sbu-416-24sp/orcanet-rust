@@ -215,7 +215,7 @@ async fn handle_arg_matches(
         }
         Some(("consumer", consumer_matches)) => {
             match consumer_matches.subcommand() {
-                Some(("upload", upload_matches)) => {
+                Some(("upload", _upload_matches)) => {
                     // Add your implementation for the upload subcommand here
                     Ok(())
                 }
