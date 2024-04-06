@@ -94,10 +94,7 @@ fn cli() -> Command {
                         .about("Downloads a file from a producer")
                         .arg(arg!(<FILE_HASH> "The hash of the file to download").required(true))
                         .arg(arg!(<PRODUCER> "The producer to download from").required(true))
-                        .arg(
-                            arg!(<CHUNK_NUM> "The chunk number to download")
-                                .required(false)
-                        )
+                        .arg(arg!(<CHUNK_NUM> "The chunk number to download").required(false))
                         .arg(arg!(<CONTINUE> "Continue downloading a file").required(false)),
                 ),
         )

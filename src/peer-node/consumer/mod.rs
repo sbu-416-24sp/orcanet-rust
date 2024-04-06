@@ -2,7 +2,7 @@ pub mod encode;
 pub mod http;
 
 use crate::grpc::{orcanet::User, MarketClient};
-use anyhow::{Result};
+use anyhow::Result;
 
 use self::http::GetFileResponse;
 
