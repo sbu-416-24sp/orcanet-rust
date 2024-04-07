@@ -21,7 +21,6 @@ fn cli() -> Command {
                 .about("Producer node commands")
                 .subcommand_required(true)
                 .ignore_errors(true)
-                // .arg_required_else_help(true)
                 .subcommand(
                     Command::new("register")
                         .about("Registers with all known market servers")
