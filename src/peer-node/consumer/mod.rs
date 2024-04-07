@@ -77,51 +77,50 @@ pub async fn get_file_chunk(
     return http::get_file_chunk(producer, file_hash.clone(), token, chunk).await;
 }
 
-pub async fn upload_file(file_path: String, market: String) -> Result<()> {
-    let mut client = MarketClient::new(market).await?;
-    //let file_hash = client.upload_file(file_path).await?;
-    println!("File uploaded successfully, hash: {}", file_hash);
-    Ok(())
-}
+// pub async fn upload_file(file_path: String, market: String) -> Result<()> {
+//     let mut client = MarketClient::new(market).await?;
+//     //let file_hash = client.upload_file(file_path).await?;
+//     println!("File uploaded successfully, hash: {}", file_hash);
+//     Ok(())
+// }
 
-pub async fn run(market: String, file_hash: String) -> Result<()> {
-    let mut client = MarketClient::new(market).await?;
+// pub async fn run(market: String, file_hash: String) -> Result<()> {
+//     let mut client = MarketClient::new(market).await?;
 
-    // Check the producers for the file
-    println!("Consumer: Checking producers for file hash {}", file_hash);
-    let producers = client.check_holders(file_hash.clone()).await?;
+//     // Check the producers for the file
+//     println!("Consumer: Checking producers for file hash {}", file_hash);
+//     let producers = client.check_holders(file_hash.clone()).await?;
 
-    let producer = producers
-        .holders
-        .get(0)
-        .ok_or(anyhow::anyhow!("No producers found"))?;
-    println!(
-        "Consumer: Found producer at {}:{}",
-        producer.ip, producer.port
-    );
+//     let producer = producers
+//         .holders
+//         .get(0)
+//         .ok_or(anyhow::anyhow!("No producers found"))?;
+//     println!(
+//         "Consumer: Found producer at {}:{}",
+//         producer.ip, producer.port
+//     );
 
-    let mut chunk = 0;
-    let mut token = String::from("token");
-    loop {
-        match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
-            Ok(response) => {
-                match response {
-                    http::GetFileResponse::Token(new_token) => {
-                        token = new_token;
-                    }
-                    http::GetFileResponse::Done => {
-                        println!("Consumer: File downloaded successfully");
-                        break;
-                    }
-                }
-                chunk += 1;
-            }
-            Err(e) => {
-                eprintln!("Failed to download chunk {}: {}", chunk, e);
-                break;
-            }
-        }
-    }
-
-    Ok(())
-}
+//     let mut chunk = 0;
+//     let mut token = String::from("token");
+//     loop {
+//         match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
+//             Ok(response) => {
+//                 match response {
+//                     http::GetFileResponse::Token(new_token) => {
+//                         token = new_token;
+//                     }
+//                     http::GetFileResponse::Done => {
+//                         println!("Consumer: File downloaded successfully");
+//                         break;
+//                     }
+//                 }
+//                 chunk += 1;
+//             }
+//             Err(e) => {
+//                 eprintln!("Failed to download chunk {}: {}", chunk, e);
+//                 break;
+//             }
+//         }
+//     }
+//     Ok(())
+// }
