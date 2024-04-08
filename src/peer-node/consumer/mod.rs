@@ -12,7 +12,7 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
     let producers = client.check_holders(file_hash.clone()).await?;
 
     // For now, use the first producer
-    // TODO: Pick the least expensive producer
+    // TODO: Allow user to choose a producer, give them a list of options with IP and port
     let producer = producers
         .holders
         .get(0)
@@ -24,6 +24,9 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
 
     let mut chunk = 0;
     let mut token = String::from("token");
+    // TODO: allow looping through chunks, but client should be allowed to cancel at any time
+    // when the client cancels, the chunk num they stopped at should be returned to them so they
+    // can query another producer for the next chunk
     loop {
         match http::get_file_chunk(producer.clone(), file_hash.clone(), token, chunk).await {
             Ok(response) => {
