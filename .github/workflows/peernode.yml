@@ -3,8 +3,8 @@ name: Peernode CI
 on:
   push:
     branches: [ "*" ]
-    paths:
-      - peernode/**
+    # paths:
+      # - peernode/**
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: test
+      run: echo ${{ toJson(github) }}
     - name: Install protobuf-compiler
       run: sudo apt update && sudo apt install -y protobuf-compiler
     - name: Build
