@@ -23,6 +23,6 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-    - uses: $GITHUB_REPOSITORY/.github/workflows/fmt.yml@main # use current repo's fmt.yml
+    - uses: ${{ github.repository }}/.github/workflows/fmt.yml@main # use current repo's fmt.yml
       with:
         config-path: "peernode"
