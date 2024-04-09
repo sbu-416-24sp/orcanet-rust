@@ -20,6 +20,8 @@ jobs:
       CONFIG_PATH: ${{ github.event.inputs.config-path }}
     steps:
       - uses: actions/checkout@v4
+      - name: Test
+        run: echo $CONFIG_PATH & cd $CONFIG_PATH && ls
       - name: Format
         run: cd $CONFIG_PATH && cargo fmt
       - name: update
