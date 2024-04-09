@@ -1,9 +1,12 @@
 name: Auto Formatter
 
 on:
-  push:
-    branches: ["*"]
-
+  workflow_call:
+    inputs:
+      config-path:
+        required: true
+        type: string
+  
 env:
   CARGO_TERM_COLOR: always
 
@@ -20,6 +23,7 @@ jobs:
         run: cargo fmt
       - name: update
         run: |
+          cd ${{ inputs.config-path }}
           if ! git diff --exit-code; then
             git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git config --local user.name "github-actions[bot]"
