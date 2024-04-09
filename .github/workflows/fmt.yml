@@ -17,7 +17,7 @@ jobs:
       contents: write # 'write' access to repository contents
       pull-requests: write # 'write' access to pull requests
     env:
-      CONFIG_PATH: ${{ github.event.inputs.config-path }}
+      CONFIG_PATH: ${{ inputs.config-path }}
     steps:
       - uses: actions/checkout@v4
       - name: Test
