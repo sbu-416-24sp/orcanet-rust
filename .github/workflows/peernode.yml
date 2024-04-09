@@ -23,11 +23,9 @@ jobs:
   format:
     runs-on: ubuntu-latest
     env:
-      REPONAME: ${{ github.repository }}
+      REPOOWNER: ${{ github.repository_owner }}
     steps:
-    - uses: actions/checkout@v4
-    - name: print env
-      run: ls
-    - uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml
+    - name: Run Format Workflow
+      uses: $REPOOWNER/orcanet-rust/.github/workflows/fmt.yml # use current repo's fmt.yml
       with:
         config-path: "peernode"
