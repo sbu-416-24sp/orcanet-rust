@@ -21,14 +21,15 @@ jobs:
     - name: Run tests
       run: cd peernode && cargo test --verbose
   format:
-    runs-on: ubuntu-latest
-    env:
-      REPOOWNER: ${{ github.repository_owner }}
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Run Format Workflow
-      if: ${{ !contains(github.event.head_commit.message, 'GITHUB ACTIONS') }}
-      uses: ./.github/workflows/fmt # use current repo's fmt.yml
-      with:
-        config-path: "peernode"
+    # runs-on: ubuntu-latest
+    # env:
+    #   REPOOWNER: ${{ github.repository_owner }}
+    # steps:
+    # - name: Checkout
+    #   uses: actions/checkout@v4
+    # - name: Run Format Workflow
+    if: ${{ !contains(github.event.head_commit.message, 'GITHUB ACTIONS') }}
+    uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml
+    with:
+      config-path: "peernode"
+    
