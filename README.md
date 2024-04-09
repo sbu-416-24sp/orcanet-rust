@@ -65,5 +65,5 @@ We also provide a Docker compose file to easily run the producer and market serv
 docker-compose build
 docker-compose up
 ```
-This will automatically mount the local `files` directory to the producer container and expose the producer HTTP and market server gRPC ports.
+This will automatically mount the local `peernode/files` directory to the producer container and expose the producer HTTP and market server gRPC ports.
 
