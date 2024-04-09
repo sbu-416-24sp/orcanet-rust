@@ -20,11 +20,9 @@ jobs:
       CONFIG_PATH: ${{ inputs.config-path }}
     steps:
       - uses: actions/checkout@v4
-      - name: Test
-        run: echo $CONFIG_PATH & cd $CONFIG_PATH && ls
       - name: Format
         run: cd $CONFIG_PATH && cargo fmt
-      - name: update
+      - name: Update with Formatted Code
         run: |
           cd $CONFIG_PATH
           if ! git diff --exit-code; then

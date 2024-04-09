@@ -3,8 +3,8 @@ name: Peernode CI
 on:
   push:
     branches: [ "*" ]
-    # paths:
-    #   - peernode/**
+    paths:
+      - peernode/**
 
 env:
   CARGO_TERM_COLOR: always
@@ -27,6 +27,7 @@ jobs:
       - name: Run tests
         run: cd peernode && cargo test --verbose
   format:
+    name: Format Peernode
     needs: build
     if: ${{ !contains(github.event.head_commit.message, 'GITHUB ACTIONS') }}
     uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml

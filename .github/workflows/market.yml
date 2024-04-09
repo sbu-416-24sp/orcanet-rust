@@ -28,6 +28,7 @@ jobs:
       - name: Run tests
         run: cd market && cargo test --verbose
   format:
+    name: Format Market
     if: ${{ !contains(github.event.head_commit.message, 'GITHUB ACTIONS') }}
     uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml
     with:
