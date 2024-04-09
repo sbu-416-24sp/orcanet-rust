@@ -1,4 +1,4 @@
-target
+target/*
 
 *.pb.go
 
@@ -7,5 +7,7 @@ target
 
 **/.DS_Store
 target
-files/giraffe.mp4
-download/giraffe.mp4
+peernode/files/*
+!peernode/files/.gitkeep
+peernode/download/*
+!peernode/download/.gitkeep
