@@ -1,0 +1,25 @@
+services:
+  producer:
+    build:
+      context: .
+      dockerfile: docker/producer/Dockerfile
+    ports:
+      - '${ORCA_HTTP_PORT}:${ORCA_HTTP_PORT}'
+    environment:
+      - ORCA_MARKET_ADDRESS=market:50051
+    volumes:
+      - ./files:/files
+    depends_on:
+      market:
+        condition: service_started
+    env_file:
+      - .env
+
+  market:
+    build:
+      context: .
+      dockerfile: docker/market/Dockerfile
+    expose:
+      - "50051"
+    ports:
+      - "50051:50051"
