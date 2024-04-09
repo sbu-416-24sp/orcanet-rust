@@ -173,7 +173,7 @@ pub async fn run(files: AsyncFileMap, port: u16) -> Result<(), Box<dyn std::erro
             consumers: Arc::new(db::Consumers::new()),
             files,
         });
-    
+
     let addr = format!("0.0.0.0:{}", port);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("HTTP: Listening on {}", listener.local_addr()?);
