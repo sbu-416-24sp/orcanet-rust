@@ -2,7 +2,7 @@ name: Auto Formatter
 
 on:
   push:
-    branches: ["main"]
+    branches: ["*"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,9 +19,10 @@ jobs:
       - name: Format
         run: cargo fmt
       - name: update
-        if: steps.verify_diff.outputs.changed == 'true'
         run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git commit -am 'GITHUB ACTIONS: auto-formatter'
-          git push origin HEAD:main
+          if ! git diff --exit-code; then
+            git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git commit -am 'GITHUB ACTIONS: auto-formatter'
+            git push origin HEAD:${GITHUB_REF##*/}
+          fi
