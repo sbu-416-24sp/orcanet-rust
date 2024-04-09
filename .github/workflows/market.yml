@@ -11,6 +11,7 @@ env:
 
 jobs:
   build:
+    name: Build and Test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -21,8 +22,9 @@ jobs:
     - name: Run tests
       run: cd market && cargo test --verbose
   format:
+    name: Format
     runs-on: ubuntu-latest
     steps:
-    - uses: $GITHUB_REPOSITORY/.github/workflows/fmt.yml@main # use current repo's fmt.yml
+    - uses: ${{ github.repository }}/.github/workflows/fmt.yml@main # use current repo's fmt.yml
       with:
         config-path: "market"
