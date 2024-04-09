@@ -26,6 +26,6 @@ jobs:
       REPOOWNER: ${{ github.repository_owner }}
     steps:
     - name: Run Format Workflow
-      uses: $REPOOWNER/orcanet-rust/.github/workflows/fmt.yml # use current repo's fmt.yml
+      uses: ./.github/workflows/fmt # use current repo's fmt.yml
       with:
         config-path: "peernode"
