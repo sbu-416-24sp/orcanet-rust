@@ -26,7 +26,7 @@ jobs:
       REPONAME: ${{ github.repository }}
     steps:
     - name: print env
-      run: echo $REPONAME
-    - uses: ./github/workflows/fmt.yml # use current repo's fmt.yml
+      run: ls
+    - uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml
       with:
         config-path: "peernode"
