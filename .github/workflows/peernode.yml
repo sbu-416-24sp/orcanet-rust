@@ -25,6 +25,8 @@ jobs:
     env:
       REPOOWNER: ${{ github.repository_owner }}
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
     - name: Run Format Workflow
       uses: ./.github/workflows/fmt # use current repo's fmt.yml
       with:
