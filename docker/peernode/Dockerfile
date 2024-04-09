@@ -7,19 +7,22 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     protobuf-compiler
 
+# Add proto files
+WORKDIR /proto
+COPY ../proto .
+
 # Create empty project
-WORKDIR /orcanet-rust
+WORKDIR /peernode
 
 # Copy in files
-COPY Cargo.toml .
-COPY Cargo.lock .
-COPY build.rs .
-COPY src src
-COPY market market
+COPY peernode/Cargo.toml .
+COPY peernode/Cargo.lock .
+COPY peernode/build.rs .
+COPY peernode/src src
 
 # Build the project with caching
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-	--mount=type=cache,target=/orcanet-rust/target \
+	--mount=type=cache,target=/peernode/target \
 	cargo build --release && \
     cp ./target/release/peer-node ./peer-node
 
@@ -31,7 +34,7 @@ RUN apt-get update && apt-get install -y \
     libssl1.1
 
 # Copy the binary from the build image
-COPY --from=build /orcanet-rust/peer-node .
+COPY --from=build /peernode/peer-node .
 
 # Environment variables
 ENV ORCA_MARKET_ADDRESS localhost:50051
