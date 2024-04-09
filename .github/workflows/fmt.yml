@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Format
-        run: cargo fmt
+        run: cd $CONFIG_PATH && cargo fmt
       - name: update
         run: |
           cd $CONFIG_PATH

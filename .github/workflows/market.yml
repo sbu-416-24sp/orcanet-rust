@@ -22,14 +22,8 @@ jobs:
     - name: Run tests
       run: cd market && cargo test --verbose
   format:
-    name: Format
-    runs-on: ubuntu-latest
-    env:
-      REPONAME: ${{ github.repository }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Print Env
-      run: ls
-    - uses: ./.github/workflows/fmt.yml@main # use current repo's fmt.yml
-      with:
-        config-path: "market"
+    if: ${{ !contains(github.event.head_commit.message, 'GITHUB ACTIONS') }}
+    uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml
+    with:
+      config-path: "peernode"
+    
