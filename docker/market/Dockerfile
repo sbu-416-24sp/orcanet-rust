@@ -8,17 +8,22 @@ RUN apt-get update && apt-get install -y \
     protobuf-compiler \
     git
 
-# Clone market repository (first step is to prevent Docker from using cache)
-# TODO: Use the official branch instead of our fork, once PR is merged
-ADD https://api.github.com/repos/dyscott/orcanet-market-rust/git/refs/heads/main version.json
-RUN git clone https://github.com/dyscott/orcanet-market-rust.git
+# Add proto files
+WORKDIR /proto
+COPY ../proto .
 
-# Go to the market directory
-WORKDIR /orcanet-market-rust
+# Create empty project
+WORKDIR /market
+
+# Copy in files
+COPY market/Cargo.toml .
+COPY market/Cargo.lock .
+COPY market/build.rs .
+COPY market/src src
 
 # Build the project with caching
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-	--mount=type=cache,target=/orcanet-market-rust/target \
+	--mount=type=cache,target=/market/target \
 	cargo build --release && \
     cp ./target/release/orcanet-market-ferrous ./orcanet-market-ferrous
 
@@ -30,7 +35,7 @@ RUN apt-get update && apt-get install -y \
     libssl1.1
 
 # Copy the binary from the build image
-COPY --from=build /orcanet-market-rust/orcanet-market-ferrous .
+COPY --from=build /market/orcanet-market-ferrous .
 
 # Run the binary
 CMD ./orcanet-market-ferrous

@@ -2,13 +2,13 @@ services:
   producer:
     build:
       context: .
-      dockerfile: docker/producer/Dockerfile
+      dockerfile: docker/peernode/Dockerfile
     ports:
       - '${ORCA_HTTP_PORT}:${ORCA_HTTP_PORT}'
     environment:
       - ORCA_MARKET_ADDRESS=market:50051
     volumes:
-      - ./files:/files
+      - ./peernode/files:/files
     depends_on:
       market:
         condition: service_started
