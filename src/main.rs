@@ -37,6 +37,22 @@ struct MarketData {
 }
 
 impl MarketData {
+    fn insert_and_validate(&mut self, filerequest: FileRequest) {
+        let hash = &filerequest.file_hash;
+        match self.files.get_mut(hash) {
+            None => {
+                self.files.insert(hash.clone(), vec![filerequest]);
+            }
+            Some(producers) => {
+                let current_time = get_current_time();
+                producers.retain(|holder| {
+                    holder.expiration >= current_time && holder.user.id != filerequest.user.id
+                });
+                producers.push(filerequest);
+            }
+        }
+    }
+
     fn print_holders_map(&self) {
         for (hash, holders) in &self.files {
             println!("File Hash: {hash}");
@@ -64,12 +80,9 @@ impl Market for MarketState {
         let register_file_data = request.into_inner();
         let file_request = FileRequest::from(register_file_data)
             .map_err(|()| Status::invalid_argument("User not present"))?;
-        let file_hash = file_request.file_hash.clone();
-
         let mut market_data = self.market_data.lock().await;
-
-        (*market_data.files.entry(file_hash).or_default()).push(file_request);
-
+        // insert the file request into the market data and validate the holders
+        market_data.insert_and_validate(file_request);
         Ok(Response::new(()))
     }
 
@@ -81,14 +94,14 @@ impl Market for MarketState {
 
         let mut market_data = self.market_data.lock().await;
         let now = get_current_time();
-        
+
         let mut users = vec![];
 
         let holders = market_data.files.get_mut(&file_hash);
 
-        if let Some(holders) = holders {   
+        if let Some(holders) = holders {
             // check if any of the files have expired
-            
+
             let mut first_valid = -1;
             //TODO: use binary search since times are inserted in order
             for (i, holder) in holders.iter().enumerate() {
@@ -97,7 +110,7 @@ impl Market for MarketState {
                     break;
                 }
             }
-            
+
             // no valid files, remove all of them
             if first_valid == -1 {
                 println!("All files ({}) expired.", holders.len());
@@ -108,12 +121,11 @@ impl Market for MarketState {
                     // remove expired times
                     holders.drain(0..first_valid as usize);
                 }
-                
+
                 for holder in holders {
                     users.push(holder.user.clone());
                 }
             }
-
         }
 
         market_data.print_holders_map();
