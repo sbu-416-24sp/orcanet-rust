@@ -24,7 +24,9 @@ jobs:
       run: cd peernode && cargo test --verbose
   format:
     runs-on: ubuntu-latest
+    env:
+      REPONAME: ${{ github.repository }}
     steps:
-    - uses: ${{ github.repository }}/.github/workflows/fmt.yml@main # use current repo's fmt.yml
+    - uses: $REPONAME/.github/workflows/fmt.yml@main # use current repo's fmt.yml
       with:
         config-path: "peernode"
