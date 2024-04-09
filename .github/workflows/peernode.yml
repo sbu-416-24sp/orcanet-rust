@@ -25,6 +25,7 @@ jobs:
     env:
       REPONAME: ${{ github.repository }}
     steps:
+    - uses: actions/checkout@v4
     - name: print env
       run: ls
     - uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml
