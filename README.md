@@ -50,13 +50,13 @@ cargo run --bin test_client
 
 ```bash
 cd peernode
-cargo run -- -p  
+cargo run -- -p  [ --ip <IP - USE 127.0.0.1 FOR LOCAL TESTING> ]
 ```
 
 To run the consumer:
 ```bash
 cd peernode
-cargo run -- -f <file_hash>
+cargo run -- -f <FILE_HASH>
 ```
 
 ## Running with Docker
