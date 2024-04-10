@@ -1,0 +1,40 @@
+name: Peernode CI
+
+on:
+  push:
+    branches: [ "*" ]
+    paths:
+      - peernode/**
+  pull_request:
+    branches: [ "*" ]
+    paths:
+      - peernode/**
+    
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install protobuf-compiler
+      run: sudo apt update && sudo apt install -y protobuf-compiler
+    - name: Build
+      run: cd peernode && cargo build --verbose
+  test:
+    name: Test Peernode
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: cd peernode && cargo test --verbose
+  format:
+    name: Format Peernode
+    needs: build
+    if: ${{ !contains(github.event.head_commit.message, 'GITHUB ACTIONS') }}
+    uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml
+    with:
+      config-path: "peernode"
+    
