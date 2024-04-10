@@ -5,6 +5,10 @@ on:
     branches: [ "*" ]
     paths:
       - market/**
+  pull_request:
+    branches: [ "*" ]
+    paths:
+      - market/**
 
 env:
   CARGO_TERM_COLOR: always
