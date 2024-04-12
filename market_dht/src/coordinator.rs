@@ -5,7 +5,7 @@ use std::{
 use thiserror::Error;
 
 use futures::StreamExt;
-use libp2p::{kad::store::MemoryStore, swarm::SwarmEvent, Multiaddr, Swarm};
+use libp2p::{kad::store::MemoryStore, ping::Event, swarm::SwarmEvent, Multiaddr, Swarm};
 use log::{error, info, warn};
 use tokio::{sync::mpsc, time};
 
@@ -97,6 +97,18 @@ impl Coordinator {
                     self.swarm.behaviour_mut().file_req_res_mut(),
                 );
             }
+            MarketBehaviourEvent::Ping(Event {
+                peer,
+                connection,
+                result,
+            }) => match result {
+                Ok(_) => {
+                    info!("[ConnId {connection}] - Pinged peer: {peer} successfully");
+                }
+                Err(err) => {
+                    warn!("[ConnId {connection}] - Failed to ping peer: {peer} with error: {err}");
+                }
+            },
         }
     }
 

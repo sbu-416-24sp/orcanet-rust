@@ -3,7 +3,9 @@ use std::{thread, time::Duration};
 use libp2p::{
     identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
     kad::{store::MemoryStore, Behaviour as KadBehaviour, Config as KadConfig},
-    noise, yamux,
+    noise,
+    ping::{Behaviour as PingBehaviour, Config as PingConfig},
+    yamux,
 };
 use thiserror::Error;
 use tokio::{runtime::Runtime, sync::mpsc};
@@ -20,7 +22,7 @@ use crate::{
     peer::Peer,
 };
 
-const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
+const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(60 * 10);
 pub(crate) const PROVIDER_RECORD_TTL: Duration = Duration::from_secs(60 * 60);
 const PROVIDER_REPUBLICATION: Duration = Duration::from_secs(60 * 5);
 
@@ -48,7 +50,8 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
             let config = IdentifyConfig::new(IDENTIFY_PROTOCOL_NAME.to_string(), key.public());
             let identify_behaviour = IdentifyBehaviour::new(config);
             let file_req_res = FileReqResBehaviour::new(FILE_REQ_RES_PROTOCOL, Default::default());
-            MarketBehaviour::new(kad_behaviour, identify_behaviour, file_req_res)
+            let ping = PingBehaviour::new(PingConfig::default());
+            MarketBehaviour::new(kad_behaviour, identify_behaviour, file_req_res, ping)
         })
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
         .with_swarm_config(|c| c.with_idle_connection_timeout(KEEP_ALIVE_TIMEOUT))

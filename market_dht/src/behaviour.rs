@@ -1,6 +1,6 @@
 use libp2p::{
     identify::Behaviour as IdentifyBehaviour, kad::Behaviour as KadBehaviour,
-    swarm::NetworkBehaviour,
+    ping::Behaviour as PingBehaviour, swarm::NetworkBehaviour,
 };
 
 use self::{
@@ -16,6 +16,7 @@ pub(crate) struct MarketBehaviour<TKadStore: KadStore> {
     kademlia: Kad<TKadStore>,
     identify: Identify,
     file_req_res: FileReqResBehaviour,
+    ping: PingBehaviour,
 }
 
 impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
@@ -24,11 +25,13 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
         kademlia: KadBehaviour<TKadStore>,
         identify: IdentifyBehaviour,
         file_req_res: FileReqResBehaviour,
+        ping: PingBehaviour,
     ) -> Self {
         Self {
             kademlia: Kad::new(kademlia),
             identify: Identify::new(identify),
             file_req_res,
+            ping,
         }
     }
 

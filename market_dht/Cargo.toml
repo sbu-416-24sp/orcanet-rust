@@ -21,6 +21,7 @@ libp2p = { version = "0.53.2", features = [
   "identify",
   "macros",
   "request-response",
+  "ping",
 ] }
 futures = { version = "0.3.30" }
 thiserror = { version = "1.0.58" }

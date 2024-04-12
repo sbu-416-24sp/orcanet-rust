@@ -97,7 +97,7 @@ impl FileReqResHandler {
 }
 
 pub(crate) const FILE_REQ_RES_PROTOCOL: [(StreamProtocol, ProtocolSupport); 1] = [(
-    StreamProtocol::new("/file_req_res/1.0.0"),
+    StreamProtocol::new("/orcanet/file_req_res/1.0.0"),
     ProtocolSupport::Full,
 )];
 
