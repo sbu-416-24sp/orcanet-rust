@@ -1,0 +1,23 @@
+[package]
+name = "market_test_client"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+market_proto = { path = "../market_proto" }
+tonic = { version = "0.11.0" }
+tokio = { version = "1.36.0", features = ["full"] }
+anyhow = { version = "1.0.81" }
+clap = { version = "4.5.3", features = ["derive"] }
+rustyline = { version = "14.0.0" }
+strum = { version = "0.26.2", features = ["derive"] }
+strum_macros = { version = "0.26.2" }
+thiserror = { version = "1.0.58" }
+
+[build-dependencies]
+tonic-build = "0.11.0"
+
+[dev-dependencies]
+pretty_assertions = { version = "1.4.0" }

@@ -1,0 +1,41 @@
+[package]
+name = "market_dht"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { version = "1.0.81" }
+libp2p = { version = "0.53.2", features = [
+  "cbor",
+  "dns",
+  "kad",
+  "noise",
+  "tokio",
+  "mdns",
+  "tcp",
+  "quic",
+  "ed25519",
+  "yamux",
+  "identify",
+  "macros",
+  "request-response",
+] }
+futures = { version = "0.3.30" }
+thiserror = { version = "1.0.58" }
+log = { version = "0.4.21" }
+tokio = { version = "1.36.0", features = [
+  "rt-multi-thread",
+  "sync",
+  "macros",
+  "time",
+] }
+serde = { version = "1.0.130", features = ["derive"] }
+
+[dev-dependencies]
+pretty_assertions = "1.4.0"
+tracing = { version = "0.1.40", features = ["log"] }
+tracing-subscriber = "0.3.18"
+tokio-test = { version = "0.4.4" }
+tracing-log = "0.2.0"

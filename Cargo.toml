@@ -1,0 +1,3 @@
+[workspace]
+members = [ "market_dht","market_proto", "market_server", "market_test_client"]
+resolver = "2"

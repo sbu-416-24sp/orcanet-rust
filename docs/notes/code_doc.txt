@@ -1,0 +1,321 @@
+# Market Client
+- **main**
+	- parse cmd args, init a new user instance, store market port, setup (tx, rx) [trnasmitter and reciever ends of multi-producer channel for async msg passing], and (m_state_tx, m_state_rx) [single use channel for sending single sg from one task to another through ActorMarketState channel (<--pub enum in util)]
+		- **CHECK cli struct notes in cli.rs**
+		- #[arg] -> attr from clap crate and is cli arg
+			- short = short version of argument (-p)
+			- long = long (--port)
+			- default = default
+		- takes port,
+			- what local market server is listening on and client to connect to
+		- username, 
+			- prob remove this cuz sha256 ids made from user pub keys
+		- price, 
+			- price / mb, (can prob change based on file size chunks)
+		- id, 
+			- ID of peer, generated if n/a
+		- client_port and ip
+			- where other customers connect to
+	- created scoped thread (spawn 2 threads concurrently)
+		- *ensures any ref created within the scope can't outlive scope itself (no data races/mem safety issues)*
+		- Thread 1
+			- Inits Actor with user and rx channels
+			- init new runtime, blocking on async block where it connects to market server with init client
+			- on init, m_state_tx can send a msg with connection and run actor main logic
+			- if init or state transmission fails, return ok at the end
+		- Thread 2
+			- wait for actor client to connect to market server
+			- blocks until msg received for connection or not
+
+- **actor
+	- pub struct that takes in User and receiver msgs
+	- '*run*'
+		- take ownership of 'self' and mutable client to send and receieve data/commands
+		- enters loop to continuously receieve cmds from receiver channel
+		- *cmd processing*
+				- #[derive()] used on enum commands
+					- macro to tell compiler to derive implementations for listed traits and behaviors automatically
+					- debug - allow enum to be printed
+					- clone - clone instances of enum
+					- partialeq and eq - instances of enum compared for equality
+					- enumString - conversion of strings to enum variants and vice versa
+			- quit
+			- help
+			- register file
+				- takes file hash and user and returns msg
+			- check holders 
+				- check holders of a file with a given hash
+	- '*message*'
+		- msg struct takes in string and converts to lowercase
+		- into_cmd attempts to parse msg string into cmd from: 
+		- '*TryFrom for command*'
+			- parse content of msg into a command
+			- split msg str into words and takes it as a cmd name and extract args based on cmd
+			- matches cmd to one of the options
+		- '*display for msg*'
+			- impl display trait for msg and specifiy how message should be formated
+
+- **util**
+	- loopback addr (local machine) and default market server port number
+	- '*start main loop*'
+		- (tx) takes unbounded channel sender for sending msgs
+			- *unbounded channel sender* - send messages btwn asynch tasks running concurrently
+		- continuously read line and turn msg into command
+			- if yes, send cmd through 'tx'
+		- keep going til EOF or interrupt signal for 'quit' cmd or if error reading parsing input
+	- '*initialize client*'
+		- create an init 'marketClient' that connects to market server with GRPC
+		- takes market port arg
+		- build uri used for gRPC using loopback address and market port
+		- then async connect to market server passing URI
+	- '*actor market state*'
+		- not connected/ connected
+	- '*Prompt*'
+		- >> used as cmd prompt to enter command
+
+- **lib**
+	- entry point for crate to encapsulate related functionality
+	- specify compiler warnings 
+		- warn if debug trait is not implemented for a type
+		- warn if pub item is declared but never used
+		- deny unsafe code
+			- call unsafe functions or methods
+			- access or modify static mut variables
+			- implement unsafe traits, etc.
+	- specify module declarations
+
+
+# Market Server
+- **Main**
+	- creates instance for CLI parsing and MarketService (backend)
+	- Server::builder() sets up gRPC server with 'MarketServer' and binds it to specific socket address
+		- returns error if any server issues
+- **CLI**
+	- clap crate for parsing
+	- Port from crate 
+	- *CLI Struct*
+		- #[derive()]implements debug and parser traits
+		- #[command] author, version, about, long_about = None (<-- no extended description provided)
+			- metadata about CLI
+		- Port field (*defined as u16 in lib.rb*)
+			- defaulted to 8080
+- **lib**
+	- same compiler attrs as **MarketClient**
+	- *Port* = u16
+	- modules cli and market_server
+- **market_service**
+	- Peer that starts as a DHT node with an IP address and Port (some fields might be allocated to the *peer nodes* team to get rid of some overhead)
+	- *Imports*
+		- std - sync, collections
+		- market_porto_rpc file stuff
+		- tonic
+	- **DHT initialization will be using market_dht lib and then integrated into market_server**
+	- *MarketService struct*
+		- store: 'Arc<Mutex<MarketStore'
+			- reference counted smart pointer (Arc) to thread safe mutex containing ***MarketStore*** (Hashmap<String, HashSet<User) 
+	- *Market Trait implementation*
+		- 'register file'
+			- takes request with file information and locks 'store' mutex for exclusive access and inserts into store
+			- stores file hash and userID associated with file
+			- *returns* empty response if successful
+		- 'check holders'
+			- check for holders identified by file hash
+			- takes request containing file hash and locks store mutex to retrieve holders of a file
+			- *returns* response containing holders
+
+
+ 
+
+
+# Market DHT
+
+CUSTOM market DHT opposed to using IPFS-kad 
+Behavior contains most of the logic
+- ***Behavior***
+	- **ident**
+		- set up identify handler using libp2p network framework
+		- use kademlia from [Behavior.rs]
+		- *handle_identify_event*
+			- takes in 3 parameters
+				- mutable reference to instance
+				- IdentifyEvent enum to find Identify event
+				- mutable ref to Kad DHT
+			- *received event*
+				- extract peer id, listen addrs, and protocols
+				- if peer supports Kad, iterate through listen addresses and add them to the routing table
+			- *sent event*
+			- *pushed event*
+			- *error event*
+				- the previous three ^^^ sends log messages and errors depending on the peer id 
+		- *Identify Struct* 
+			- defined using NetworkBehavior derive macro
+			- wrapper around IdentifyBehavior
+			- *Impl*
+				- new 
+					- new instance of Identify that takes in IdentifyBehavior and return Identify Struct
+	- **kademlia**
+		- utilities
+			- create a new custom protocol name that all peer IDs would contain (orcanet/kad/1.0.0)
+			- define traits *KadStore* will inherit
+				- RecordStore, send/sync for KadStore to be send safely between threads and accessed concurrently, static lifetime (during of the program)
+		- *Kad Struct*
+			- kad network behavior with generic store 'TKadStore'
+			- *impl*
+				- *constructor*
+				- *bootstrap*
+					- determies if bootstrap with a predefined list of nodes or without
+					- if yes:
+						- add addresses of boot notes to Kad DHT
+					- call bootstrap on KadBehavior instance
+		- *KadHandler Struct*
+			- maps Kad query IDs to request handler instances
+			- *Impl*
+				- *handle_kad_request*
+					- takes in: self ref to instance, ref to Kad struct, request handler, and enum struct of which Kad data to get
+					- *ClosestLocalPeers*
+						- query Kad for closest local peers given key and returns list of peers
+					- *ClosestPeers*
+						- query Kad for closest peers to a given key and store request handler for later
+					- *GetFile*
+						- query kad to get record given key and store request handler for later
+				- *handle_kad_event*
+					- takes in self ref, ref kad struct, and KadEvent enum for a specific event
+					- *InboundRequest*
+						- call [handle_inbound_request]
+					- *OutboundQueryProgressed*
+						- call [handle_outbound_query]
+					- *RoutingUpdated*
+						- logs warning message for routing table update
+					- *ModeChanged*
+						- when Kad mode has changed (server/client)
+				- *handle_outbound_query*
+					- takes in: self ref, mutable kad instance, query id, result, query stats, step of the query
+					- Query results:
+						- *Bootstrap, GetClosestPeers, and GetRecord
+						- **TODO**: getproviders, start providing, republish provider
+				- *handle_inbound_request
+					- Requests
+						- *FindNode, GetProvider, AddProvider, GetRecord, PutRecord*
+				- 
+- **lib**
+	- **NOTE: possibly add more extensions for more protocols later**
+	- same compiler attrs plus a few more
+	- export items from bridge and command for users and file
+- **behavior.rs**
+	- *MarketBehavior Struct*
+		- combined behavior of Kad DHT and identify protocol
+		- *impl*
+			- *constructor*
+			- un/mutable getters for kad and identify instances
+- **boot_nodes.rs**
+	- *BootNode struct*
+		- contain addr and peer id
+		- *impl*
+			- constructor
+		- *impl Display for Bootnode*
+			- format as a string to print out
+		- *impl From<(Multiaddr, peerid) for Bootnode*
+			- create bootnode from tuple, simpliy creation of Bootnode instances
+		- *impl a,b TryFrom <a str, b str> for Bootnode*
+			- creat boot node from tuple of string slices (addr and peer id)
+		
+	- *BootNodes struct*
+		- wrapper around Vec<BootNode.
+		- *impl*
+			- *constructor*
+				- takes in: iterator of items to be converted to BootNode instances collected into Vec<Bootnode.
+				- returns errors of boot nodes are empty
+			- *iter*
+				- iterator over boot node references
+		- *impl From<BootNodes for Vec<BootNode*
+			- converts bootnodes to vec<bootnode.
+		- *impl Deref for BootNodes*
+			- obtain reference to underlying slice of BootNode instances
+		- *impl IntoIterator for BootNodes*
+			- convert BootNOdes into an iterator 
+		- *Impl TryFrom for BootNOdes*
+			- convert vector type T to BootNodes
+	- *BootNodesIter struct*
+		- customer iterator struct for iterating over references of BootNode instances
+		- *impl*
+			- Iterator for BootNodesIter
+				- specify type 'a BootNode, and advance iterator to next element as an Option containing ref to BootNode 
+				- return None when nothing else to iterate
+- **config.rs**
+	- *Config Struct*
+		- takes in optional collection of bootstrap nodes, listener address, thread name
+		- *impl*
+			- *builder*
+				- returns ConfigBuilder instance
+			- *getters for boot_nodes, listener, thread_name*
+	- *ConfigBuilder Struct*
+		- same fields as config but all fields as 'Options' to incrementally build Config Struct
+		- *impl*
+			- *constructor and setters with_boot_nodes, with_listener, with_thread_name*
+			- *build*
+				- create Config instance from builder 
+				- have default values for listener and thread name if not provided
+- **coordinator.rs**
+	- *coordinator struct*
+		- takes in: swarm object from market behavior and memory store (manage network behavior and state), kad handler instance and identify handler
+		- *impl*
+			- *constructor*
+				- create swarm by listening to provided address and if bootstrap nodes are provided, bootstrap into Kad DHT
+			- *handle_event*
+				- matches market behavior event to Kad or Identify handler
+			- *handle_bootstrap_refresh*
+				- refresh Kad DHT bootstrap without additional nodes
+			- *handle_request*
+				- match request_data with type of request
+					- get all listeners, get connected peers, is connected to, kad request
+			- *handle_swarm_event*
+				- match event with different swarm events
+					- behavior is taken from handle_event method above ^^^
+					- connection establish, connection closed, incoming connection, incoming connection error, outgoing connection error, new listen addr, expired listen addr, listener closed, clistener error, dialing, new external addr candidate, external addr expired
+			- *run*
+				- async function that takes in mut self, and sender to notify when coordinator is ready
+				- creates an unbounded channel for requests, a peer object with local peer id (sender gets the local peer), and timer for bootstrap refresh
+				- a loop that handles bootstrap refreshes, incoming requests, and swarm events
+- **net.rs**
+	- initialize network bridge with a new thread and return a Peer handle to interact with it with a 'NetworkBridgeError' enum
+	- *spawn_bridge*
+		- init a new swarm with a new key pair
+			- with tokio, with tcp, with dns, 
+			- with behavior (closure that recieves node's pub key)
+				- pub key to peer id, init kad DHT config with list of protocol names, kad behavior with kad config and memory store for records, identify config and behavior
+				- kad and identify behavior combined to define market behavior
+		- has idle connection timeout for swarm
+		- create new oneshot channel to signal when network bridge is ready
+		- destructure Config struct to get boot nodes, listener, thread name
+		- build a new thread with specified name and blocks on async block to create a new [Coordinator] with initialized swarm
+			- when coordinator ready then peer instance is sent
+- **peers.rs**
+	- define functionality for a network peer
+	- *peer struct*
+		- takes in peerId and sender part of a channel
+		- *impl*
+			- *constructor*
+			- *accessor for peer id*
+			- *async network communication methods that use a custom 'send' macro to send requests
+				- is connected to, get all listeners, get connected peers, get closest local peers, get closest peers, get file
+			- *send_request*
+				- async method to send requests through the channel and wait for a response
+			- *get_owned_key*
+				- takes Cow (clone-on-write) pointer and returned owned Vec<u8.
+- **req_res.rs**
+	- req/res for p2p network communication
+	- *ResponseHandler struct*
+		- takes a oneshot receiver for receiving responses
+		- *impl*
+			- *get_response_data*
+				- waits for response from oneshot channel
+	- *RequestHandler struct*
+		- takes oneshot sender for sending response back to requester
+		- *impl*
+			- *constructor*
+				- return tuple of reponse handler and response sender
+			- *respond*
+				- request handler sends response through channel
+	- *Enums*
+		- Request data, response data, kad request data, kad response data
+
