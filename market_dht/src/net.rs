@@ -1,6 +1,7 @@
 use std::{thread, time::Duration};
 
 use libp2p::{
+    autonat::{Behaviour as AutonatBehaviour, Config as AutonatConfig},
     identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
     kad::{store::MemoryStore, Behaviour as KadBehaviour, Config as KadConfig},
     noise,
@@ -51,7 +52,14 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
             let identify_behaviour = IdentifyBehaviour::new(config);
             let file_req_res = FileReqResBehaviour::new(FILE_REQ_RES_PROTOCOL, Default::default());
             let ping = PingBehaviour::new(PingConfig::default());
-            MarketBehaviour::new(kad_behaviour, identify_behaviour, file_req_res, ping)
+            let autonat = AutonatBehaviour::new(peer_id, AutonatConfig::default());
+            MarketBehaviour::new(
+                kad_behaviour,
+                identify_behaviour,
+                file_req_res,
+                ping,
+                autonat,
+            )
         })
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
         .with_swarm_config(|c| c.with_idle_connection_timeout(KEEP_ALIVE_TIMEOUT))

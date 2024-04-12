@@ -11,6 +11,7 @@ use tokio::{sync::mpsc, time};
 
 use crate::{
     behaviour::{
+        autonat::AutoNatHandler,
         file_req_res::{FileHash, FileReqResHandler, SupplierInfo},
         ident::IdentifyHandler,
         kademlia::{BootstrapMode, KadHandler},
@@ -29,6 +30,7 @@ pub(crate) struct Coordinator {
     identify_handler: IdentifyHandler,
     file_req_res_handler: FileReqResHandler,
     market_map: LocalMarketMap,
+    autonat_handler: AutoNatHandler,
     request_receiver: mpsc::UnboundedReceiver<Request>,
 }
 
@@ -45,13 +47,13 @@ impl Coordinator {
         if let Some(boot_nodes) = boot_nodes {
             swarm
                 .behaviour_mut()
-                .kademlia_mut()
                 .bootstrap(BootstrapMode::WithNodes(boot_nodes))
                 .map_err(|err| CoordinatorError::SpawnError(err.to_string()))?;
         }
         Ok(Self {
             swarm,
             kad_handler: Default::default(),
+            autonat_handler: Default::default(),
             identify_handler: Default::default(),
             file_req_res_handler: Default::default(),
             market_map: Default::default(),
@@ -109,6 +111,9 @@ impl Coordinator {
                     warn!("[ConnId {connection}] - Failed to ping peer: {peer} with error: {err}");
                 }
             },
+            MarketBehaviourEvent::Autonat(event) => self
+                .autonat_handler
+                .handle_event(event, self.swarm.behaviour_mut().autonat_mut()),
         }
     }
 
@@ -116,7 +121,6 @@ impl Coordinator {
         if let Err(err) = self
             .swarm
             .behaviour_mut()
-            .kademlia_mut()
             .bootstrap(BootstrapMode::WithoutNodes)
         {
             error!("Failed to bootstrap peer: {}", err);

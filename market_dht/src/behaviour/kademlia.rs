@@ -261,18 +261,6 @@ impl<TKadStore: KadStore> Kad<TKadStore> {
         Self { kad }
     }
 
-    pub(crate) fn bootstrap(&mut self, mode: BootstrapMode) -> Result<(), KadError> {
-        if let BootstrapMode::WithNodes(boot_nodes) = mode {
-            for node in boot_nodes {
-                self.kad.add_address(&node.peer_id, node.addr);
-            }
-        }
-        self.kad
-            .bootstrap()
-            .map_err(|err| KadError::Bootstrap(err.to_string()))?;
-        Ok(())
-    }
-
     #[allow(dead_code)]
     pub(crate) const fn kad(&self) -> &KadBehaviour<TKadStore> {
         &self.kad
