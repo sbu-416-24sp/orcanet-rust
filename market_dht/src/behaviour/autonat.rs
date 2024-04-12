@@ -14,12 +14,18 @@ impl AutoNatHandler {
                     probe_id,
                     peer,
                     addresses,
-                } => todo!(),
+                } => {
+                    info!("[{probe_id:?}] - Received inbound probe request from {peer} with {addresses:?}",);
+                }
                 InboundProbeEvent::Response {
                     probe_id,
                     peer,
                     address,
-                } => todo!(),
+                } => {
+                    info!(
+                        "[{probe_id:?}] - Sent inbound probe response to {peer} with {address:?}",
+                    );
+                }
                 InboundProbeEvent::Error {
                     probe_id,
                     peer,
@@ -28,33 +34,31 @@ impl AutoNatHandler {
                     error!("[{probe_id:?}] - Error with inbound probe from {peer:?}: {error:?}");
                 }
             },
-            Event::OutboundProbe(event) => {
-                match event {
-                    OutboundProbeEvent::Request { probe_id, peer } => {
-                        info!(
-                            "[{probe_id:?}] - Received outbound probe request from {}",
-                            peer
-                        );
-                    }
-                    OutboundProbeEvent::Response {
-                        probe_id,
-                        peer,
-                        address,
-                    } => todo!(),
-                    OutboundProbeEvent::Error {
-                        probe_id,
-                        peer,
-                        error,
-                    } => {
-                        if let Some(peer) = peer {
-                            error!("[{probe_id:?}] - Error sending outbound probe to {peer:?}: {error:?}");
-                        } else {
-                            error!("[{probe_id:?}] - Error sending outbound probe: {error:?}");
-                        }
-                    }
+            Event::OutboundProbe(event) => match event {
+                OutboundProbeEvent::Request { probe_id, peer } => {
+                    info!("[{probe_id:?}] - Sent outbound probe request from {}", peer);
                 }
+                OutboundProbeEvent::Response {
+                    probe_id,
+                    peer,
+                    address,
+                } => {
+                    info!(
+                        "[{probe_id:?}] - Sent outbound probe response to {peer} with {address:?}",
+                    );
+                }
+                OutboundProbeEvent::Error {
+                    probe_id,
+                    peer: Some(peer),
+                    error,
+                } => {
+                    error!("[{probe_id:?}] - Error sending outbound probe to {peer:?}: {error:?}");
+                }
+                _ => {}
+            },
+            Event::StatusChanged { old, new } => {
+                info!("Status changed from {:?} to {:?}", old, new);
             }
-            Event::StatusChanged { old, new } => todo!(),
         }
     }
 }

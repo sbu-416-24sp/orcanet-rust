@@ -15,7 +15,7 @@ fn main() {
     let peer1 = spawn_bridge(
         Config::builder()
             .with_thread_name("peer1".to_owned())
-            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(5555u16)))
+            .with_listener(multiaddr!(Ip4([0, 0, 0, 0]), Tcp(5555u16)))
             .build(),
     )
     .unwrap();
@@ -23,12 +23,15 @@ fn main() {
     let peer1_id = peer1.id();
     let peer2 = spawn_bridge(
         Config::builder()
-            .with_listener(multiaddr!(Ip4([127, 0, 0, 1]), Tcp(1234u16)))
+            .with_listener(multiaddr!(Ip4([0, 0, 0, 0]), Tcp(1234u16)))
             .with_thread_name("peer2".to_owned())
             .with_boot_nodes(
-                vec![("/ip4/127.0.0.1/tcp/5555".to_owned(), peer1_id.to_string())]
-                    .try_into()
-                    .unwrap(),
+                vec![(
+                    "/ip4/172.25.89.249/tcp/5555".to_owned(),
+                    peer1_id.to_string(),
+                )]
+                .try_into()
+                .unwrap(),
             )
             .build(),
     )
