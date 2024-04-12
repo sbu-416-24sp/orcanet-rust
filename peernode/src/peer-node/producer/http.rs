@@ -181,8 +181,7 @@ pub async fn run(files: AsyncFileMap, port: u16) -> Result<(), Box<dyn std::erro
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
+    ) 
     .await?;
-
     Ok(())
 }
