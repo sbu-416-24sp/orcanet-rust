@@ -164,7 +164,7 @@ async fn handle_file_request(
         .header("X-Access-Token", request.access_token.as_str())
         .body(body)
         .unwrap()
-} 
+}
 
 pub async fn run(files: AsyncFileMap, port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
