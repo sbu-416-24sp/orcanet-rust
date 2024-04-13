@@ -186,8 +186,19 @@ impl Coordinator {
                 connection_id,
                 num_established,
                 established_in,
+                endpoint,
                 ..
             } => {
+                warn!("ENDPOINT DEBUG INFO: {endpoint:?}");
+                warn!("ENDPOINT RELAYED INFO: {:?}", endpoint.is_relayed());
+                warn!(
+                    "ENDPOINT TO ENDPOINT DEBUG INFO {:?}",
+                    endpoint.to_endpoint()
+                );
+                warn!(
+                    "ENDPOINT GET REMOTE ADDR: {:?}",
+                    endpoint.get_remote_address()
+                );
                 info!("[ConnId {connection_id}] - Connection established with peer: {peer_id}. Number of established connections: {num_established}. Established in: {established_in:?}");
             }
             SwarmEvent::ConnectionClosed {
