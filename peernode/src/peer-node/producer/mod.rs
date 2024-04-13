@@ -1,51 +1,28 @@
 mod db;
-mod files;
+pub mod files;
 mod http;
 
+use crate::grpc::MarketClient;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::grpc::MarketClient;
+use anyhow::Result;
 
-use anyhow::{anyhow, Result};
-
-pub async fn run(market: String, ip: Option<String>, port: Option<u16>) -> Result<()> {
+pub async fn run(market: String) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
 
     // Load the files
-    let file_map = Arc::new(files::FileMap::new());
-    file_map.add_all("files/**/*").await?;
-
-    // Get the port
-    let port = port.unwrap_or(8080);
+    let file_map = Arc::new(files::FileMap::default());
+    file_map.add_dir("files/**/*", 100).await?;
 
     // Launch the HTTP server in the background
     let http_file_map = file_map.clone();
     tokio::spawn(async move {
-        if let Err(e) = http::run(http_file_map, port).await {
+        if let Err(e) = http::run(http_file_map, String::from("8080")).await {
             eprintln!("HTTP server error: {}", e);
         }
     });
-
-    // Get the public IP address
-    let ip = match ip {
-        Some(ip) => ip,
-        // Use the AWS checkip service to get the public IP address
-        None => match reqwest::get("http://checkip.amazonaws.com").await {
-            Ok(resp) => match resp.text().await {
-                Ok(text) => text.trim().to_string(),
-                Err(e) => {
-                    return Err(anyhow!("Failed to get public IP: {}", e));
-                }
-            },
-            Err(e) => {
-                return Err(anyhow!("Failed to get public IP: {}", e));
-            }
-        },
-    };
-    println!("Producer: IP address is {}", ip);
-
-    // Generate a random producer ID
-    let producer_id = uuid::Uuid::new_v4().to_string();
 
     // Register the files with the market service
     let hash = file_map.get_hashes().await;
@@ -54,10 +31,10 @@ pub async fn run(market: String, ip: Option<String>, port: Option<u16>) -> Resul
         println!("Producer: Registering file with hash {}", hash);
         client
             .register_file(
-                producer_id.clone(),
-                "producer".to_string(),
-                ip.clone(),
-                port.into(),
+                "id".to_string(),
+                "name".to_string(),
+                "127.0.0.1".to_string(),
+                8080,
                 100,
                 hash,
             )
@@ -66,6 +43,63 @@ pub async fn run(market: String, ip: Option<String>, port: Option<u16>) -> Resul
 
     // Never return
     tokio::signal::ctrl_c().await?;
+
+    Ok(())
+}
+
+pub async fn start_server(
+    files: HashMap<String, PathBuf>,
+    prices: HashMap<String, i64>,
+    port: String,
+) -> tokio::task::JoinHandle<()> {
+    // Launch the HTTP server in the background
+    let http_file_map = Arc::new(files::FileMap::new(files, prices));
+    tokio::spawn(async move {
+        if let Err(e) = http::run(http_file_map, port).await {
+            eprintln!("HTTP server error: {}", e);
+        }
+    })
+}
+
+pub async fn stop_server(join_handle: tokio::task::JoinHandle<()>) -> Result<()> {
+    // Stop the HTTP server
+    join_handle.abort();
+    Ok(())
+}
+
+pub async fn register_files(
+    prices: HashMap<String, i64>,
+    market: String,
+    port: String,
+) -> Result<()> {
+    let mut client = MarketClient::new(market).await?;
+
+    // get port from string
+    let port = match port.parse::<i32>() {
+        Ok(port) => port,
+        Err(_) => {
+            eprintln!("Invalid port number");
+            return Ok(());
+        }
+    };
+
+    for (hash, price) in prices {
+        // TODO: Find a way to get the public IP address
+        println!(
+            "Producer: Registering file with hash {} and price {}",
+            hash, price
+        );
+        client
+            .register_file(
+                "id".to_string(),
+                "name".to_string(),
+                "127.0.0.1".to_string(),
+                port,
+                price,
+                hash,
+            )
+            .await?;
+    }
 
     Ok(())
 }

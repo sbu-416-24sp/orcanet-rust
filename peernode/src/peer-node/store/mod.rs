@@ -40,7 +40,7 @@ impl Configurations {
                 }
             }
             Err(e) => {
-                eprintln!("Failed to load configuration: {:?}", e);
+                // eprintln!("Failed to load configuration: {:?}", e);
                 return Self::default().await;
             }
         };
