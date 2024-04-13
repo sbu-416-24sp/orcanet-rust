@@ -15,16 +15,14 @@ impl AutoNatHandler {
                     peer,
                     addresses,
                 } => {
-                    info!("[{probe_id:?}] - Received inbound probe request from {peer} with {addresses:?}",);
+                    info!("[{probe_id:?}] - Inbound probe request from {peer} with {addresses:?}",);
                 }
                 InboundProbeEvent::Response {
                     probe_id,
                     peer,
                     address,
                 } => {
-                    info!(
-                        "[{probe_id:?}] - Sent inbound probe response to {peer} with {address:?}",
-                    );
+                    info!("[{probe_id:?}] - Inbound probe response to {peer} with {address:?}",);
                 }
                 InboundProbeEvent::Error {
                     probe_id,

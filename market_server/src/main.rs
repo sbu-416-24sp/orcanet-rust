@@ -41,7 +41,7 @@ fn main() -> Result<()> {
         }
     };
     let mut listen_addr = Multiaddr::empty();
-    listen_addr.push(Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)));
+    listen_addr.push(Protocol::Ip4(Ipv4Addr::new(0, 0, 0, 0)));
     listen_addr.push(Protocol::Tcp(peer_port));
     let config = {
         if let Some(boot_nodes) = boot_nodes {

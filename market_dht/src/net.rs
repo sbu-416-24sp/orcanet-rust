@@ -6,6 +6,7 @@ use libp2p::{
     kad::{store::MemoryStore, Behaviour as KadBehaviour, Config as KadConfig},
     noise,
     ping::{Behaviour as PingBehaviour, Config as PingConfig},
+    relay::{Behaviour as RelayBehaviour, Config as RelayConfig},
     yamux,
 };
 use thiserror::Error;
@@ -38,7 +39,9 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
         .with_dns()
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
-        .with_behaviour(|key| {
+        .with_relay_client(noise::Config::new, yamux::Config::default)
+        .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
+        .with_behaviour(|key, relay_client| {
             let peer_id = key.public().to_peer_id();
             // TODO: maybe configure something?
             let mut config = KadConfig::default();
@@ -53,12 +56,16 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
             let file_req_res = FileReqResBehaviour::new(FILE_REQ_RES_PROTOCOL, Default::default());
             let ping = PingBehaviour::new(PingConfig::default());
             let autonat = AutonatBehaviour::new(peer_id, AutonatConfig::default());
+            let relay = RelayBehaviour::new(peer_id, RelayConfig::default());
+
             MarketBehaviour::new(
                 kad_behaviour,
                 identify_behaviour,
                 file_req_res,
                 ping,
                 autonat,
+                relay,
+                relay_client,
             )
         })
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?

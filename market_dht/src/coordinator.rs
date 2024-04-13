@@ -126,6 +126,8 @@ impl Coordinator {
             MarketBehaviourEvent::Autonat(event) => self
                 .autonat_handler
                 .handle_event(event, self.swarm.behaviour_mut().autonat_mut()),
+            MarketBehaviourEvent::Relay(_) => todo!(),
+            MarketBehaviourEvent::RelayClient(_) => todo!(),
         }
     }
 
