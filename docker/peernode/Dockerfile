@@ -42,7 +42,4 @@ ENV ORCA_EXTERNAL_IP 127.0.0.1
 ENV ORCA_HTTP_PORT 8080
 
 # Run the binary
-# CMD if [ -z "$ORCA_EXTERNAL_IP" ]; then ./peer-node -p -m $ORCA_MARKET_ADDRESS --port $ORCA_HTTP_PORT; \
-#     else ./peer-node -p -m $ORCA_MARKET_ADDRESS --port $ORCA_HTTP_PORT --ip $ORCA_EXTERNAL_IP ; fi
-
-CMD ./peer-node producer add files 100 && ./peer-node producer register
+CMD ./peer-node producer add files 100 && ./peer-node producer register -m $ORCA_MARKET_ADDRESS

@@ -132,9 +132,10 @@ impl Configurations {
         self.write();
     }
 
-    pub fn set_market(&mut self, market: String) {
-        self.props.market = market;
+    pub fn set_market(&mut self, market: String) -> String {
+        self.props.market = market.clone();
         self.write();
+        market
     }
 
     pub fn add_dir(&mut self, file_path: String, price: i64) -> Result<()> {

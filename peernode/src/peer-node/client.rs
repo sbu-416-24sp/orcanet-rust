@@ -28,11 +28,12 @@ fn cli() -> Command {
                 .subcommand(
                     Command::new("register")
                         .about("Registers with all known market servers")
-                        .arg(arg!(<PORT> "The port to run the HTTP server on").required(false)),
+                        .arg(arg!(<PORT> "The port to run the HTTP server on").required(false))
+                        .arg(arg!(<MARKET> "The market to connect to").required(false).short('m')),
                 )
                 .subcommand(
                     Command::new("add")
-                        .about("Registers a dir/file with the market server")
+                        .about("Adds a dir/file to be registered with the market server")
                         .arg(
                             arg!(<FILE_NAME> "The file or directory name to register")
                                 .required(true),
@@ -56,6 +57,11 @@ fn cli() -> Command {
                     Command::new("port")
                         .about("Sets the port for the HTTP server")
                         .arg(arg!(<PORT> "The port to run the HTTP server on").required(true)),
+                )
+                .subcommand(
+                  Command::new("market")
+                  .about("Sets the market")
+                  .arg(arg!(<MARKET> "The market").required(true)),
                 )
                 .subcommand(
                     Command::new("ls").about("Lists all files registered with the market server"),
@@ -129,7 +135,6 @@ async fn main() {
     let cli = cli();
     // Load the configuration
     let mut config = store::Configurations::new().await;
-    let market = config.get_market();
 
     // check if there are any arguments passed to the program
     // if there are, process them and then exit
@@ -137,7 +142,7 @@ async fn main() {
         // remove the first argument which is the name of the program
         let args = std::env::args().skip(1).collect::<Vec<String>>();
         let matches = cli.clone().get_matches_from(args);
-        match handle_arg_matches(matches, &mut config, market.clone())
+        match handle_arg_matches(matches, &mut config)
             .await
         {
             Ok(_) => {}
@@ -172,7 +177,7 @@ async fn main() {
         let matches = cli
             .clone()
             .get_matches_from(input.split_whitespace().collect::<Vec<&str>>());
-        match handle_arg_matches(matches, &mut config, market.clone()).await {
+        match handle_arg_matches(matches, &mut config).await {
             Ok(_) => {}
             Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}", e),
         };
@@ -182,7 +187,6 @@ async fn main() {
 async fn handle_arg_matches(
     matches: clap::ArgMatches,
     config: &mut Configurations,
-    market: String,
 ) -> Result<()> {
     match matches.subcommand() {
         Some(("producer", producer_matches)) => {
@@ -192,6 +196,10 @@ async fn handle_arg_matches(
                     let port = match register_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
                         None => config.get_port(),
+                    };
+                    let market = match register_matches.get_one::<String>("MARKET") {
+                        Some(market) => config.set_market(market.to_owned()),
+                        None => config.get_market(),
                     };
                     producer::register_files(config.get_prices(), market, port.clone()).await?;
                     config.start_http_client(port).await;
@@ -287,7 +295,7 @@ async fn handle_arg_matches(
                         Some(file_hash) => file_hash.clone(),
                         None => Err(anyhow!("No file hash provided"))?,
                     };
-                    consumer::list_producers(file_hash, market).await?;
+                    consumer::list_producers(file_hash, config.get_market()).await?;
                     Ok(())
                 }
                 Some(("get", get_matches)) => {
