@@ -5,7 +5,12 @@ use std::{
 use thiserror::Error;
 
 use futures::StreamExt;
-use libp2p::{kad::store::MemoryStore, ping::Event, swarm::SwarmEvent, Multiaddr, Swarm};
+use libp2p::{
+    kad::{self, store::MemoryStore},
+    ping::Event,
+    swarm::SwarmEvent,
+    Multiaddr, Swarm,
+};
 use log::{error, info, warn};
 use tokio::{sync::mpsc, time};
 
@@ -41,9 +46,16 @@ impl Coordinator {
         boot_nodes: Option<BootNodes>,
         request_receiver: mpsc::UnboundedReceiver<Request>,
     ) -> Result<Self, CoordinatorError> {
+        // FIXIT: don't start in server mode by default and have it where only if the user is
+        // providing become a server mode?
         swarm
             .listen_on(listen_addr)
             .map_err(|err| CoordinatorError::SpawnError(err.to_string()))?;
+        swarm
+            .behaviour_mut()
+            .kademlia_mut()
+            .kad_mut()
+            .set_mode(Some(kad::Mode::Server));
         if let Some(boot_nodes) = boot_nodes {
             swarm
                 .behaviour_mut()
@@ -257,14 +269,11 @@ impl Coordinator {
             } => {
                 warn!("[ConnId {connection_id}] - Dialing peer: {:?}", peer_id);
             }
-            SwarmEvent::NewExternalAddrCandidate { address } => {
-                // TODO: this will be useful when we deal with NAT remotely since upnp emits a
-                // SwarmEvent::ExternalAddressConfirmed event in which we will use to actually add
-                // the address in I think
-                self.swarm.add_external_address(address);
-            }
             SwarmEvent::ExternalAddrExpired { address } => {
                 self.swarm.remove_external_address(&address);
+            }
+            SwarmEvent::ExternalAddrConfirmed { address } => {
+                self.swarm.add_external_address(address);
             }
             _ => {
                 error!("Unhandled swarm event: {:?}", event);

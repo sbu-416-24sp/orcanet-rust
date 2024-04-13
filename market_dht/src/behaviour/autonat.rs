@@ -31,7 +31,7 @@ impl AutoNatHandler {
                     peer,
                     error,
                 } => {
-                    error!("[{probe_id:?}] - Error with inbound probe from {peer:?}: {error:?}");
+                    error!("[{probe_id:?}] - Error with inbound probe request from {peer:?}: {error:?}");
                 }
             },
             Event::OutboundProbe(event) => match event {
