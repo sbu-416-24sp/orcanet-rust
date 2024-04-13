@@ -3,24 +3,28 @@ mod grpc;
 mod producer;
 mod store;
 
-use std::io::{self, Write};
+use std::{any, io::{self, Write}};
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
 use store::Configurations;
 
+use clap::CommandFactory;
+
 fn cli() -> Command {
     Command::new("peernode")
         .about("Orcanet Peernode CLI")
         .no_binary_name(true)
-        .ignore_errors(true)
+        // .ignore_errors(true)
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(
             Command::new("producer")
                 .about("Producer node commands")
                 .subcommand_required(true)
-                .ignore_errors(true)
+                .arg_required_else_help(true)
+                .subcommand_required(true)
+                // .ignore_errors(true)
                 .subcommand(
                     Command::new("register")
                         .about("Registers with all known market servers")
@@ -61,12 +65,13 @@ fn cli() -> Command {
             Command::new("consumer")
                 .about("Consumer node commands")
                 .subcommand_required(true)
-                .ignore_errors(true)
+                // .ignore_errors(true)
                 .arg_required_else_help(true)
+                .subcommand_required(true)
                 .subcommand(
                     Command::new("consumer")
                         .about("Consumer node commands")
-                        .ignore_errors(true)
+                        // .ignore_errors(true)
                         .arg_required_else_help(true)
                         .subcommand(
                             Command::new("send")
@@ -101,7 +106,7 @@ fn cli() -> Command {
             Command::new("market")
                 .about("Market node commands")
                 .subcommand_required(true)
-                .ignore_errors(true)
+                // .ignore_errors(true)
                 .subcommand(
                     Command::new("set")
                         .about("Sets the market to connect to")
@@ -111,16 +116,44 @@ fn cli() -> Command {
         .subcommand(Command::new("exit").about("Exits the CLI"))
 }
 
+async fn exit_gracefully(config: &mut Configurations) {
+    if config.is_http_running() {
+        // stop the current http client
+        config.stop_http_client().await;
+    }
+}
+
+
 #[tokio::main]
 async fn main() {
-    println!("Orcanet Peernode CLI: Type 'help' for a list of commands");
-    let mut cli = cli();
-    let help = cli.render_help();
-
+    let cli = cli();
     // Load the configuration
     let mut config = store::Configurations::new().await;
     let market = config.get_market();
 
+    // check if there are any arguments passed to the program
+    // if there are, process them and then exit
+    if std::env::args().len() > 1 {
+        // remove the first argument which is the name of the program
+        let args = std::env::args().skip(1).collect::<Vec<String>>();
+        let matches = cli.clone().get_matches_from(args);
+        match handle_arg_matches(matches, &mut config, market.clone())
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}", e),
+        };
+        // wait for the HTTP server to start
+        // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        if config.is_http_running() {
+          // wait for user to exit with control-c
+          tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
+          exit_gracefully(&mut config).await;
+        }
+        return;
+    }
+
+    println!("Orcanet Peernode CLI: Type 'help' for a list of commands");
     loop {
         // Print command prompt and get command
         io::stdout().flush().expect("Couldn't flush stdout");
@@ -141,7 +174,7 @@ async fn main() {
             .get_matches_from(input.split_whitespace().collect::<Vec<&str>>());
         match handle_arg_matches(matches, &mut config, market.clone()).await {
             Ok(_) => {}
-            Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}\n{}", e, help),
+            Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}", e),
         };
     }
 }
@@ -194,11 +227,13 @@ async fn handle_arg_matches(
                     let price = match price.parse::<i64>() {
                         Ok(price) => price,
                         Err(_) => {
-                            eprintln!("Invalid price");
-                            return Ok(());
+                            // eprintln!("Invalid price");
+                            return Err(anyhow!("Invalid price"));
                         }
                     };
                     config.add_file_path(file_name.to_string(), price);
+                    // print
+                    println!("File {} has been registered at price {}", file_name, price);
                     Ok(())
                 }
                 Some(("rm", rm_matches)) => {

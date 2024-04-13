@@ -178,10 +178,6 @@ pub async fn run(files: AsyncFileMap, port: String) -> Result<(), Box<dyn std::e
             files,
         });
 
-    let addr = format!("0.0.0.0:{}", port);
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    println!("HTTP: Listening on {}", listener.local_addr()?);
-
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

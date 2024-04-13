@@ -11,4 +11,4 @@ peernode/files/*
 !peernode/files/.gitkeep
 peernode/download/*
 !peernode/download/.gitkeep
-config.json
+peernode/config.json

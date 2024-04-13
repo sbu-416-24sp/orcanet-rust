@@ -220,6 +220,13 @@ impl Configurations {
         self.http_client = Some(http_client);
     }
 
+    pub fn is_http_running(&self) -> bool {
+        if self.http_client.is_some() {
+            return true;
+        }
+        return false
+    }
+
     pub async fn start_http_client(&mut self, port: String) {
         // stop the current http client
         if let Some(http_client) = self.http_client.take() {
