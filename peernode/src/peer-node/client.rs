@@ -3,7 +3,10 @@ mod grpc;
 mod producer;
 mod store;
 
-use std::{any, io::{self, Write}};
+use std::{
+    any,
+    io::{self, Write},
+};
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
@@ -123,7 +126,6 @@ async fn exit_gracefully(config: &mut Configurations) {
     }
 }
 
-
 #[tokio::main]
 async fn main() {
     let cli = cli();
@@ -137,18 +139,18 @@ async fn main() {
         // remove the first argument which is the name of the program
         let args = std::env::args().skip(1).collect::<Vec<String>>();
         let matches = cli.clone().get_matches_from(args);
-        match handle_arg_matches(matches, &mut config, market.clone())
-            .await
-        {
+        match handle_arg_matches(matches, &mut config, market.clone()).await {
             Ok(_) => {}
             Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}", e),
         };
         // wait for the HTTP server to start
         // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if config.is_http_running() {
-          // wait for user to exit with control-c
-          tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
-          exit_gracefully(&mut config).await;
+            // wait for user to exit with control-c
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to listen for ctrl-c");
+            exit_gracefully(&mut config).await;
         }
         return;
     }
