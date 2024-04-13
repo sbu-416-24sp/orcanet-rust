@@ -225,7 +225,7 @@ impl Configurations {
         if self.http_client.is_some() {
             return true;
         }
-        return false
+        return false;
     }
 
     pub async fn start_http_client(&mut self, port: String) {

@@ -3,7 +3,10 @@ mod grpc;
 mod producer;
 mod store;
 
-use std::{any, io::{self, Write}};
+use std::{
+    any,
+    io::{self, Write},
+};
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
@@ -29,7 +32,11 @@ fn cli() -> Command {
                     Command::new("register")
                         .about("Registers with all known market servers")
                         .arg(arg!(<PORT> "The port to run the HTTP server on").required(false))
-                        .arg(arg!(<MARKET> "The market to connect to").required(false).short('m')),
+                        .arg(
+                            arg!(<MARKET> "The market to connect to")
+                                .required(false)
+                                .short('m'),
+                        ),
                 )
                 .subcommand(
                     Command::new("add")
@@ -59,9 +66,9 @@ fn cli() -> Command {
                         .arg(arg!(<PORT> "The port to run the HTTP server on").required(true)),
                 )
                 .subcommand(
-                  Command::new("market")
-                  .about("Sets the market")
-                  .arg(arg!(<MARKET> "The market").required(true)),
+                    Command::new("market")
+                        .about("Sets the market")
+                        .arg(arg!(<MARKET> "The market").required(true)),
                 )
                 .subcommand(
                     Command::new("ls").about("Lists all files registered with the market server"),
@@ -129,7 +136,6 @@ async fn exit_gracefully(config: &mut Configurations) {
     }
 }
 
-
 #[tokio::main]
 async fn main() {
     let cli = cli();
@@ -142,18 +148,18 @@ async fn main() {
         // remove the first argument which is the name of the program
         let args = std::env::args().skip(1).collect::<Vec<String>>();
         let matches = cli.clone().get_matches_from(args);
-        match handle_arg_matches(matches, &mut config)
-            .await
-        {
+        match handle_arg_matches(matches, &mut config).await {
             Ok(_) => {}
             Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}", e),
         };
         // wait for the HTTP server to start
         // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if config.is_http_running() {
-          // wait for user to exit with control-c
-          tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
-          exit_gracefully(&mut config).await;
+            // wait for user to exit with control-c
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to listen for ctrl-c");
+            exit_gracefully(&mut config).await;
         }
         return;
     }
@@ -184,10 +190,7 @@ async fn main() {
     }
 }
 
-async fn handle_arg_matches(
-    matches: clap::ArgMatches,
-    config: &mut Configurations,
-) -> Result<()> {
+async fn handle_arg_matches(matches: clap::ArgMatches, config: &mut Configurations) -> Result<()> {
     match matches.subcommand() {
         Some(("producer", producer_matches)) => {
             match producer_matches.subcommand() {
