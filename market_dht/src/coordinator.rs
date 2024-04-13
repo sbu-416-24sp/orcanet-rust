@@ -270,9 +270,14 @@ impl Coordinator {
                 warn!("[ConnId {connection_id}] - Dialing peer: {:?}", peer_id);
             }
             SwarmEvent::ExternalAddrExpired { address } => {
+                warn!("External address expired: {}", address);
                 self.swarm.remove_external_address(&address);
             }
+            SwarmEvent::NewExternalAddrCandidate { address } => {
+                warn!("New external address candidate: {}", address);
+            }
             SwarmEvent::ExternalAddrConfirmed { address } => {
+                warn!("External address confirmed: {}", address);
                 self.swarm.add_external_address(address);
             }
             _ => {
