@@ -6,6 +6,9 @@ use anyhow::{anyhow, Result};
 use clap::{arg, Command};
 use store::Configurations;
 
+#[cfg(test)]
+mod tests;
+
 pub fn cli() -> Command {
     Command::new("peernode")
         .about("Orcanet Peernode CLI")
