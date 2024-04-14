@@ -34,7 +34,7 @@ pub fn cli() -> Command {
                             arg!(<IP> "The public IP address to announce")
                                 .required(false)
                                 .short('i'),
-                        )
+                        ),
                 )
                 .subcommand(
                     Command::new("add")
