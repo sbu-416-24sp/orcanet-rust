@@ -2,7 +2,7 @@ mod db;
 pub mod files;
 mod http;
 
-use crate::grpc::{orcanet::market_server::Market, MarketClient};
+use crate::grpc::MarketClient;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
