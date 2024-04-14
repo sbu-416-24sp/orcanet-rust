@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub async fn start_server(
     files: HashMap<String, PathBuf>,
@@ -82,7 +82,7 @@ pub async fn register_files(
                 hash,
             )
             .await?;
-    }
+      }
 
     Ok(())
 }
