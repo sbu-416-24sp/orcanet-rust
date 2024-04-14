@@ -238,7 +238,7 @@ impl Configurations {
             }
         }
 
-        // set the port
+        // Set the port
         self.set_port(port.clone());
 
         let join =
