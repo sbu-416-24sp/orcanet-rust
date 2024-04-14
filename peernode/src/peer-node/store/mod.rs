@@ -3,11 +3,13 @@ use anyhow::Result;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
+use crate::grpc::MarketClient;
 
 #[derive()]
 pub struct Configurations {
     props: Properties,
     http_client: Option<tokio::task::JoinHandle<()>>,
+    market_client: Option<MarketClient>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -45,6 +47,7 @@ impl Configurations {
         Configurations {
             props,
             http_client: None,
+            market_client: None,
         }
     }
 
@@ -59,6 +62,7 @@ impl Configurations {
                 port: "8080".to_string(),
             },
             http_client: None,
+            market_client: None,
         };
         default.write();
         return default;
@@ -255,4 +259,21 @@ impl Configurations {
             }
         }
     }
+
+    pub async fn get_market_client(&mut self) -> Result<&mut MarketClient> {
+      if self.market_client.is_none() {
+        let market_client = MarketClient::new(self.get_market()).await?;
+        self.market_client = Some(market_client);
+      }
+      let market_client = self.market_client.as_mut().unwrap(); // safe to unwrap because we just set it
+      Ok(market_client)
+    }
+
+    pub async fn set_market_client(&mut self, market: String) -> Result<&mut MarketClient>{
+      let market_client = MarketClient::new(market.clone()).await?;
+      self.market_client = Some(market_client);
+      self.set_market(market);
+      Ok(self.market_client.as_mut().unwrap())  // safe to unwrap because we just set it
+    }
+
 }

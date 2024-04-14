@@ -108,8 +108,8 @@ pub fn cli() -> Command {
                         .about("Downloads a file from a producer")
                         .arg(arg!(<FILE_HASH> "The hash of the file to download").required(true))
                         .arg(arg!(<PRODUCER> "The producer to download from").required(true))
-                        .arg(arg!(<CHUNK_NUM> "The chunk number to download").required(false))
-                        .arg(arg!(<CONTINUE> "Continue downloading a file").required(false)),
+                        .arg(arg!(<CHUNK_NUM> "The chunk number to download").required(false).short('n'))
+                        .arg(arg!(<CONTINUE> "Continue downloading a file").required(false).short('c'))
                 ),
         )
         .subcommand(
@@ -134,20 +134,22 @@ pub async fn handle_arg_matches(
         Some(("producer", producer_matches)) => {
             match producer_matches.subcommand() {
                 Some(("register", register_matches)) => {
+                    let prices = config.get_prices();
                     // register files with the market service
                     let port = match register_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
                         None => config.get_port(),
                     };
-                    let market = match register_matches.get_one::<String>("MARKET") {
-                        Some(market) => config.set_market(market.to_owned()),
-                        None => config.get_market(),
+                    let market_client = match register_matches.get_one::<String>("MARKET") {
+                        Some(market) => config.set_market_client(market.to_owned()).await?,
+                        None => config.get_market_client().await?,
                     };
                     let ip = match register_matches.get_one::<String>("IP") {
                         Some(ip) => Some(ip.clone()),
                         None => None,
                     };
-                    producer::register_files(config.get_prices(), market, port.clone(), ip).await?;
+                    // let market_client = config.get_market_client().await?;
+                    producer::register_files(prices, market_client, port.clone(), ip).await?;
                     config.start_http_client(port).await;
                     Ok(())
                 }
@@ -241,7 +243,8 @@ pub async fn handle_arg_matches(
                         Some(file_hash) => file_hash.clone(),
                         None => Err(anyhow!("No file hash provided"))?,
                     };
-                    consumer::list_producers(file_hash, config.get_market()).await?;
+                    let market_client = config.get_market_client().await?;
+                    consumer::list_producers(file_hash, market_client).await?;
                     Ok(())
                 }
                 Some(("get", get_matches)) => {
@@ -296,7 +299,7 @@ pub async fn handle_arg_matches(
                     Some(market) => market.clone(),
                     None => Err(anyhow!("No market provided"))?,
                 };
-                config.set_market(market);
+                config.set_market_client(market).await?;
                 Ok(())
             }
             _ => Err(anyhow!("Invalid subcommand")),

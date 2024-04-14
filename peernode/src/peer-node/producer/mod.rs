@@ -2,7 +2,7 @@ mod db;
 pub mod files;
 mod http;
 
-use crate::grpc::MarketClient;
+use crate::grpc::{orcanet::market_server::Market, MarketClient};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -31,11 +31,11 @@ pub async fn stop_server(join_handle: tokio::task::JoinHandle<()>) -> Result<()>
 
 pub async fn register_files(
     prices: HashMap<String, i64>,
-    market: String,
+    client: &mut MarketClient,
     port: String,
     ip: Option<String>,
 ) -> Result<()> {
-    let mut client = MarketClient::new(market).await?;
+    // let mut client = MarketClient::new(market).await?;
 
     // get port from string
     let port = match port.parse::<i32>() {
