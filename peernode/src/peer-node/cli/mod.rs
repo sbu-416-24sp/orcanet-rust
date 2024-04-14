@@ -29,7 +29,12 @@ pub fn cli() -> Command {
                             arg!(<MARKET> "The market to connect to")
                                 .required(false)
                                 .short('m'),
-                        ),
+                        )
+                        .arg(
+                            arg!(<IP> "The public IP address to announce")
+                                .required(false)
+                                .short('i'),
+                        )
                 )
                 .subcommand(
                     Command::new("add")
@@ -138,7 +143,8 @@ pub async fn handle_arg_matches(
                         Some(market) => config.set_market(market.to_owned()),
                         None => config.get_market(),
                     };
-                    producer::register_files(config.get_prices(), market, port.clone()).await?;
+                    let ip = register_matches.get_one::<String>("IP");
+                    producer::register_files(config.get_prices(), market, port.clone(), ip).await?;
                     config.start_http_client(port).await;
                     Ok(())
                 }

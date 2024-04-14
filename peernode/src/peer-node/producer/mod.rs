@@ -33,6 +33,7 @@ pub async fn register_files(
     prices: HashMap<String, i64>,
     market: String,
     port: String,
+    ip: Option<String>,
 ) -> Result<()> {
     let mut client = MarketClient::new(market).await?;
 
@@ -45,17 +46,37 @@ pub async fn register_files(
         }
     };
 
+    // Get the public IP address
+    let ip = match ip {
+        Some(ip) => ip,
+        // Use the AWS checkip service to get the public IP address
+        None => match reqwest::get("http://checkip.amazonaws.com").await {
+            Ok(resp) => match resp.text().await {
+                Ok(text) => text.trim().to_string(),
+                Err(e) => {
+                    return Err(anyhow!("Failed to get public IP: {}", e));
+                }
+            },
+            Err(e) => {
+                return Err(anyhow!("Failed to get public IP: {}", e));
+            }
+        },
+    };
+    println!("Producer: IP address is {}", ip);
+
+    // Generate a random Producer ID
+    let producer_id = uuid::Uuid::new_v4().to_string();
+
     for (hash, price) in prices {
-        // TODO: Find a way to get the public IP address
         println!(
             "Producer: Registering file with hash {} and price {}",
             hash, price
         );
         client
             .register_file(
-                "id".to_string(),
-                "name".to_string(),
-                "127.0.0.1".to_string(),
+                producer_id.clone(),
+                "producer".to_string(),
+                ip.clone(),
                 port,
                 price,
                 hash,
