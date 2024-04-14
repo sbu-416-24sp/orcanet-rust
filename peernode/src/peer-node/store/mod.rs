@@ -1,9 +1,9 @@
+use crate::grpc::MarketClient;
 use crate::producer;
 use anyhow::Result;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
-use crate::grpc::MarketClient;
 
 #[derive()]
 pub struct Configurations {
@@ -261,19 +261,18 @@ impl Configurations {
     }
 
     pub async fn get_market_client(&mut self) -> Result<&mut MarketClient> {
-      if self.market_client.is_none() {
-        let market_client = MarketClient::new(self.get_market()).await?;
+        if self.market_client.is_none() {
+            let market_client = MarketClient::new(self.get_market()).await?;
+            self.market_client = Some(market_client);
+        }
+        let market_client = self.market_client.as_mut().unwrap(); // safe to unwrap because we just set it
+        Ok(market_client)
+    }
+
+    pub async fn set_market_client(&mut self, market: String) -> Result<&mut MarketClient> {
+        let market_client = MarketClient::new(market.clone()).await?;
         self.market_client = Some(market_client);
-      }
-      let market_client = self.market_client.as_mut().unwrap(); // safe to unwrap because we just set it
-      Ok(market_client)
+        self.set_market(market);
+        Ok(self.market_client.as_mut().unwrap()) // safe to unwrap because we just set it
     }
-
-    pub async fn set_market_client(&mut self, market: String) -> Result<&mut MarketClient>{
-      let market_client = MarketClient::new(market.clone()).await?;
-      self.market_client = Some(market_client);
-      self.set_market(market);
-      Ok(self.market_client.as_mut().unwrap())  // safe to unwrap because we just set it
-    }
-
 }

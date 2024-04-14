@@ -81,7 +81,6 @@ pub fn cli() -> Command {
                 .subcommand(
                     Command::new("consumer")
                         .about("Consumer node commands")
-                        // .ignore_errors(true)
                         .arg_required_else_help(true)
                         .subcommand(
                             Command::new("send")
@@ -108,8 +107,16 @@ pub fn cli() -> Command {
                         .about("Downloads a file from a producer")
                         .arg(arg!(<FILE_HASH> "The hash of the file to download").required(true))
                         .arg(arg!(<PRODUCER> "The producer to download from").required(true))
-                        .arg(arg!(<CHUNK_NUM> "The chunk number to download").required(false).short('n'))
-                        .arg(arg!(<CONTINUE> "Continue downloading a file").required(false).short('c'))
+                        .arg(
+                            arg!(<CHUNK_NUM> "The chunk number to download")
+                                .required(false)
+                                .short('n'),
+                        )
+                        .arg(
+                            arg!(<CONTINUE> "Continue downloading a file")
+                                .required(false)
+                                .short('c'),
+                        ),
                 ),
         )
         .subcommand(
