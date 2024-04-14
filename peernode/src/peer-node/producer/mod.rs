@@ -82,7 +82,7 @@ pub async fn register_files(
                 hash,
             )
             .await?;
-      }
+    }
 
     Ok(())
 }
