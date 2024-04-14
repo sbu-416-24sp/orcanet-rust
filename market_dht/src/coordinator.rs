@@ -7,6 +7,7 @@ use thiserror::Error;
 use futures::StreamExt;
 use libp2p::{
     kad::{self, store::MemoryStore},
+    multiaddr::Protocol,
     ping::Event,
     swarm::SwarmEvent,
     Multiaddr, Swarm,
@@ -199,6 +200,13 @@ impl Coordinator {
                     "ENDPOINT GET REMOTE ADDR: {:?}",
                     endpoint.get_remote_address()
                 );
+                let res = self.swarm.listen_on(
+                    endpoint
+                        .get_remote_address()
+                        .clone()
+                        .with(Protocol::P2pCircuit),
+                );
+                error!("{:?}", res);
                 info!("[ConnId {connection_id}] - Connection established with peer: {peer_id}. Number of established connections: {num_established}. Established in: {established_in:?}");
             }
             SwarmEvent::ConnectionClosed {
