@@ -1,6 +1,7 @@
 use crate::consumer;
 use crate::producer;
 use crate::store;
+mod test;
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
