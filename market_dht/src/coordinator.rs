@@ -127,8 +127,15 @@ impl Coordinator {
             MarketBehaviourEvent::Autonat(event) => self
                 .autonat_handler
                 .handle_event(event, self.swarm.behaviour_mut().autonat_mut()),
-            MarketBehaviourEvent::Relay(_) => todo!(),
-            MarketBehaviourEvent::RelayClient(_) => todo!(),
+            MarketBehaviourEvent::Relay(event) => {
+                info!("{:?}", event);
+            }
+            MarketBehaviourEvent::RelayClient(event) => {
+                info!("{:?}", event);
+            }
+            MarketBehaviourEvent::Dcutr(event) => {
+                info!("{:?}", event);
+            }
         }
     }
 
@@ -278,8 +285,12 @@ impl Coordinator {
                 // addr in a session
                 error!("[{listener_id}] - Expired listening on {}", address);
             }
-            SwarmEvent::ListenerClosed { listener_id, .. } => {
-                error!("[{listener_id}] - Listener closed");
+            SwarmEvent::ListenerClosed {
+                listener_id,
+                addresses,
+                reason,
+            } => {
+                error!("[{listener_id}] - Listener closed: {addresses:?} {reason:?}");
             }
             SwarmEvent::ListenerError { listener_id, error } => {
                 error!("[{listener_id}] - Listener error: {error}");

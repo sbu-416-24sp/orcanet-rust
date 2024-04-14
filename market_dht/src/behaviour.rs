@@ -1,8 +1,8 @@
 use libp2p::{
-    autonat::Behaviour as AutoNatBehaviour, identify::Behaviour as IdentifyBehaviour,
-    kad::Behaviour as KadBehaviour, ping::Behaviour as PingBehaviour,
-    relay::client::Behaviour as RelayClientBehaviour, relay::Behaviour as RelayBehaviour,
-    swarm::NetworkBehaviour,
+    autonat::Behaviour as AutoNatBehaviour, dcutr::Behaviour as DcutrBehaviour,
+    identify::Behaviour as IdentifyBehaviour, kad::Behaviour as KadBehaviour,
+    ping::Behaviour as PingBehaviour, relay::client::Behaviour as RelayClientBehaviour,
+    relay::Behaviour as RelayBehaviour, swarm::NetworkBehaviour,
 };
 
 use self::{
@@ -22,6 +22,7 @@ pub(crate) struct MarketBehaviour<TKadStore: KadStore> {
     autonat: AutoNatBehaviour,
     relay: RelayBehaviour,
     relay_client: RelayClientBehaviour,
+    dcutr: DcutrBehaviour,
 }
 
 impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
@@ -34,6 +35,7 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
         autonat: AutoNatBehaviour,
         relay: RelayBehaviour,
         relay_client: RelayClientBehaviour,
+        dcutr: DcutrBehaviour,
     ) -> Self {
         Self {
             kademlia: Kad::new(kademlia),
@@ -43,6 +45,7 @@ impl<TKadStore: KadStore> MarketBehaviour<TKadStore> {
             autonat,
             relay,
             relay_client,
+            dcutr,
         }
     }
 

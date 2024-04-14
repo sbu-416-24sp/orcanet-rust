@@ -2,6 +2,7 @@ use std::{thread, time::Duration};
 
 use libp2p::{
     autonat::{Behaviour as AutonatBehaviour, Config as AutonatConfig},
+    dcutr::Behaviour as DcutrBehaviour,
     identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
     kad::{store::MemoryStore, Behaviour as KadBehaviour, Config as KadConfig},
     noise,
@@ -57,6 +58,7 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
             let ping = PingBehaviour::new(PingConfig::default());
             let autonat = AutonatBehaviour::new(peer_id, AutonatConfig::default());
             let relay = RelayBehaviour::new(peer_id, RelayConfig::default());
+            let dcutr = DcutrBehaviour::new(key.public().to_peer_id());
 
             MarketBehaviour::new(
                 kad_behaviour,
@@ -66,6 +68,7 @@ pub fn spawn_bridge(config: Config) -> Result<Peer, NetworkBridgeError> {
                 autonat,
                 relay,
                 relay_client,
+                dcutr,
             )
         })
         .map_err(|err| NetworkBridgeError::Init(err.to_string()))?
