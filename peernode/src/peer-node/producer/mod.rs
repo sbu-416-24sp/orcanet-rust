@@ -1,30 +1,48 @@
 mod db;
-mod files;
+pub mod files;
 mod http;
 
-use std::sync::Arc;
-
 use crate::grpc::MarketClient;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
-pub async fn run(market: String, ip: Option<String>, port: Option<u16>) -> Result<()> {
-    let mut client = MarketClient::new(market).await?;
-
-    // Load the files
-    let file_map = Arc::new(files::FileMap::new());
-    file_map.add_all("files/**/*").await?;
-
-    // Get the port
-    let port = port.unwrap_or(8080);
-
+pub async fn start_server(
+    files: HashMap<String, PathBuf>,
+    prices: HashMap<String, i64>,
+    port: String,
+) -> tokio::task::JoinHandle<()> {
     // Launch the HTTP server in the background
-    let http_file_map = file_map.clone();
+    let http_file_map = Arc::new(files::FileMap::new(files, prices));
     tokio::spawn(async move {
         if let Err(e) = http::run(http_file_map, port).await {
             eprintln!("HTTP server error: {}", e);
         }
-    });
+    })
+}
+
+pub async fn stop_server(join_handle: tokio::task::JoinHandle<()>) -> Result<()> {
+    // Stop the HTTP server
+    join_handle.abort();
+    Ok(())
+}
+
+pub async fn register_files(
+    prices: HashMap<String, i64>,
+    client: &mut MarketClient,
+    port: String,
+    ip: Option<String>,
+) -> Result<()> {
+    // get port from string
+    let port = match port.parse::<i32>() {
+        Ok(port) => port,
+        Err(_) => {
+            eprintln!("Invalid port number");
+            return Ok(());
+        }
+    };
 
     // Get the public IP address
     let ip = match ip {
@@ -44,28 +62,25 @@ pub async fn run(market: String, ip: Option<String>, port: Option<u16>) -> Resul
     };
     println!("Producer: IP address is {}", ip);
 
-    // Generate a random producer ID
+    // Generate a random Producer ID
     let producer_id = uuid::Uuid::new_v4().to_string();
 
-    // Register the files with the market service
-    let hash = file_map.get_hashes().await;
-    for hash in hash {
-        // TODO: Find a way to get the public IP address
-        println!("Producer: Registering file with hash {}", hash);
+    for (hash, price) in prices {
+        println!(
+            "Producer: Registering file with hash {} and price {}",
+            hash, price
+        );
         client
             .register_file(
                 producer_id.clone(),
                 "producer".to_string(),
                 ip.clone(),
-                port.into(),
-                100,
+                port,
+                price,
                 hash,
             )
             .await?;
     }
-
-    // Never return
-    tokio::signal::ctrl_c().await?;
 
     Ok(())
 }
