@@ -32,7 +32,6 @@ async fn main() {
             Err(e) => eprintln!("\x1b[93mError:\x1b[0m {}", e),
         };
         // wait for the HTTP server to start
-        // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if config.is_http_running() {
             // wait for user to exit with control-c
             tokio::signal::ctrl_c()
