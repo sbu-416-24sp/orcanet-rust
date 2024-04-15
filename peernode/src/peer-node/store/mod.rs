@@ -6,14 +6,16 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 
 #[derive()]
-pub struct Configurations { // this is the struct that will be used to store the configurations
+pub struct Configurations {
+    // this is the struct that will be used to store the configurations
     props: Properties,
     http_client: Option<tokio::task::JoinHandle<()>>,
     market_client: Option<MarketClient>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Properties { // must be a separate serializable struct so can read from config.json file
+pub struct Properties {
+    // must be a separate serializable struct so can read from config.json file
     name: String,
     market: String,
     files: HashMap<String, PathBuf>,
@@ -23,7 +25,7 @@ pub struct Properties { // must be a separate serializable struct so can read fr
     // wallet: String, // not sure about implementation details, will revisit later
 }
 
-// TODO: Put prices and path attached to the same hash in config file, and then construct the hashmaps from that 
+// TODO: Put prices and path attached to the same hash in config file, and then construct the hashmaps from that
 impl Configurations {
     pub async fn new() -> Self {
         let config = Config::builder()
@@ -51,7 +53,8 @@ impl Configurations {
         }
     }
 
-    pub async fn default() -> Self { // this is the default configuration
+    pub async fn default() -> Self {
+        // this is the default configuration
         let default = Configurations {
             props: Properties {
                 name: "default".to_string(),

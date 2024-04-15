@@ -139,8 +139,10 @@ pub fn cli() -> Command {
 pub async fn handle_arg_matches(
     matches: clap::ArgMatches,
     config: &mut Configurations,
-) -> Result<()> { // take in result to pass up and print errors to user directly
-    match matches.subcommand() { // match subcommands, get the inputs, and execute the appropriate functions
+) -> Result<()> {
+    // take in result to pass up and print errors to user directly
+    match matches.subcommand() {
+        // match subcommands, get the inputs, and execute the appropriate functions
         Some(("producer", producer_matches)) => {
             match producer_matches.subcommand() {
                 Some(("register", register_matches)) => {
