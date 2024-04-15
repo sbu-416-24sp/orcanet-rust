@@ -75,5 +75,8 @@ pub async fn get_file_chunk(
         file_name,
         duration.as_millis()
     );
-    Ok(GetFileResponse::Token(auth_token.to_string(), file_name.to_string()))
+    Ok(GetFileResponse::Token(
+        auth_token.to_string(),
+        file_name.to_string(),
+    ))
 }

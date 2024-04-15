@@ -62,7 +62,7 @@ pub async fn run(market: String, file_hash: String) -> Result<()> {
     io::copy(&mut file, &mut sha256)?;
     let hash = sha256.finalize();
     let hash = format!("{:x}", hash);
-    
+
     if hash == file_hash {
         println!("Consumer: File hash verified");
     } else {
