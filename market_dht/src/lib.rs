@@ -11,6 +11,8 @@
 pub use config::*;
 pub use lmm::SupplierInfo;
 
-mod lmm;
+pub(crate) mod behaviour;
+pub(crate) mod handler;
+pub(crate) mod lmm;
 
 pub mod config;
