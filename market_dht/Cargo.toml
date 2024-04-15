@@ -12,6 +12,7 @@ libp2p = { version = "0.53.2", features = [
   "dns",
   "kad",
   "noise",
+  "tls",
   "tokio",
   "mdns",
   "relay",

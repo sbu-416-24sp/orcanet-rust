@@ -1,4 +1,6 @@
-use libp2p::Swarm;
+use std::cell::Cell;
+
+use libp2p::{swarm::SwarmEvent, Swarm};
 
 use crate::{behaviour::Behaviour, lmm::LocalMarketMap};
 
@@ -16,6 +18,80 @@ pub(crate) trait EventHandler {
 
 pub(crate) trait CommandRequestHandler {}
 
+pub(crate) struct BootupHandler<'a, 'b> {
+    swarm: &'a mut Swarm<Behaviour>,
+    booting: &'b Cell<bool>,
+}
+
+impl<'a, 'b> BootupHandler<'a, 'b> {
+    pub(crate) fn new(swarm: &'a mut Swarm<Behaviour>, booting: &'b Cell<bool>) -> Self {
+        BootupHandler { swarm, booting }
+    }
+}
+
+impl<'a, 'b> EventHandler for BootupHandler<'a, 'b> {
+    type Event = SwarmEvent<BehaviourEvent>;
+
+    fn handle_event(&mut self, event: Self::Event) {
+        match event {
+            SwarmEvent::Behaviour(_) => todo!(),
+            SwarmEvent::ConnectionEstablished {
+                peer_id,
+                connection_id,
+                endpoint,
+                num_established,
+                concurrent_dial_errors,
+                established_in,
+            } => todo!(),
+            SwarmEvent::ConnectionClosed {
+                peer_id,
+                connection_id,
+                endpoint,
+                num_established,
+                cause,
+            } => todo!(),
+            SwarmEvent::IncomingConnection {
+                connection_id,
+                local_addr,
+                send_back_addr,
+            } => todo!(),
+            SwarmEvent::IncomingConnectionError {
+                connection_id,
+                local_addr,
+                send_back_addr,
+                error,
+            } => todo!(),
+            SwarmEvent::OutgoingConnectionError {
+                connection_id,
+                peer_id,
+                error,
+            } => todo!(),
+            SwarmEvent::NewListenAddr {
+                listener_id,
+                address,
+            } => todo!(),
+            SwarmEvent::ExpiredListenAddr {
+                listener_id,
+                address,
+            } => todo!(),
+            SwarmEvent::ListenerClosed {
+                listener_id,
+                addresses,
+                reason,
+            } => todo!(),
+            SwarmEvent::ListenerError { listener_id, error } => todo!(),
+            SwarmEvent::Dialing {
+                peer_id,
+                connection_id,
+            } => todo!(),
+            SwarmEvent::NewExternalAddrCandidate { address } => todo!(),
+            SwarmEvent::ExternalAddrConfirmed { address } => todo!(),
+            SwarmEvent::ExternalAddrExpired { address } => todo!(),
+            _ => {}
+        }
+    }
+}
+
 pub(crate) struct Handler<'a, 'b> {
     swarm: &'a mut Swarm<Behaviour>,
     lmm: &'b mut LocalMarketMap,
@@ -28,38 +104,94 @@ impl<'a, 'b> Handler<'a, 'b> {
 }
 
 impl<'a, 'b> EventHandler for Handler<'a, 'b> {
-    type Event = BehaviourEvent;
+    type Event = SwarmEvent<BehaviourEvent>;
 
     fn handle_event(&mut self, event: Self::Event) {
+        // NOTE:  maybe use  box,dyn but that would remove zca?
         match event {
-            BehaviourEvent::Kad(event) => {
-                let mut kad_handler = KadHandler::new(self.swarm, self.lmm);
-                kad_handler.handle_event(event);
-            }
-            BehaviourEvent::Identify(event) => {
-                let mut identify_handler = IdentifyHandler::new(self.swarm);
-                identify_handler.handle_event(event);
-            }
-            BehaviourEvent::Ping(event) => {
-                let mut ping_handler = PingHandler {};
-                ping_handler.handle_event(event);
-            }
-            BehaviourEvent::Autonat(event) => {
-                let mut autonat_handler = AutoNatHandler {};
-                autonat_handler.handle_event(event);
-            }
-            BehaviourEvent::RelayServer(event) => {
-                let mut relay_server_handler = RelayServerHandler {};
-                relay_server_handler.handle_event(event);
-            }
-            BehaviourEvent::Dcutr(event) => {
-                let mut dcutr_handler = DcutrHandler {};
-                dcutr_handler.handle_event(event);
-            }
-            BehaviourEvent::RelayClient(event) => {
-                let mut relay_client = RelayClientHandler {};
-                relay_client.handle_event(event);
-            }
+            SwarmEvent::Behaviour(event) => match event {
+                BehaviourEvent::Kad(event) => {
+                    let mut kad_handler = KadHandler::new(self.swarm, self.lmm);
+                    kad_handler.handle_event(event);
+                }
+                BehaviourEvent::Identify(event) => {
+                    let mut identify_handler = IdentifyHandler::new(self.swarm);
+                    identify_handler.handle_event(event);
+                }
+                BehaviourEvent::Ping(event) => {
+                    let mut ping_handler = PingHandler {};
+                    ping_handler.handle_event(event);
+                }
+                BehaviourEvent::Autonat(event) => {
+                    let mut autonat_handler = AutoNatHandler {};
+                    autonat_handler.handle_event(event);
+                }
+                BehaviourEvent::RelayServer(event) => {
+                    let mut relay_server_handler = RelayServerHandler {};
+                    relay_server_handler.handle_event(event);
+                }
+                BehaviourEvent::Dcutr(event) => {
+                    let mut dcutr_handler = DcutrHandler {};
+                    dcutr_handler.handle_event(event);
+                }
+                BehaviourEvent::RelayClient(event) => {
+                    let mut relay_client = RelayClientHandler {};
+                    relay_client.handle_event(event);
+                }
+            },
+            SwarmEvent::ConnectionEstablished {
+                peer_id,
+                connection_id,
+                endpoint,
+                num_established,
+                concurrent_dial_errors,
+                established_in,
+            } => todo!(),
+            SwarmEvent::ConnectionClosed {
+                peer_id,
+                connection_id,
+                endpoint,
+                num_established,
+                cause,
+            } => todo!(),
+            SwarmEvent::IncomingConnection {
+                connection_id,
+                local_addr,
+                send_back_addr,
+            } => todo!(),
+            SwarmEvent::IncomingConnectionError {
+                connection_id,
+                local_addr,
+                send_back_addr,
+                error,
+            } => todo!(),
+            SwarmEvent::OutgoingConnectionError {
+                connection_id,
+                peer_id,
+                error,
+            } => todo!(),
+            SwarmEvent::NewListenAddr {
+                listener_id,
+                address,
+            } => todo!(),
+            SwarmEvent::ExpiredListenAddr {
+                listener_id,
+                address,
+            } => todo!(),
+            SwarmEvent::ListenerClosed {
+                listener_id,
+                addresses,
+                reason,
+            } => todo!(),
+            SwarmEvent::ListenerError { listener_id, error } => todo!(),
+            SwarmEvent::Dialing {
+                peer_id,
+                connection_id,
+            } => todo!(),
+            SwarmEvent::NewExternalAddrCandidate { address } => todo!(),
+            SwarmEvent::ExternalAddrConfirmed { address } => todo!(),
+            SwarmEvent::ExternalAddrExpired { address } => todo!(),
+            _ => {}
         }
     }
 }

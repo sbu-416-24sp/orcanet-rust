@@ -83,13 +83,12 @@ mod tests {
             username: "Alice".to_string(),
         };
         lmm.insert(file_hash.clone(), supplier_info.clone());
-        sleep(Duration::from_millis(150));
         assert_eq!(lmm.get_if_not_expired(&file_hash), Some(supplier_info));
     }
 
     #[test]
     fn test_insert_and_should_expire() {
-        let mut lmm = LocalMarketMap::new(Duration::from_millis(250));
+        let mut lmm = LocalMarketMap::new(Duration::from_millis(10));
         let file_hash = FileHash(vec![1]);
         let supplier_info = SupplierInfo {
             ip: Ipv4Addr::new(127, 0, 0, 1),
@@ -98,7 +97,7 @@ mod tests {
             username: "Alice".to_string(),
         };
         lmm.insert(file_hash.clone(), supplier_info);
-        sleep(Duration::from_millis(300));
+        sleep(Duration::from_millis(20));
         assert_eq!(lmm.get_if_not_expired(&file_hash), None);
     }
 }
