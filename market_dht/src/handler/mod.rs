@@ -1,5 +1,3 @@
-use std::cell::Cell;
-
 use libp2p::{swarm::SwarmEvent, Swarm};
 
 use crate::{behaviour::Behaviour, lmm::LocalMarketMap};

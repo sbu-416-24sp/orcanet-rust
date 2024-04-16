@@ -1,24 +1,22 @@
-use std::{cell::Cell, io, net::Ipv4Addr, time::Duration};
+use std::{cell::Cell, net::Ipv4Addr, sync::mpsc, thread, time::Duration};
 
 use crate::{
     behaviour::Behaviour,
     handler::{self, EventHandler},
     Config,
 };
-use futures::{executor::block_on, StreamExt};
+use futures::StreamExt;
 use libp2p::{
-    autonat,
-    core::transport,
-    dcutr, identify,
+    autonat, dcutr, identify,
     kad::{self, store::MemoryStore, NoKnownPeers},
     multiaddr::Protocol,
     noise, ping, relay,
     swarm::behaviour::toggle::Toggle,
     tls, yamux, Multiaddr, StreamProtocol, SwarmBuilder,
 };
-use log::error;
+use log::{error, info};
 use thiserror::Error;
-use tokio::{select, time};
+use tokio::{runtime::Runtime, time};
 
 pub(crate) const IDENTIFY_PROTOCOL_VERSION: &str = "/orcanet/id/1.0.0";
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
@@ -68,7 +66,10 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
                 ping::Behaviour::new(config)
             };
             let autonat = {
-                let config = autonat::Config::default();
+                let config = autonat::Config {
+                    boot_delay: Duration::from_secs(3),
+                    ..Default::default()
+                };
                 autonat::Behaviour::new(peer_id, config)
             };
 
@@ -92,40 +93,64 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
         .map_err(|_| BridgeError::Behaviour)?
         .with_swarm_config(|config| config.with_idle_connection_timeout(TIMEOUT))
         .build();
-    swarm
-        .listen_on(
-            Multiaddr::empty()
-                .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
-                .with(Protocol::Tcp(peer_tcp_port)),
-        )
-        .map_err(|err| BridgeError::InitialListen(err.to_string()))?;
-
-    if let Some(boot_nodes) = &boot_nodes {
-        let boot_nodes = boot_nodes.get_kad_addrs();
-        for (peer_id, ip) in boot_nodes {
-            // swarm.behaviour_mut().kad.add_address(&peer_id, ip.clone());
-            swarm.behaviour_mut().autonat.add_server(peer_id, Some(ip));
-        }
-        // swarm
-        //     .behaviour_mut()
-        //     .kad
-        //     .bootstrap()
-        //     .map_err(BridgeError::InitialBootstrap)?;
-        block_on(async {
-            time::timeout(BOOTING_TIMEOUT, async {
-                let booting = Cell::new(true);
-                while booting.get() {
-                    let event = swarm.select_next_some().await;
-                    let mut handler = handler::bootup::BootupHandler::new(&mut swarm, &booting);
-                    handler.handle_event(event);
+    let (boot_tx, boot_rx) = mpsc::channel();
+    thread::Builder::new()
+        .name(coordinator_thread_name)
+        .spawn(move || {
+            Runtime::new().unwrap().block_on(async move {
+                if let Err(err) = swarm
+                    .listen_on(
+                        Multiaddr::empty()
+                            .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+                            .with(Protocol::Tcp(peer_tcp_port)),
+                    )
+                    .map_err(|err| BridgeError::InitialListen(err.to_string()))
+                {
+                    boot_tx.send(Err(err)).expect("send to succeed");
+                    drop(boot_tx);
+                    return;
                 }
-            })
-            .await
-        })
-        .map_err(|err| BridgeError::Booting(err.to_string()))?;
-    }
-    // NOTE: without boot nodes you are assumed to be the genesis and assumed to be a public node
 
+                if let Some(boot_nodes) = &boot_nodes {
+                    let boot_nodes = boot_nodes.get_kad_addrs();
+                    for (peer_id, ip) in boot_nodes {
+                        swarm.behaviour_mut().kad.add_address(&peer_id, ip.clone());
+                        // swarm.behaviour_mut().autonat.add_server(peer_id, Some(ip));
+                    }
+                    swarm
+                        .behaviour_mut()
+                        .kad
+                        .bootstrap()
+                        .expect("bootstrap to succeed");
+
+                    if let Err(err) = time::timeout(BOOTING_TIMEOUT, async {
+                        let booting = Cell::new(true);
+                        while booting.get() {
+                            let event = swarm.select_next_some().await;
+                            let mut handler =
+                                handler::bootup::BootupHandler::new(&mut swarm, &booting);
+                            handler.handle_event(event);
+                        }
+                    })
+                    .await
+                    .map_err(|err| BridgeError::Booting(err.to_string()))
+                    {
+                        boot_tx.send(Err(err)).expect("send to succeed");
+                        return;
+                    }
+                    boot_tx.send(Ok(())).expect("send to succeed");
+                } else {
+                    loop {
+                        let event = swarm.select_next_some().await;
+                        info!("{:?}", event);
+                    }
+                }
+            });
+        })
+        .expect("thread to spawn");
+
+    boot_rx.recv().expect("recv to succeed")?;
+    thread::sleep(Duration::from_secs(3000000));
     todo!()
 }
 

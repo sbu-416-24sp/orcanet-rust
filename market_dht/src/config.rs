@@ -125,7 +125,11 @@ impl BootNodes {
                     .iter()
                     .find(|proto| matches!(proto, Protocol::Ip4(_)))
                     .expect("to not fail unless try_with_nodes didn't catch this");
-                let ip4 = Multiaddr::from(ip4);
+                let tcp = addr
+                    .iter()
+                    .find(|proto| matches!(proto, Protocol::Tcp(_)))
+                    .expect("to not fail unless try_with_nodes didn't catch this");
+                let ip4 = Multiaddr::from(ip4).with(tcp);
                 if let Protocol::P2p(peer_id) = peer_id {
                     Some((peer_id, ip4))
                 } else {
@@ -143,12 +147,24 @@ impl BootNodes {
             .map(|node: TNode| match node.try_into() {
                 Ok(node) => {
                     let node: Multiaddr = node;
-                    if node.iter().any(|proto| matches!(proto, Protocol::P2p(_)))
-                        && node.iter().any(|proto| matches!(proto, Protocol::Ip4(_)))
-                    {
-                        Ok(node)
+                    let supports_p2p = node.iter().any(|proto| matches!(proto, Protocol::P2p(_)));
+
+                    let supports_ip4 = node.iter().any(|proto| matches!(proto, Protocol::Ip4(_)));
+                    let supports_tcp = node.iter().any(|proto| matches!(proto, Protocol::Tcp(_)));
+                    if !supports_p2p {
+                        Err(BootNodesError::MissingRequiredProtocol(
+                            RequiredProtocol::P2p,
+                        ))
+                    } else if !supports_ip4 {
+                        Err(BootNodesError::MissingRequiredProtocol(
+                            RequiredProtocol::Ip4,
+                        ))
+                    } else if !supports_tcp {
+                        Err(BootNodesError::MissingRequiredProtocol(
+                            RequiredProtocol::Tcp,
+                        ))
                     } else {
-                        Err(BootNodesError::MissingRequiredProtocol)
+                        Ok(node)
                     }
                 }
                 Err(err) => Err(BootNodesError::InvalidMultiaddr(err)),
@@ -198,8 +214,15 @@ impl IntoIterator for BootNodes {
 #[derive(Debug)]
 pub enum BootNodesError<TNode: TryInto<Multiaddr>> {
     InvalidMultiaddr(TNode::Error),
-    MissingRequiredProtocol,
+    MissingRequiredProtocol(RequiredProtocol),
     Empty,
+}
+
+#[derive(Debug)]
+pub enum RequiredProtocol {
+    Tcp,
+    Ip4,
+    P2p,
 }
 
 #[cfg(test)]
@@ -236,7 +259,12 @@ mod tests {
     #[test]
     fn test_boot_nodes_no_peer_id() {
         let res = BootNodes::try_with_nodes(vec!["/ip4/127.0.0.1"]);
-        assert!(matches!(res, Err(BootNodesError::MissingRequiredProtocol)));
+        assert!(matches!(
+            res,
+            Err(BootNodesError::MissingRequiredProtocol(
+                RequiredProtocol::P2p
+            ))
+        ));
     }
 
     #[test]

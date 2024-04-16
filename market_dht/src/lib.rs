@@ -9,6 +9,7 @@
 #![deny(unsafe_code, unreachable_pub)]
 
 pub use config::*;
+pub use libp2p::Multiaddr;
 pub use lmm::SupplierInfo;
 
 pub(crate) mod behaviour;
