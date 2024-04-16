@@ -105,9 +105,7 @@ async fn delete_file(Path(hash): Path<String>) -> impl IntoResponse {
         .status(StatusCode::OK)
         .body(Body::from(format!("{{\"hash\": \"{}\"}}", hash)))
         .unwrap()
-
 }
-
 
 // Main function to setup and run the server
 #[tokio::main]
@@ -117,4 +115,3 @@ async fn main() {
         .route("/file/:hash/info", get(get_file_info))
         .route("/file/:hash", post(delete_file));
 }
-
