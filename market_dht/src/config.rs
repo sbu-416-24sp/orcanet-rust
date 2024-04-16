@@ -1,6 +1,6 @@
-use std::time::Duration;
+use std::{fmt::Debug, net::Ipv4Addr, time::Duration};
 
-use libp2p::{multiaddr::Protocol, Multiaddr};
+use libp2p::{multiaddr::Protocol, Multiaddr, PeerId};
 
 use crate::lmm::FILE_DEFAULT_TTL;
 
@@ -105,10 +105,34 @@ pub struct BootNodes {
 }
 
 impl BootNodes {
-    pub fn with_nodes<TNode: Into<Multiaddr>>(
+    pub fn with_nodes<TNode: Into<Multiaddr> + Debug>(
         nodes: impl IntoIterator<Item = TNode>,
-    ) -> Result<BootNodes, BootNodesError<TNode>> {
+    ) -> BootNodes {
         Self::try_with_nodes(nodes)
+            .expect("to fail if user does not provide required things for try_with_nodes")
+    }
+
+    pub fn get_kad_addrs(&self) -> Vec<(PeerId, Multiaddr)> {
+        // TODO: should optimize this to return lazily?
+        self.inner
+            .iter()
+            .filter_map(|addr| {
+                let peer_id = addr
+                    .iter()
+                    .find(|proto| matches!(proto, Protocol::P2p(_)))
+                    .expect("to not fail unless try_with_nodes didn't catch this");
+                let ip4 = addr
+                    .iter()
+                    .find(|proto| matches!(proto, Protocol::Ip4(_)))
+                    .expect("to not fail unless try_with_nodes didn't catch this");
+                let ip4 = Multiaddr::from(ip4);
+                if let Protocol::P2p(peer_id) = peer_id {
+                    Some((peer_id, ip4))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     pub fn try_with_nodes<TNode: TryInto<Multiaddr>>(
@@ -119,10 +143,12 @@ impl BootNodes {
             .map(|node: TNode| match node.try_into() {
                 Ok(node) => {
                     let node: Multiaddr = node;
-                    if node.iter().any(|proto| matches!(proto, Protocol::P2p(_))) {
+                    if node.iter().any(|proto| matches!(proto, Protocol::P2p(_)))
+                        && node.iter().any(|proto| matches!(proto, Protocol::Ip4(_)))
+                    {
                         Ok(node)
                     } else {
-                        Err(BootNodesError::NoPeerId)
+                        Err(BootNodesError::MissingRequiredProtocol)
                     }
                 }
                 Err(err) => Err(BootNodesError::InvalidMultiaddr(err)),
@@ -172,7 +198,7 @@ impl IntoIterator for BootNodes {
 #[derive(Debug)]
 pub enum BootNodesError<TNode: TryInto<Multiaddr>> {
     InvalidMultiaddr(TNode::Error),
-    NoPeerId,
+    MissingRequiredProtocol,
     Empty,
 }
 
@@ -183,9 +209,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_boot_nodes_is_empty() {
+    #[should_panic]
+    fn test_with_boot_nodes_is_empty() {
         let boot_nodes = BootNodes::with_nodes(Vec::<Multiaddr>::new());
-        assert!(matches!(boot_nodes, Err(BootNodesError::Empty)));
     }
 
     #[test]
@@ -210,7 +236,7 @@ mod tests {
     #[test]
     fn test_boot_nodes_no_peer_id() {
         let res = BootNodes::try_with_nodes(vec!["/ip4/127.0.0.1"]);
-        assert!(matches!(res, Err(BootNodesError::NoPeerId)));
+        assert!(matches!(res, Err(BootNodesError::MissingRequiredProtocol)));
     }
 
     #[test]
