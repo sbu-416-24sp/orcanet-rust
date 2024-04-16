@@ -48,16 +48,21 @@ cargo run --bin test_client
 
 ### Peer Node
 
+To run the producer:
 ```bash
 cd peernode
-cargo run -- -p  
+cargo run producer add <FILE_PATH> <PRICE>
+cargo run producer register
 ```
 
 To run the consumer:
 ```bash
 cd peernode
-cargo run -- -f <file_hash>
+cargo run consumer ls <FILE_HASH>
+cargo run consumer get <FILE_HASH> <CHOSEN_PRODUCER>
 ```
+
+Additional commands can be detailed by utilizing the help command.
 
 ## Running with Docker
 We also provide a Docker compose file to easily run the producer and market server together. To run it:

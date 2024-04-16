@@ -12,38 +12,104 @@ use tokio::io::SeekFrom;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::RwLock;
 
+#[allow(dead_code)]
 pub struct FileMap {
     files: RwLock<HashMap<String, PathBuf>>,
+    prices: RwLock<HashMap<String, i64>>,
 }
 
 pub type AsyncFileMap = Arc<FileMap>;
 
+pub fn hash_file(file: &mut File) -> Result<String> {
+    // Get the hash of a file
+    let mut sha256 = Sha256::new();
+    io::copy(file, &mut sha256)?;
+    let hash = sha256.finalize();
+    let hash = format!("{:x}", hash);
+    Ok(hash)
+}
+#[allow(dead_code)]
 impl FileMap {
-    pub fn new() -> Self {
+    pub fn default() -> Self {
         FileMap {
             files: RwLock::new(HashMap::new()),
+            prices: RwLock::new(HashMap::new()),
         }
     }
 
-    // Add all the files in a Unix-style glob to the map
-    pub async fn add_all(&self, file_path: &str) -> Result<()> {
+    pub fn new(files: HashMap<String, PathBuf>, prices: HashMap<String, i64>) -> Self {
+        FileMap {
+            files: RwLock::new(files),
+            prices: RwLock::new(prices),
+        }
+    }
+
+    pub async fn set(
+        &self,
+        files: HashMap<String, PathBuf>,
+        prices: HashMap<String, i64>,
+    ) -> Result<()> {
+        let mut file_map = self.files.write().await;
+        let mut price_map = self.prices.write().await;
+        *file_map = files;
+        *price_map = prices;
+        Ok(())
+    }
+
+    pub async fn add_file(&self, file_path: &str, price: i64) -> Result<String> {
         // Get a write lock on the files map
         let mut files = self.files.write().await;
+        let mut prices = self.prices.write().await;
+
+        // Open the file
+        let mut file = File::open(file_path)?;
+        let hash = hash_file(&mut file)?;
+        files.insert(hash.clone(), file_path.into());
+        prices.insert(hash.clone(), price);
+        Ok(hash)
+    }
+
+    // Add all the files in a Unix-style glob to the map
+    pub async fn add_dir(&self, file_path: &str, price: i64) -> Result<String> {
+        // Get a write lock on the files map
+        let mut files = self.files.write().await;
+        let mut prices = self.prices.write().await;
         for entry in glob(file_path)? {
             let path = entry?;
             let file = File::open(path.clone());
             match file {
                 Ok(mut file) => {
-                    let hash = self.hash_file(&mut file)?;
-                    files.insert(hash, path);
+                    let hash = hash_file(&mut file)?;
+                    files.insert(hash.clone(), path);
+                    prices.insert(hash, price);
                 }
                 Err(_) => {
                     eprintln!("Failed to open file {:?}", path);
                 }
             }
         }
+        Ok("".to_string())
+    }
 
-        Ok(())
+    pub async fn add_all(&self, files: HashMap<String, i64>) -> Result<String> {
+        // Get a write lock on the files map
+        for (file, price) in files {
+            // check if this is a file or a directory
+            match std::fs::metadata(&file) {
+                Ok(metadata) => {
+                    if metadata.is_file() {
+                        self.add_file(&file, price).await?;
+                    }
+                    if metadata.is_dir() {
+                        self.add_dir(&file, price).await?;
+                    }
+                }
+                Err(_) => {
+                    eprintln!("Failed to open file {}", &file);
+                }
+            }
+        }
+        Ok("".to_string())
     }
 
     // Get a file path by its hash
@@ -63,13 +129,11 @@ impl FileMap {
         files.keys().cloned().collect()
     }
 
-    // Get the hash of a file
-    fn hash_file(&self, file: &mut File) -> Result<String> {
-        let mut sha256 = Sha256::new();
-        io::copy(file, &mut sha256)?;
-        let hash = sha256.finalize();
-        let hash = format!("{:x}", hash);
-        Ok(hash)
+    pub async fn get_prices(&self) -> HashMap<String, i64> {
+        // Get a read lock on the prices map
+        let prices = self.prices.read().await;
+
+        prices.clone()
     }
 }
 
