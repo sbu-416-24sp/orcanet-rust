@@ -115,7 +115,7 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
                     let boot_nodes = boot_nodes.get_kad_addrs();
                     for (peer_id, ip) in boot_nodes {
                         swarm.behaviour_mut().kad.add_address(&peer_id, ip.clone());
-                        swarm.behaviour_mut().autonat.add_server(peer_id, Some(ip));
+                        // swarm.behaviour_mut().autonat.add_server(peer_id, Some(ip));
                     }
                     swarm
                         .behaviour_mut()
@@ -138,12 +138,22 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
                         boot_tx.send(Err(err)).expect("send to succeed");
                         return;
                     }
+
+                    match swarm.behaviour_mut().autonat.nat_status() {
+                        autonat::NatStatus::Public(addr) => {
+                            info!("{addr:?}");
+                        }
+                        autonat::NatStatus::Private => {
+                            // TODO: need to join a relay server here
+                        }
+                        autonat::NatStatus::Unknown => todo!(),
+                    }
                     boot_tx.send(Ok(())).expect("send to succeed");
                 } else {
-                    loop {
-                        let event = swarm.select_next_some().await;
-                        info!("{:?}", event);
-                    }
+                    boot_tx.send(Ok(())).expect("send to succeed");
+
+                    // TODO: this will be assumed to be public since this means it's a genesis node
+                    // since it has no boot nodes
                 }
             });
         })
