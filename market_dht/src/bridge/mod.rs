@@ -114,7 +114,8 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
                 if let Some(boot_nodes) = &boot_nodes {
                     let boot_nodes = boot_nodes.get_kad_addrs();
                     for (peer_id, ip) in boot_nodes {
-                        swarm.behaviour_mut().kad.add_address(&peer_id, ip);
+                        swarm.behaviour_mut().kad.add_address(&peer_id, ip.clone());
+                        swarm.behaviour_mut().autonat.add_server(peer_id, Some(ip));
                     }
                     swarm
                         .behaviour_mut()
@@ -136,6 +137,12 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
                     {
                         boot_tx.send(Err(err)).expect("send to succeed");
                         return;
+                    }
+                    boot_tx.send(Ok(())).expect("send to succeed");
+                } else {
+                    loop {
+                        let event = swarm.select_next_some().await;
+                        info!("{:?}", event);
                     }
                 }
             });
