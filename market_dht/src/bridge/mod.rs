@@ -22,7 +22,7 @@ pub(crate) const IDENTIFY_PROTOCOL_VERSION: &str = "/orcanet/id/1.0.0";
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
 pub(crate) const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 10);
 
-pub(crate) const BOOTING_TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(60);
+pub(crate) const BOOTING_TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(120);
 
 pub fn spawn(config: Config) -> Result<(), BridgeError> {
     let Config {
