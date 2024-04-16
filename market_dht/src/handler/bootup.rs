@@ -1,6 +1,11 @@
 use std::cell::Cell;
 
-use libp2p::{autonat, kad, swarm::SwarmEvent, Swarm};
+use libp2p::{
+    autonat,
+    kad::{self, BootstrapError, BootstrapOk, QueryResult},
+    swarm::SwarmEvent,
+    Swarm,
+};
 use log::{error, info, warn};
 
 use crate::behaviour::{Behaviour, BehaviourEvent};
@@ -31,6 +36,20 @@ impl<'a, 'b> EventHandler for BootupHandler<'a, 'b> {
                         } => {
                             warn!("[Kad] Routing updated with {peer} with {addresses:?}");
                         }
+                        kad::Event::OutboundQueryProgressed {
+                            result: QueryResult::Bootstrap(bootstrap_sts),
+                            ..
+                        } => match bootstrap_sts {
+                            Ok(BootstrapOk {
+                                peer,
+                                num_remaining,
+                            }) => {
+                                info!("[Kad] Bootstrap succeeded with {peer} and {num_remaining} remaining");
+                            }
+                            Err(BootstrapError::Timeout { peer, .. }) => {
+                                error!("[Kad] Bootstrap timeout with {peer}");
+                            }
+                        },
                         kad::Event::ModeChanged { new_mode } => {
                             warn!("[Kad] Mode changed to {new_mode}");
                         }
@@ -106,6 +125,17 @@ impl<'a, 'b> EventHandler for BootupHandler<'a, 'b> {
             } => {
                 info!(
                     "[ConnId {connection_id}] Connection established with {peer_id} ({num_established} established in {established_in:?})"
+                );
+            }
+            SwarmEvent::ConnectionClosed {
+                peer_id,
+                connection_id,
+                endpoint,
+                num_established,
+                cause,
+            } => {
+                warn!(
+                    "[ConnId {connection_id}] Connection closed with {peer_id} ({num_established} established in {endpoint:?}) because of {cause:?}"
                 );
             }
             SwarmEvent::IncomingConnection {

@@ -15,10 +15,20 @@ fn main() {
     let args = args().collect::<Vec<_>>();
     let config;
     if let Some(boot_node) = args.get(1) {
-        config = Config::builder()
-            .set_boot_nodes(BootNodes::try_with_nodes(vec![boot_node.as_str()]).unwrap())
-            .set_peer_tcp_port(19000)
-            .build();
+        if let Some(boot_node_2) = args.get(2) {
+            config = Config::builder()
+                .set_boot_nodes(
+                    BootNodes::try_with_nodes(vec![boot_node.as_str(), boot_node_2.as_str()])
+                        .unwrap(),
+                )
+                .set_peer_tcp_port(16899)
+                .build();
+        } else {
+            config = Config::builder()
+                .set_boot_nodes(BootNodes::try_with_nodes(vec![boot_node.as_str()]).unwrap())
+                .set_peer_tcp_port(16899)
+                .build();
+        }
     } else {
         config = Config::builder().set_peer_tcp_port(16899).build();
     }
