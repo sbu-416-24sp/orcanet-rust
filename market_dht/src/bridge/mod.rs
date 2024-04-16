@@ -149,6 +149,7 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
                         autonat::NatStatus::Unknown => todo!(),
                     }
                     boot_tx.send(Ok(())).expect("send to succeed");
+                    tokio::time::sleep(Duration::from_secs(60000000)).await;
                 } else {
                     boot_tx.send(Ok(())).expect("send to succeed");
 
