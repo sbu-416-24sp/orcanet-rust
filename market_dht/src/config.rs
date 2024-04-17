@@ -5,7 +5,7 @@ use libp2p::{multiaddr::Protocol, Multiaddr, PeerId};
 use crate::lmm::FILE_DEFAULT_TTL;
 
 const DEFAULT_COORDINATOR_THREAD_NAME: &str = "coordinator";
-const DEFAULT_PEER_TCP_PORT: u16 = 0;
+const DEFAULT_PEER_TCP_PORT: u16 = 16899;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -13,6 +13,11 @@ pub struct Config {
     pub(crate) boot_nodes: Option<BootNodes>,
     pub(crate) coordinator_thread_name: String,
     pub(crate) file_ttl: Duration,
+    // NOTE: this is only useful for if you are a PUBLIC GENESIS NODE.
+    // We require this at least for the public genesis node since it can't figure out itself if it
+    // can be used as a relay server. By providing this, you are guaranteeing that the node you are
+    // running on is reachable by other nodes since your node must be private.
+    // pub(crate) public_address: Option<Multiaddr>,
 }
 
 impl Config {
@@ -77,8 +82,8 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn set_coordinator_thread_name(mut self, name: String) -> Self {
-        self.coordinator_thread_name = Some(name);
+    pub fn set_coordinator_thread_name(mut self, name: impl Into<String>) -> Self {
+        self.coordinator_thread_name = Some(name.into());
         self
     }
 

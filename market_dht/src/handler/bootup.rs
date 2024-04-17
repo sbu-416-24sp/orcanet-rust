@@ -109,7 +109,7 @@ impl<'a, 'b> EventHandler for BootupHandler<'a, 'b> {
                             },
                             autonat::Event::StatusChanged { old, new } => {
                                 warn!("[Autonat] Status changed from {old:?} to {new:?}");
-                                // self.booting.replace(false);
+                                self.booting.replace(false);
                             }
                         }
                     }

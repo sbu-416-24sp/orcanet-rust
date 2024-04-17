@@ -1,7 +1,7 @@
 use std::env::args;
 
-use log::Level;
 use market_dht::{bridge::spawn, BootNodes, Config};
+use tracing::Level;
 use tracing_log::LogTracer;
 
 fn main() {

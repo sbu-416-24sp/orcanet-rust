@@ -14,7 +14,7 @@ use libp2p::{
     swarm::behaviour::toggle::Toggle,
     tls, yamux, Multiaddr, StreamProtocol, SwarmBuilder,
 };
-use log::{error, info};
+use log::{error, info, warn};
 use thiserror::Error;
 use tokio::{runtime::Runtime, time};
 
@@ -112,8 +112,8 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
                 }
 
                 if let Some(boot_nodes) = &boot_nodes {
-                    let boot_nodes = boot_nodes.get_kad_addrs();
-                    for (peer_id, ip) in boot_nodes {
+                    let kad_boot_nodes = boot_nodes.get_kad_addrs();
+                    for (peer_id, ip) in kad_boot_nodes {
                         swarm.behaviour_mut().kad.add_address(&peer_id, ip.clone());
                         // swarm.behaviour_mut().autonat.add_server(peer_id, Some(ip));
                     }
@@ -144,9 +144,17 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
                             info!("{addr:?}");
                         }
                         autonat::NatStatus::Private => {
-                            // TODO: need to join a relay server here
+                            for node in boot_nodes.iter() {
+                                let addr = node.clone().with(Protocol::P2pCircuit);
+                                println!("{:?}", addr);
+                                warn!("{:?}", swarm.listen_on(addr));
+                            }
                         }
                         autonat::NatStatus::Unknown => todo!(),
+                    }
+                    loop {
+                        let event = swarm.select_next_some().await;
+                        info!("{:?}", event);
                     }
                     boot_tx.send(Ok(())).expect("send to succeed");
                     tokio::time::sleep(Duration::from_secs(60000000)).await;
