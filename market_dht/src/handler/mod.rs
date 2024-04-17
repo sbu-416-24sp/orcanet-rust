@@ -6,7 +6,7 @@ use crate::{
     behaviour::Behaviour,
     command::{request::Request, QueryHandler},
     lmm::LocalMarketMap,
-    Response, SuccessfulResponse,
+    BootNodes, Response, SuccessfulResponse,
 };
 
 use self::{
@@ -33,6 +33,7 @@ pub(crate) struct Handler<'a> {
     swarm: &'a mut Swarm<Behaviour>,
     lmm: &'a mut LocalMarketMap,
     query_handler: &'a mut QueryHandler,
+    boot_nodes: Option<&'a BootNodes>,
 }
 
 impl<'a> Handler<'a> {
@@ -40,11 +41,13 @@ impl<'a> Handler<'a> {
         swarm: &'a mut Swarm<Behaviour>,
         lmm: &'a mut LocalMarketMap,
         query_handler: &'a mut QueryHandler,
+        boot_nodes: Option<&'a BootNodes>,
     ) -> Self {
         Handler {
             swarm,
             lmm,
             query_handler,
+            boot_nodes,
         }
     }
 }
@@ -70,7 +73,7 @@ impl<'a> EventHandler for Handler<'a> {
                     ping_handler.handle_event(event);
                 }
                 BehaviourEvent::Autonat(event) => {
-                    let mut autonat_handler = AutoNatHandler {};
+                    let mut autonat_handler = AutoNatHandler::new(self.boot_nodes);
                     autonat_handler.handle_event(event);
                 }
                 BehaviourEvent::RelayServer(event) => {

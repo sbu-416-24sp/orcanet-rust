@@ -64,12 +64,12 @@ impl Coordinator {
         loop {
             select! {
                 event = self.swarm.select_next_some() => {
-                    let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler);
+                    let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler, self.boot_nodes.as_ref());
                     handler.handle_event(event);
                 }
                 command = self.command_receiver.recv() => {
                     if let Some((request, responder)) = command {
-                        let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler);
+                        let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler, self.boot_nodes.as_ref());
                         handler.handle_command(request, responder);
                     } else {
                         error!("Command channel closed");
