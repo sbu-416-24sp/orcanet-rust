@@ -1,10 +1,21 @@
 use libp2p::{swarm::SwarmEvent, Swarm};
+use log::error;
+use tokio::sync::oneshot;
 
-use crate::{behaviour::Behaviour, lmm::LocalMarketMap};
+use crate::{
+    behaviour::Behaviour,
+    command::{request::Request, QueryHandler},
+    lmm::LocalMarketMap,
+    Response, SuccessfulResponse,
+};
 
 use self::{
-    autonat::AutoNatHandler, dcutr::DcutrHandler, identify::IdentifyHandler, kad::KadHandler,
-    ping::PingHandler, relay_client::RelayClientHandler, relay_server::RelayServerHandler,
+    autonat::AutoNatHandler,
+    dcutr::DcutrHandler,
+    identify::IdentifyHandler,
+    kad::KadHandler,
+    ping::PingHandler,
+    relay::{client::RelayClientHandler, server::RelayServerHandler},
 };
 
 use super::behaviour::BehaviourEvent;
@@ -14,28 +25,40 @@ pub(crate) trait EventHandler {
     fn handle_event(&mut self, event: Self::Event);
 }
 
-pub(crate) trait CommandRequestHandler {}
-
-pub(crate) struct Handler<'a, 'b> {
-    swarm: &'a mut Swarm<Behaviour>,
-    lmm: &'b mut LocalMarketMap,
+pub(crate) trait CommandRequestHandler {
+    fn handle_command(&mut self, request: Request, responder: oneshot::Sender<Response>);
 }
 
-impl<'a, 'b> Handler<'a, 'b> {
-    pub(crate) fn new(swarm: &'a mut Swarm<Behaviour>, lmm: &'b mut LocalMarketMap) -> Self {
-        Handler { swarm, lmm }
+pub(crate) struct Handler<'a> {
+    swarm: &'a mut Swarm<Behaviour>,
+    lmm: &'a mut LocalMarketMap,
+    query_handler: &'a mut QueryHandler,
+}
+
+impl<'a> Handler<'a> {
+    pub(crate) fn new(
+        swarm: &'a mut Swarm<Behaviour>,
+        lmm: &'a mut LocalMarketMap,
+        query_handler: &'a mut QueryHandler,
+    ) -> Self {
+        Handler {
+            swarm,
+            lmm,
+            query_handler,
+        }
     }
 }
 
-impl<'a, 'b> EventHandler for Handler<'a, 'b> {
+impl<'a> EventHandler for Handler<'a> {
     type Event = SwarmEvent<BehaviourEvent>;
 
     fn handle_event(&mut self, event: Self::Event) {
         // NOTE:  maybe use  box,dyn but that would remove zca?
+        // or implement a proc macro in the future
         match event {
             SwarmEvent::Behaviour(event) => match event {
                 BehaviourEvent::Kad(event) => {
-                    let mut kad_handler = KadHandler::new(self.swarm, self.lmm);
+                    let mut kad_handler = KadHandler::new(self.swarm, self.lmm, self.query_handler);
                     kad_handler.handle_event(event);
                 }
                 BehaviourEvent::Identify(event) => {
@@ -120,13 +143,49 @@ impl<'a, 'b> EventHandler for Handler<'a, 'b> {
     }
 }
 
-impl<'a, 'b> CommandRequestHandler for Handler<'a, 'b> {}
+impl<'a> CommandRequestHandler for Handler<'a> {
+    fn handle_command(&mut self, request: Request, responder: oneshot::Sender<Response>) {
+        match request {
+            Request::Listeners => {
+                let listeners = self.swarm.listeners().cloned().collect();
+                send_ok!(responder, SuccessfulResponse::Listeners { listeners });
+            }
+            Request::ConnectedPeers => {
+                let peers = self.swarm.connected_peers().cloned().collect();
+                send_ok!(responder, SuccessfulResponse::ConnectedPeers { peers });
+            }
+            Request::ConnectedTo { peer_id } => {
+                let connected = self.swarm.is_connected(&peer_id);
+                send_ok!(responder, SuccessfulResponse::ConnectedTo { connected });
+            }
+        };
+    }
+}
+
+mod macros {
+    macro_rules! send_ok {
+        ($sender:expr, $response:expr) => {
+            if let Err(_) = $sender.send(Ok($response)) {
+                error!("Failed to send response back to peer!");
+            }
+        };
+    }
+    macro_rules! send_err {
+        ($sender:expr, $response:expr) => {
+            if let Err(_) = $sender.send(Err($response)) {
+                error!("Failed to send response back to peer!");
+            }
+        };
+    }
+    pub(crate) use send_err;
+    pub(crate) use send_ok;
+}
+pub(crate) use macros::send_err;
+pub(crate) use macros::send_ok;
 
 mod autonat;
-pub(crate) mod bootup;
 mod dcutr;
 mod identify;
 mod kad;
 mod ping;
-mod relay_client;
-mod relay_server;
+mod relay;

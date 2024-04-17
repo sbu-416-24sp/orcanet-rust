@@ -1,38 +1,39 @@
-use std::{cell::Cell, net::Ipv4Addr, sync::mpsc, thread, time::Duration};
+use std::{thread, time::Duration};
 
 use crate::{
     behaviour::Behaviour,
-    handler::{self, EventHandler},
+    bridge::{coordinator::Coordinator, peer::Peer},
+    command::Message,
     Config,
 };
-use futures::StreamExt;
 use libp2p::{
     autonat, dcutr, identify,
+    identity::{ed25519, Keypair},
     kad::{self, store::MemoryStore, NoKnownPeers},
-    multiaddr::Protocol,
     noise, ping, relay,
     swarm::behaviour::toggle::Toggle,
-    tls, yamux, Multiaddr, StreamProtocol, SwarmBuilder,
+    tls, yamux, StreamProtocol, SwarmBuilder,
 };
-use log::{error, info, warn};
 use thiserror::Error;
-use tokio::{runtime::Runtime, time};
+use tokio::{runtime::Runtime, sync::mpsc};
 
 pub(crate) const IDENTIFY_PROTOCOL_VERSION: &str = "/orcanet/id/1.0.0";
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
 pub(crate) const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 10);
 
-pub(crate) const BOOTING_TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(120);
-
-pub fn spawn(config: Config) -> Result<(), BridgeError> {
+pub fn spawn(config: Config) -> Result<Peer, BridgeError> {
     let Config {
         peer_tcp_port,
         boot_nodes,
         coordinator_thread_name,
         file_ttl,
+        public_address,
     } = config;
 
-    let mut swarm = SwarmBuilder::with_new_identity()
+    // TODO: use the zeroize crate for zeroing memory after move of public/priv key
+    let keypair = Keypair::from(ed25519::Keypair::generate());
+
+    let swarm = SwarmBuilder::with_existing_identity(keypair.clone())
         .with_tokio()
         .with_tcp(
             Default::default(),
@@ -93,84 +94,164 @@ pub fn spawn(config: Config) -> Result<(), BridgeError> {
         .map_err(|_| BridgeError::Behaviour)?
         .with_swarm_config(|config| config.with_idle_connection_timeout(TIMEOUT))
         .build();
-    let (boot_tx, boot_rx) = mpsc::channel();
+    let (command_sender, command_receiver) = mpsc::unbounded_channel::<Message>();
+    let (peer_init_tx, peer_init_rx) = std::sync::mpsc::channel::<anyhow::Result<Peer>>();
     thread::Builder::new()
         .name(coordinator_thread_name)
         .spawn(move || {
+            // TODO: maybe allow in future allow user to pass in # of worker threads they want to use
+            // here
             Runtime::new().unwrap().block_on(async move {
-                if let Err(err) = swarm
-                    .listen_on(
-                        Multiaddr::empty()
-                            .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
-                            .with(Protocol::Tcp(peer_tcp_port)),
-                    )
-                    .map_err(|err| BridgeError::InitialListen(err.to_string()))
-                {
-                    boot_tx.send(Err(err)).expect("send to succeed");
-                    drop(boot_tx);
-                    return;
-                }
-
-                if let Some(boot_nodes) = &boot_nodes {
-                    let kad_boot_nodes = boot_nodes.get_kad_addrs();
-                    for (peer_id, ip) in kad_boot_nodes {
-                        swarm.behaviour_mut().kad.add_address(&peer_id, ip.clone());
-                        // swarm.behaviour_mut().autonat.add_server(peer_id, Some(ip));
+                let peer_id = *swarm.local_peer_id();
+                let maybe_coordinator = Coordinator::new(
+                    swarm,
+                    public_address,
+                    boot_nodes,
+                    peer_tcp_port,
+                    command_receiver,
+                );
+                match maybe_coordinator {
+                    Ok(coordinator) => {
+                        peer_init_tx
+                            .send(Ok(Peer::new(peer_id, command_sender, keypair)))
+                            .expect("send to succeed");
+                        drop(peer_init_tx);
+                        coordinator.run().await;
                     }
-                    swarm
-                        .behaviour_mut()
-                        .kad
-                        .bootstrap()
-                        .expect("bootstrap to succeed");
-
-                    if let Err(err) = time::timeout(BOOTING_TIMEOUT, async {
-                        let booting = Cell::new(true);
-                        while booting.get() {
-                            let event = swarm.select_next_some().await;
-                            let mut handler =
-                                handler::bootup::BootupHandler::new(&mut swarm, &booting);
-                            handler.handle_event(event);
-                        }
-                    })
-                    .await
-                    .map_err(|err| BridgeError::Booting(err.to_string()))
-                    {
-                        boot_tx.send(Err(err)).expect("send to succeed");
-                        return;
+                    Err(err) => {
+                        peer_init_tx.send(Err(err)).expect("send to succeed");
                     }
-
-                    match swarm.behaviour_mut().autonat.nat_status() {
-                        autonat::NatStatus::Public(addr) => {
-                            info!("{addr:?}");
-                        }
-                        autonat::NatStatus::Private => {
-                            for node in boot_nodes.iter() {
-                                let addr = node.clone().with(Protocol::P2pCircuit);
-                                println!("{:?}", addr);
-                                warn!("{:?}", swarm.listen_on(addr));
-                            }
-                        }
-                        autonat::NatStatus::Unknown => todo!(),
-                    }
-                    loop {
-                        let event = swarm.select_next_some().await;
-                        info!("{:?}", event);
-                    }
-                    boot_tx.send(Ok(())).expect("send to succeed");
-                    tokio::time::sleep(Duration::from_secs(60000000)).await;
-                } else {
-                    boot_tx.send(Ok(())).expect("send to succeed");
-
-                    // TODO: this will be assumed to be public since this means it's a genesis node
-                    // since it has no boot nodes
                 }
             });
         })
         .expect("thread to spawn");
+    peer_init_rx
+        .recv()
+        .expect("to receive some kind of response for initializing a peer")
+        .map_err(|err| BridgeError::PeerInitializationFailed(err.to_string()))
+    // let (boot_tx, boot_rx) = mpsc::channel();
+    // thread::Builder::new()
+    //     .name(coordinator_thread_name)
+    //     .spawn(move || {
+    //         Runtime::new().unwrap().block_on(async move {
+    //             if let Err(err) = swarm
+    //                 .listen_on(
+    //                     Multiaddr::empty()
+    //                         .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+    //                         .with(Protocol::Tcp(peer_tcp_port)),
+    //                 )
+    //                 .map_err(|err| BridgeError::InitialListen(err.to_string()))
+    //             {
+    //                 boot_tx.send(Err(err)).expect("send to succeed");
+    //                 drop(boot_tx);
+    //                 return;
+    //             }
 
-    boot_rx.recv().expect("recv to succeed")?;
-    thread::sleep(Duration::from_secs(3000000));
-    todo!()
+    //             if let Some(boot_nodes) = &boot_nodes {
+    //                 let kad_boot_nodes = boot_nodes.get_kad_addrs();
+    //                 for (peer_id, ip) in kad_boot_nodes {
+    //                     swarm.behaviour_mut().kad.add_address(&peer_id, ip.clone());
+    //                     // NOTE: seems like autonat is auto adding servers in?
+    //                     // swarm.behaviour_mut().autonat.add_server(peer_id, Some(ip));
+    //                 }
+    //                 swarm
+    //                     .behaviour_mut()
+    //                     .kad
+    //                     .bootstrap()
+    //                     .expect("bootstrap to succeed");
+
+    //                 if let Err(err) = time::timeout(BOOTING_TIMEOUT, async {
+    //                     let booting = Cell::new(true);
+    //                     while booting.get() {
+    //                         let event = swarm.select_next_some().await;
+    //                         let mut handler =
+    //                             handler::bootup::BootupHandler::new(&mut swarm, &booting);
+    //                         handler.handle_event(event);
+    //                     }
+    //                 })
+    //                 .await
+    //                 .map_err(|err| BridgeError::Booting(err.to_string()))
+    //                 {
+    //                     boot_tx.send(Err(err)).expect("send to succeed");
+    //                     return;
+    //                 }
+
+    //                 match swarm.behaviour_mut().autonat.nat_status() {
+    //                     autonat::NatStatus::Public(addr) => {
+    //                         info!("{addr:?}");
+    //                     }
+    //                     autonat::NatStatus::Private => {
+    //                         for node in boot_nodes.iter() {
+    //                             let addr = node.clone().with(Protocol::P2pCircuit);
+    //                             println!("{:?}", addr);
+    //                             warn!("{:?}", swarm.listen_on(addr));
+    //                         }
+    //                     }
+    //                     autonat::NatStatus::Unknown => todo!(),
+    //                 }
+    //                 let mut interval = time::interval(Duration::from_secs(30));
+    //                 loop {
+    //                     select! {
+    //                         _ = interval.tick() => {
+    //                             swarm.behaviour_mut().kad.bootstrap().expect("bootstrap to succeed");
+    //                         }
+    //                         event = swarm.select_next_some() => {
+    //                             if !matches!(
+    //                                 event,
+    //                                 SwarmEvent::Behaviour(BehaviourEvent::Kad(
+    //                                     kad::Event::OutboundQueryProgressed {
+    //                                         result: QueryResult::Bootstrap(_),
+    //                                         ..
+    //                                     },
+    //                                 ))
+    //                             ) {
+    //                                 info!("{:?}", event);
+    //                             }
+    //                             match event {
+    //                                 SwarmEvent::Behaviour(BehaviourEvent::Identify(Event::Received {
+    //                                     peer_id,
+    //                                     info
+    //                                 })) => {
+
+    //                                     if info.protocols.contains(&KAD_PROTOCOL_NAME) {
+    //                                         for addr in info.listen_addrs {
+    //                                             swarm.behaviour_mut().kad.add_address(&peer_id, addr);
+    //                                         }
+    //                                     }
+    //                                 }
+    //                                 SwarmEvent::Behaviour(BehaviourEvent::Dcutr(_)) => {
+    //                                     todo!()
+    //                                 }
+    //                                 _ => {}
+    //                             }
+    //                             // if let SwarmEvent::Behaviour(BehaviourEvent::Identify(Event::Received {
+    //                             //     peer_id,
+    //                             //     info,
+    //                             // })) = event
+    //                             // {
+    //                             //     if info.protocols.contains(&KAD_PROTOCOL_NAME) {
+    //                             //         for addr in info.listen_addrs {
+    //                             //             swarm.behaviour_mut().kad.add_address(&peer_id, addr);
+    //                             //         }
+    //                             //     }
+    //                             // }
+    //                         }
+    //                     }
+    //                 }
+    //                 boot_tx.send(Ok(())).expect("send to succeed");
+    //                 tokio::time::sleep(Duration::from_secs(60000000)).await;
+    //             } else {
+    //                 boot_tx.send(Ok(())).expect("send to succeed");
+
+    //                 // TODO: this will be assumed to be public since this means it's a genesis node
+    //                 // since it has no boot nodes
+    //             }
+    //         });
+    //     })
+    //     .expect("thread to spawn");
+
+    // boot_rx.recv().expect("recv to succeed")?;
+    // thread::sleep(Duration::from_secs(3000000));
 }
 
 #[derive(Debug, Clone, Error)]
@@ -189,6 +270,8 @@ pub enum BridgeError {
     InitialListen(String),
     #[error("Booting failed {0}!")]
     Booting(String),
+    #[error("Peer initialization failed!")]
+    PeerInitializationFailed(String),
 }
 
 mod coordinator;

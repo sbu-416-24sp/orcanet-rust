@@ -1,4 +1,4 @@
-use std::{fmt::Debug, net::Ipv4Addr, time::Duration};
+use std::{fmt::Debug, time::Duration};
 
 use libp2p::{multiaddr::Protocol, Multiaddr, PeerId};
 
@@ -17,18 +17,19 @@ pub struct Config {
     // We require this at least for the public genesis node since it can't figure out itself if it
     // can be used as a relay server. By providing this, you are guaranteeing that the node you are
     // running on is reachable by other nodes since your node must be private.
-    // pub(crate) public_address: Option<Multiaddr>,
+    // However, the behaviour with adding this as an external address doesn't make much of a
+    // difference(?). Will PROBABLY DEPRECATE/DISABLE THIS IN THE FUTURE.
+    // If you don't provide this and your node is a public node that is opened on the port you
+    // provided (or 16899 if you don't provide anything), then your node CANNOT BE USED as a relay
+    // server. The only other way is if you can get another (public?) node to try and confirm this
+    // public address.
+    pub(crate) public_address: Option<Multiaddr>,
 }
 
 impl Config {
     #[inline(always)]
-    pub const fn builder() -> ConfigBuilder {
-        ConfigBuilder {
-            peer_tcp_port: None,
-            boot_nodes: None,
-            coordinator_thread_name: None,
-            file_ttl: None,
-        }
+    pub fn builder() -> ConfigBuilder {
+        ConfigBuilder::default()
     }
 
     #[inline(always)]
@@ -50,6 +51,11 @@ impl Config {
     pub const fn file_ttl(&self) -> Duration {
         self.file_ttl
     }
+
+    #[inline(always)]
+    pub const fn public_address(&self) -> Option<&Multiaddr> {
+        self.public_address.as_ref()
+    }
 }
 
 impl Default for Config {
@@ -59,16 +65,18 @@ impl Default for Config {
             boot_nodes: None,
             coordinator_thread_name: DEFAULT_COORDINATOR_THREAD_NAME.to_owned(),
             file_ttl: FILE_DEFAULT_TTL,
+            public_address: None,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ConfigBuilder {
     peer_tcp_port: Option<u16>,
     boot_nodes: Option<BootNodes>,
     coordinator_thread_name: Option<String>,
     file_ttl: Option<Duration>,
+    public_address: Option<Multiaddr>,
 }
 
 impl ConfigBuilder {
@@ -92,6 +100,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn set_public_address(mut self, addr: Multiaddr) -> Self {
+        self.public_address = Some(addr);
+        self
+    }
+
     pub fn build(self) -> Config {
         Config {
             peer_tcp_port: self.peer_tcp_port.unwrap_or(DEFAULT_PEER_TCP_PORT),
@@ -100,6 +113,7 @@ impl ConfigBuilder {
                 .coordinator_thread_name
                 .unwrap_or(DEFAULT_COORDINATOR_THREAD_NAME.to_owned()),
             file_ttl: self.file_ttl.unwrap_or(FILE_DEFAULT_TTL),
+            public_address: self.public_address,
         }
     }
 }
@@ -117,31 +131,28 @@ impl BootNodes {
             .expect("to fail if user does not provide required things for try_with_nodes")
     }
 
-    pub fn get_kad_addrs(&self) -> Vec<(PeerId, Multiaddr)> {
+    pub fn get_kad_addrs(&self) -> impl Iterator<Item = (PeerId, Multiaddr)> + '_ {
         // TODO: should optimize this to return lazily?
-        self.inner
-            .iter()
-            .filter_map(|addr| {
-                let peer_id = addr
-                    .iter()
-                    .find(|proto| matches!(proto, Protocol::P2p(_)))
-                    .expect("to not fail unless try_with_nodes didn't catch this");
-                let ip4 = addr
-                    .iter()
-                    .find(|proto| matches!(proto, Protocol::Ip4(_)))
-                    .expect("to not fail unless try_with_nodes didn't catch this");
-                let tcp = addr
-                    .iter()
-                    .find(|proto| matches!(proto, Protocol::Tcp(_)))
-                    .expect("to not fail unless try_with_nodes didn't catch this");
-                let ip4 = Multiaddr::from(ip4).with(tcp);
-                if let Protocol::P2p(peer_id) = peer_id {
-                    Some((peer_id, ip4))
-                } else {
-                    None
-                }
-            })
-            .collect()
+        self.inner.iter().filter_map(|addr| {
+            let peer_id = addr
+                .iter()
+                .find(|proto| matches!(proto, Protocol::P2p(_)))
+                .expect("to not fail unless try_with_nodes didn't catch this");
+            let ip4 = addr
+                .iter()
+                .find(|proto| matches!(proto, Protocol::Ip4(_)))
+                .expect("to not fail unless try_with_nodes didn't catch this");
+            let tcp = addr
+                .iter()
+                .find(|proto| matches!(proto, Protocol::Tcp(_)))
+                .expect("to not fail unless try_with_nodes didn't catch this");
+            let ip = Multiaddr::from(ip4).with(tcp);
+            if let Protocol::P2p(peer_id) = peer_id {
+                Some((peer_id, ip))
+            } else {
+                None
+            }
+        })
     }
 
     pub fn try_with_nodes<TNode: TryInto<Multiaddr>>(
@@ -239,7 +250,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_with_boot_nodes_is_empty() {
-        let boot_nodes = BootNodes::with_nodes(Vec::<Multiaddr>::new());
+        BootNodes::with_nodes(Vec::<Multiaddr>::new());
     }
 
     #[test]

@@ -1,21 +1,30 @@
 use libp2p::{kad::Event, Swarm};
 
-use crate::{behaviour::Behaviour, lmm::LocalMarketMap};
+use crate::{behaviour::Behaviour, command::QueryHandler, lmm::LocalMarketMap};
 
 use super::EventHandler;
 
-pub(crate) struct KadHandler<'a, 'b> {
+pub(crate) struct KadHandler<'a> {
     swarm: &'a mut Swarm<Behaviour>,
-    lmm: &'b mut LocalMarketMap,
+    lmm: &'a mut LocalMarketMap,
+    query_handler: &'a mut QueryHandler,
 }
 
-impl<'a, 'b> KadHandler<'a, 'b> {
-    pub(crate) fn new(swarm: &'a mut Swarm<Behaviour>, lmm: &'b mut LocalMarketMap) -> Self {
-        KadHandler { swarm, lmm }
+impl<'a> KadHandler<'a> {
+    pub(crate) fn new(
+        swarm: &'a mut Swarm<Behaviour>,
+        lmm: &'a mut LocalMarketMap,
+        query_handler: &'a mut QueryHandler,
+    ) -> Self {
+        KadHandler {
+            swarm,
+            lmm,
+            query_handler,
+        }
     }
 }
 
-impl<'a, 'b> EventHandler for KadHandler<'a, 'b> {
+impl<'a> EventHandler for KadHandler<'a> {
     type Event = Event;
 
     fn handle_event(&mut self, event: Self::Event) {

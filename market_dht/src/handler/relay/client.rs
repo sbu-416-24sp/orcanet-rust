@@ -1,6 +1,6 @@
 use libp2p::relay::client::Event;
 
-use super::EventHandler;
+use crate::handler::EventHandler;
 
 pub(crate) struct RelayClientHandler {}
 
