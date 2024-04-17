@@ -28,6 +28,16 @@ impl Peer {
     }
 
     #[inline(always)]
+    pub const fn peer_id(&self) -> PeerId {
+        self.peer_id
+    }
+
+    #[inline(always)]
+    pub const fn keypair(&self) -> &Keypair {
+        &self.keypair
+    }
+
+    #[inline(always)]
     async fn send(&self, request: Request) -> Response {
         let (tx, rx) = oneshot::channel();
         self.sender

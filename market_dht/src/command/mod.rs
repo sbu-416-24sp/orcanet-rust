@@ -15,10 +15,6 @@ pub(crate) struct QueryHandler {
 }
 
 impl QueryHandler {
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
-
     pub(crate) fn add_query(&mut self, query: Query, responder: oneshot::Sender<Response>) {
         self.inner.insert(query, responder);
     }
