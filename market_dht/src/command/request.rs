@@ -1,4 +1,10 @@
-use libp2p::PeerId;
+use libp2p::{kad::QueryId, request_response::OutboundRequestId, PeerId};
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub(crate) enum Query {
+    Kad(QueryId),
+    ReqRes(OutboundRequestId),
+}
 
 #[derive(Debug)]
 pub(crate) enum Request {

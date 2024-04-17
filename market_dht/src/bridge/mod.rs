@@ -11,6 +11,7 @@ use libp2p::{
     identity::{ed25519, Keypair},
     kad::{self, store::MemoryStore, NoKnownPeers},
     noise, ping, relay,
+    request_response::{self, ProtocolSupport},
     swarm::behaviour::toggle::Toggle,
     tls, yamux, StreamProtocol, SwarmBuilder,
 };
@@ -20,6 +21,11 @@ use tokio::{runtime::Runtime, sync::mpsc};
 pub(crate) const IDENTIFY_PROTOCOL_VERSION: &str = "/orcanet/id/1.0.0";
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
 pub(crate) const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 10);
+
+pub(crate) const FILE_REQ_RES_PROTOCOL: [(StreamProtocol, ProtocolSupport); 1] = [(
+    StreamProtocol::new("/file_req_res/1.0.0"),
+    ProtocolSupport::Full,
+)];
 
 pub fn spawn(config: Config) -> Result<Peer, BridgeError> {
     let Config {
@@ -81,6 +87,10 @@ pub fn spawn(config: Config) -> Result<Peer, BridgeError> {
             };
             let relay_client = Toggle::from(Some(relay_client));
             let dcutr = Toggle::from(Some(dcutr::Behaviour::new(peer_id)));
+            let req_res = {
+                let config = request_response::Config::default();
+                request_response::Behaviour::new(FILE_REQ_RES_PROTOCOL, config)
+            };
             Behaviour {
                 kad,
                 identify,
@@ -89,6 +99,7 @@ pub fn spawn(config: Config) -> Result<Peer, BridgeError> {
                 relay_client,
                 relay_server,
                 dcutr,
+                req_res,
             }
         })
         .map_err(|_| BridgeError::Behaviour)?

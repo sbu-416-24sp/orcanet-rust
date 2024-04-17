@@ -64,6 +64,14 @@ pub struct SupplierInfo {
     pub port: u16,
     pub price: i64,
     pub username: String,
+    pub chunk_data: ChunkMetadata,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ChunkMetadata {
+    // TODO: replace with a concrete type
+    pub chunks: Vec<Vec<u8>>,
+    pub chunk_size: usize,
 }
 
 #[cfg(test)]
@@ -81,6 +89,10 @@ mod tests {
             port: 8080,
             price: 100,
             username: "Alice".to_string(),
+            chunk_data: ChunkMetadata {
+                chunks: vec![vec![1, 2, 3]],
+                chunk_size: 3,
+            },
         };
         lmm.insert(file_hash.clone(), supplier_info.clone());
         assert_eq!(lmm.get_if_not_expired(&file_hash), Some(supplier_info));
@@ -95,6 +107,10 @@ mod tests {
             port: 8080,
             price: 100,
             username: "Alice".to_string(),
+            chunk_data: ChunkMetadata {
+                chunks: vec![vec![1, 2, 3]],
+                chunk_size: 3,
+            },
         };
         lmm.insert(file_hash.clone(), supplier_info);
         sleep(Duration::from_millis(20));

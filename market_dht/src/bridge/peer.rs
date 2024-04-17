@@ -15,6 +15,7 @@ pub struct Peer {
 }
 
 impl Peer {
+    #[inline(always)]
     pub(crate) const fn new(
         peer_id: PeerId,
         sender: mpsc::UnboundedSender<Message>,
@@ -28,8 +29,8 @@ impl Peer {
     }
 
     #[inline(always)]
-    pub const fn peer_id(&self) -> PeerId {
-        self.peer_id
+    pub const fn peer_id(&self) -> &PeerId {
+        &self.peer_id
     }
 
     #[inline(always)]

@@ -5,6 +5,7 @@ use tokio::sync::oneshot;
 use crate::{
     behaviour::Behaviour,
     command::{request::Request, QueryHandler},
+    handler::req_res::ReqResHandler,
     lmm::LocalMarketMap,
     BootNodes, Response, SuccessfulResponse,
 };
@@ -29,6 +30,7 @@ pub(crate) trait CommandRequestHandler {
     fn handle_command(&mut self, request: Request, responder: oneshot::Sender<Response>);
 }
 
+// NOTE: one lifetime should be covariant enough?
 pub(crate) struct Handler<'a> {
     swarm: &'a mut Swarm<Behaviour>,
     lmm: &'a mut LocalMarketMap,
@@ -87,6 +89,11 @@ impl<'a> EventHandler for Handler<'a> {
                 BehaviourEvent::RelayClient(event) => {
                     let mut relay_client = RelayClientHandler {};
                     relay_client.handle_event(event);
+                }
+                BehaviourEvent::ReqRes(event) => {
+                    let mut req_res_handler =
+                        ReqResHandler::new(self.swarm, self.lmm, self.query_handler);
+                    req_res_handler.handle_event(event);
                 }
             },
             SwarmEvent::ConnectionEstablished {
@@ -192,3 +199,4 @@ mod identify;
 mod kad;
 mod ping;
 mod relay;
+mod req_res;

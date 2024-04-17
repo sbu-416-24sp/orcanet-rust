@@ -1,4 +1,4 @@
-use self::request::Request;
+use self::request::{Query, Request};
 use crate::{
     handler::{send_err, send_ok},
     Response,
@@ -33,9 +33,6 @@ impl QueryHandler {
         }
     }
 }
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub(crate) enum Query {}
 
 pub(crate) mod request;
 pub(crate) mod response;

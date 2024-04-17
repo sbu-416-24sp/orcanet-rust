@@ -5,8 +5,13 @@ use libp2p::{
     kad::{store::MemoryStore, Behaviour as KadBehaviour},
     ping::Behaviour as PingBehaviour,
     relay::{client::Behaviour as RelayClientBehaviour, Behaviour as RelayServerBehaviour},
+    request_response::cbor::Behaviour as CborReqResBehaviour,
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour},
 };
+
+use crate::{lmm::FileHash, SupplierInfo};
+
+// TODO: maybe do somethign with toggle in future?
 
 #[derive(NetworkBehaviour)]
 pub(crate) struct Behaviour {
@@ -17,6 +22,7 @@ pub(crate) struct Behaviour {
     pub(crate) relay_server: Toggle<RelayServerBehaviour>,
     pub(crate) dcutr: Toggle<DcutrBehaviour>,
     pub(crate) relay_client: Toggle<RelayClientBehaviour>,
+    pub(crate) req_res: CborReqResBehaviour<FileHash, SupplierInfo>,
 }
 
 // impl Behaviour {
