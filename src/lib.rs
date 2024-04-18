@@ -10,7 +10,11 @@
 
 pub use command::response::*;
 pub use config::*;
-pub use libp2p::Multiaddr;
+pub use libp2p::{
+    build_multiaddr,
+    multiaddr::{multiaddr, Protocol},
+    Multiaddr,
+};
 pub use lmm::SupplierInfo;
 
 pub(crate) mod behaviour;
