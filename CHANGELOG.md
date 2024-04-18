@@ -9,4 +9,3 @@ for now.
 - Communication between the peer and the coordinator through a channel.
 - Handlers for every protocol that we will end up using to implement the market
 - Config for initializing the peer
-- Local Market Map for further implementation 
