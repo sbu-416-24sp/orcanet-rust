@@ -1,9 +1,10 @@
 use std::{borrow::Cow, net::Ipv4Addr};
 
-use market_p2p::bridge::peer::Peer;
 use market_proto::market_proto_rpc::{
     market_server::Market, CheckHoldersRequest, HoldersResponse, RegisterFileRequest, User,
 };
+use orcanet_market_rust::bridge::spawn;
+use orcanet_market_rust::Peer;
 use tonic::{Request, Response, Status};
 
 #[derive(Debug)]

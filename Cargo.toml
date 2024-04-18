@@ -1,5 +1,5 @@
 [package]
-name = "market_p2p"
+name = "orcanet-market-rust"
 version = "0.1.0"
 edition = "2021"
 

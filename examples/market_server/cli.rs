@@ -1,5 +1,5 @@
 use clap::Parser;
-use market_p2p::Multiaddr;
+use orcanet_market_rust::Multiaddr;
 
 use crate::Port;
 

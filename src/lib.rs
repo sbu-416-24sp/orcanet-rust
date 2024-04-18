@@ -8,6 +8,7 @@
 )]
 #![deny(unsafe_code, unreachable_pub)]
 
+pub use bridge::peer::Peer;
 pub use command::response::*;
 pub use config::*;
 pub use libp2p::{
