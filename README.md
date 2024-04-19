@@ -1,43 +1,74 @@
-﻿# Orcanet Market Rust
+# Orcanet Rust
 
-A library that provides the implementation of the Orcanet Market using [libp2p](https://github.com/libp2p/rust-libp2p) as the framework for building the network.
+## Setup
 
-The library uses [tokio](https://tokio.rs/) as the asynchronous executor for handling the requests sent by the peer and within the libp2p swarm.
+1. Install [Rust](https://www.rust-lang.org/tools/install)
+2. Install protoc:
 
-## Quickstart
-Creating a peer and using the provided methods within it.
+   `apt install protobuf-compiler`
 
-```Rust
-use anyhow::Result;
-use orcanet_market_rust::{bridge::spawn, Config, SuccessfulResponse};
+   (May require more a [more recent version](https://grpc.io/docs/protoc-installation/#install-pre-compiled-binaries-any-os))
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let config = Config::default();
-    let peer = spawn(config).unwrap();
-    println!("{}", peer.peer_id());
-    let listeners = peer.listeners().await?;
-    if let SuccessfulResponse::Listeners { listeners } = listeners {
-        for listener in listeners {
-            println!("Listener: {}", listener);
-        }
-    }
-    if let SuccessfulResponse::ConnectedPeers { peers } = peer.connected_peers().await? {
-        for peer in peers {
-            println!("Peer: {}", peer);
-        }
-    }
-    Ok(())
-}
+## API
+Detailed gRPC endpoints are in `proto/market.proto`
+
+- Holders of a file can register the file using the RegisterFile RPC.
+  - Provide a User with 5 fields: 
+    - `id`: some string to identify the user.
+    - `name`: a human-readable string to identify the user
+    - `ip`: a string of the public ip address
+    - `port`: an int32 of the port
+    - `price`: an int64 that details the price per mb of outgoing files
+  - Provide a fileHash string that is the hash of the file
+  - Returns nothing
+
+- Then, clients can search for holders using the CheckHolders RPC
+  - Provide a fileHash to identify the file to search for
+  - Returns a list of Users that hold the file.
+
+
+
+## Running
+
+
+### Market Server
+```Shell
+cd market
+cargo run
 ```
 
-## Project Structure
-Here is an explanation of the project's directory structure
-- `examples/` - this is where you can find the `market_server` example that uses this library as its backend to perform the p2p communications and provides a gRPC communication with the `market_test_client`. You may find the other examples useful as well.
-- `src/` - this is the source code for the implementation of the Orcanet Market
-- `tests/` - this is where you can find the tests for the Orcanet Market in the library
-- `CHANGELOG.md` - provides a changelog for the project
+To run a test client:
 
-## License
-This is under the MIT License.
+```Shell
+cd market
+cargo run --bin test_client
+```
+
+(currently the Go test client is interoperable)
+
+### Peer Node
+
+To run the producer:
+```bash
+cd peernode
+cargo run producer add <FILE_PATH> <PRICE>
+cargo run producer register
+```
+
+To run the consumer:
+```bash
+cd peernode
+cargo run consumer ls <FILE_HASH>
+cargo run consumer get <FILE_HASH> <CHOSEN_PRODUCER>
+```
+
+Additional commands can be detailed by utilizing the help command.
+
+## Running with Docker
+We also provide a Docker compose file to easily run the producer and market server together. To run it:
+```bash
+docker-compose build
+docker-compose up
+```
+This will automatically mount the local `peernode/files` directory to the producer container and expose the producer HTTP and market server gRPC ports.
 
