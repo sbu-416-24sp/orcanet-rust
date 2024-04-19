@@ -1,4 +1,4 @@
-use crate::grpc::MarketClient;
+use crate::peer::MarketClient;
 use crate::producer;
 use anyhow::Result;
 use config::{Config, File, FileFormat};
