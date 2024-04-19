@@ -1,5 +1,5 @@
 [package]
-name = "orcanet-market-rust"
+name = "orcanet-market"
 version = "0.1.0"
 edition = "2021"
 
@@ -44,15 +44,3 @@ tracing = { version = "0.1.40", features = ["log"] }
 tracing-subscriber = "0.3.18"
 tokio-test = { version = "0.4.4" }
 tracing-log = "0.2.0"
-
-market_proto = { path = "./examples/market_server/market_proto" }
-tonic = { version = "0.11.0" }
-tokio = { version = "1.36.0", features = ["full"] }
-anyhow = { version = "1.0.81" }
-clap = { version = "4.5.3", features = ["derive"] }
-libp2p = { version = "0.53.2" }
-tonic-build = "0.11.0"
-prost = "0.12.3"
-strum = { version = "0.26.2" }
-strum_macros = { version = "0.26.2" }
-rustyline = { version = "14.0.0" }

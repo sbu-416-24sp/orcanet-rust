@@ -6,7 +6,7 @@ use crate::{cli::Cli, market_service::MarketService};
 use anyhow::Result;
 use clap::Parser;
 use market_proto::market_proto_rpc::market_server::MarketServer;
-use orcanet_market_rust::{bridge::spawn, config::BootNodes, config::Config};
+use orcanet_market::{bridge::spawn, config::BootNodes, config::Config};
 use tokio::runtime::Runtime;
 use tonic::transport::Server;
 use tracing::info;
@@ -33,6 +33,7 @@ fn main() -> Result<()> {
     if let Some(public_address) = public_address {
         config = config.set_public_address(public_address);
     }
+    config = config.set_peer_tcp_port(peer_port);
     let config = config.build();
 
     let peer = spawn(config)?;

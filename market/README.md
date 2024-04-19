@@ -9,7 +9,7 @@ Creating a peer and using the provided methods within it.
 
 ```Rust
 use anyhow::Result;
-use orcanet_market_rust::{bridge::spawn, Config, SuccessfulResponse};
+use orcanet_market::{bridge::spawn, Config, SuccessfulResponse};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,13 +30,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-## Project Structure
-Here is an explanation of the project's directory structure
-- `examples/` - this is where you can find the `market_server` example that uses this library as its backend to perform the p2p communications and provides a gRPC communication with the `market_test_client`. You may find the other examples useful as well.
-- `src/` - this is the source code for the implementation of the Orcanet Market
-- `tests/` - this is where you can find the tests for the Orcanet Market in the library
-- `CHANGELOG.md` - provides a changelog for the project
 
 ## License
 This is under the MIT License.
