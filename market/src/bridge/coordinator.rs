@@ -15,10 +15,10 @@ use crate::{
 };
 
 pub(super) struct Coordinator {
-    query_handler: Box<QueryHandler>,
+    query_handler: QueryHandler,
     swarm: Swarm<Behaviour>,
-    lmm: Box<LocalMarketMap>,
-    boot_nodes: Option<Box<BootNodes>>,
+    lmm: LocalMarketMap,
+    boot_nodes: Option<BootNodes>,
     command_receiver: mpsc::UnboundedReceiver<Message>,
 }
 
@@ -43,7 +43,7 @@ impl Coordinator {
                     swarm.behaviour_mut().kad.add_address(&peer_id, addr);
                 }
                 swarm.behaviour_mut().kad.bootstrap()?;
-                Some(Box::new(boot_nodes))
+                Some(boot_nodes)
             } else {
                 None
             }
@@ -64,12 +64,12 @@ impl Coordinator {
         loop {
             select! {
                 event = self.swarm.select_next_some() => {
-                    let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler, self.boot_nodes.as_deref());
+                    let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler, self.boot_nodes.as_ref());
                     handler.handle_event(event);
                 }
                 command = self.command_receiver.recv() => {
                     if let Some((request, responder)) = command {
-                        let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler, self.boot_nodes.as_deref());
+                        let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler, self.boot_nodes.as_ref());
                         handler.handle_command(request, responder);
                     } else {
                         error!("Command channel closed");
