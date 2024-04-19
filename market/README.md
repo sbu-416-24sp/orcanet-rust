@@ -31,6 +31,9 @@ async fn main() -> Result<()> {
 }
 ```
 
+## MSRV
+The minimum supported Rust version (MSRV) is 1.73.0.
+
 ## License
 This is under the MIT License.
 
