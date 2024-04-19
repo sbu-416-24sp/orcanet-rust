@@ -28,7 +28,7 @@ impl Coordinator {
         public_address: Option<Multiaddr>,
         boot_nodes: Option<BootNodes>,
         peer_tcp_port: u16,
-        command_receiver: mpsc::UnboundedReceiver<crate::command::Message>,
+        command_receiver: mpsc::UnboundedReceiver<Message>,
     ) -> Result<Self> {
         let listen_addr = Multiaddr::from(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
             .with(Protocol::Tcp(peer_tcp_port));
@@ -72,11 +72,16 @@ impl Coordinator {
                         let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler, self.boot_nodes.as_ref());
                         handler.handle_command(request, responder);
                     } else {
-                        error!("Command channel closed");
                         break;
                     }
                 }
             }
         }
+    }
+}
+
+impl Drop for Coordinator {
+    fn drop(&mut self) {
+        error!("Coordinator receiver channel closed");
     }
 }
