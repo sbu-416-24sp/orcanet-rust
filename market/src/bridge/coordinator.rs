@@ -8,7 +8,7 @@ use tokio::{select, sync::mpsc};
 
 use crate::{
     behaviour::Behaviour,
-    command::QueryHandler,
+    command::{Message, QueryHandler},
     handler::{CommandRequestHandler, EventHandler, Handler},
     lmm::LocalMarketMap,
     BootNodes,
@@ -19,7 +19,7 @@ pub(super) struct Coordinator {
     swarm: Swarm<Behaviour>,
     lmm: Box<LocalMarketMap>,
     boot_nodes: Option<Box<BootNodes>>,
-    command_receiver: mpsc::UnboundedReceiver<crate::command::Message>,
+    command_receiver: mpsc::UnboundedReceiver<Message>,
 }
 
 impl Coordinator {
