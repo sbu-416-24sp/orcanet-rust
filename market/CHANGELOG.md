@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0] (2024-04-17)
+## [Pre 0.1.0] (2024-04-17)
 ### Added
 - A basic project skeleton structure that has no implementation for the protocols
 for now, but we list the protocols that we will use and its purpose.
