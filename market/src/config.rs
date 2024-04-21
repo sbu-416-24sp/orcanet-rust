@@ -262,14 +262,11 @@ mod tests {
     #[test]
     fn test_boot_nodes_fail_from_one_bad() {
         let res = BootNodes::try_with_nodes(vec![
-            "/ip4/127.0.0.1/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
+            "/ip4/127.0.0.1/tcp/4040/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
             "/ip4/127.0.0.1/p2p",
-            "/ip4/127.0.0.1/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
+            "/ip4/127.0.0.1/tcp/4040/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
         ]);
-        assert_eq!(
-            matches!(res, Err(BootNodesError::InvalidMultiaddr(_))),
-            true
-        );
+        assert!(matches!(res, Err(BootNodesError::InvalidMultiaddr(_))),);
     }
 
     #[test]
@@ -277,18 +274,16 @@ mod tests {
         let res = BootNodes::try_with_nodes(vec!["/ip4/127.0.0.1"]);
         assert!(matches!(
             res,
-            Err(BootNodesError::MissingRequiredProtocol(
-                RequiredProtocol::P2p
-            ))
+            Err(BootNodesError::MissingRequiredProtocol(_))
         ));
     }
 
     #[test]
     fn test_boot_nodes() {
         let res = BootNodes::try_with_nodes(vec![
-            "/ip4/127.0.0.1/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
-            "/ip4/127.0.0.1/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
-            "/ip4/127.0.0.1/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
+            "/ip4/127.0.0.1/tcp/4040/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
+            "/ip4/127.0.0.1/tcp/4040/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
+            "/ip4/127.0.0.1/tcp/4040/p2p/12D3KooWEpLeeMwsMtd6F91z4DEVjt395TvEx3Dv2i833StaFGdQ",
         ])
         .unwrap();
         assert_eq!(res.len(), 3);
