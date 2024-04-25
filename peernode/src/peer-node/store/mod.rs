@@ -20,6 +20,7 @@ pub struct Properties {
     market: String,
     files: HashMap<String, PathBuf>,
     prices: HashMap<String, i64>,
+    filenames: HashMap<String, String>,
     tokens: HashMap<String, String>,
     port: String,
     // wallet: String, // not sure about implementation details, will revisit later
@@ -59,6 +60,7 @@ impl Configurations {
             props: Properties {
                 name: "default".to_string(),
                 market: "localhost:50051".to_string(),
+                filenames: HashMap::new(),
                 files: HashMap::new(),
                 prices: HashMap::new(),
                 tokens: HashMap::new(),
@@ -249,7 +251,7 @@ impl Configurations {
         self.set_port(port.clone());
 
         let join = // must run in separate thread so does not block cli inputs
-            producer::start_server(self.props.files.clone(), self.props.prices.clone(), port).await;
+            producer::start_server(self.props.files.clone(), self.props.prices.clone(), self.props.filenames.clone(), port).await;
         self.set_http_client(join);
     }
 
