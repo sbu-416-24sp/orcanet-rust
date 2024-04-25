@@ -1,6 +1,7 @@
 mod db;
 pub mod files;
 mod http;
+pub mod jobs;
 
 use crate::grpc::MarketClient;
 use std::collections::HashMap;
