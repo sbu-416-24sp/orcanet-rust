@@ -39,7 +39,11 @@ impl FileMap {
         }
     }
 
-    pub fn new(files: HashMap<String, PathBuf>, prices: HashMap<String, i64>, filenames: HashMap<String, String>) -> Self {
+    pub fn new(
+        files: HashMap<String, PathBuf>,
+        prices: HashMap<String, i64>,
+        filenames: HashMap<String, String>,
+    ) -> Self {
         FileMap {
             files: RwLock::new(files),
             prices: RwLock::new(prices),
