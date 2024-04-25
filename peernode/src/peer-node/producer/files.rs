@@ -16,6 +16,7 @@ use tokio::sync::RwLock;
 pub struct FileMap {
     files: RwLock<HashMap<String, PathBuf>>,
     prices: RwLock<HashMap<String, i64>>,
+    fileNames: RwLock<HashMap<String, String>>,
 }
 
 pub type AsyncFileMap = Arc<FileMap>;
@@ -34,6 +35,7 @@ impl FileMap {
         FileMap {
             files: RwLock::new(HashMap::new()),
             prices: RwLock::new(HashMap::new()),
+            fileNames: RwLock::new(HashMap::new()),
         }
     }
 
@@ -41,6 +43,7 @@ impl FileMap {
         FileMap {
             files: RwLock::new(files),
             prices: RwLock::new(prices),
+            fileNames: RwLock::new(HashMap::new()),
         }
     }
 
@@ -60,12 +63,15 @@ impl FileMap {
         // Get a write lock on the files map
         let mut files = self.files.write().await;
         let mut prices = self.prices.write().await;
+        let mut fileNames = self.fileNames.write().await;
 
         // Open the file
         let mut file = File::open(file_path)?;
         let hash = hash_file(&mut file)?;
         files.insert(hash.clone(), file_path.into());
         prices.insert(hash.clone(), price);
+        fileNames.insert(hash.clone(), file_path.into());
+        
         Ok(hash)
     }
 
