@@ -179,14 +179,15 @@ impl Configurations {
                 self.add_dir(path_string.to_owned(), price)?;
             }
             if path.is_file() {
-                self.add_file(path_string.to_owned(), price)
+                self.add_file(path_string.to_owned(), price);
             }
         }
         Ok(())
     }
 
     // add a single file to the list
-    pub fn add_file(&mut self, file: String, price: i64) {
+    // returns the hash
+    pub fn add_file(&mut self, file: String, price: i64) -> String {
         // hash the file
         let hash = match self.get_hash(file.clone()) {
             Ok(hash) => hash,
@@ -197,7 +198,9 @@ impl Configurations {
 
         self.props.file_names.insert(hash.clone(), file.clone());
         self.props.files.insert(hash.clone(), PathBuf::from(file));
-        self.props.prices.insert(hash, price);
+        self.props.prices.insert(hash.clone(), price);
+
+        hash
     }
 
     // cli command to add a file/dir to the list
