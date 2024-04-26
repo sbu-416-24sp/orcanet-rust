@@ -1,4 +1,4 @@
-use crate::grpc::MarketClient;
+use crate::{grpc::MarketClient, producer::jobs::Jobs};
 use crate::producer;
 use anyhow::Result;
 use config::{Config, File, FileFormat};
@@ -11,6 +11,7 @@ pub struct Configurations {
     props: Properties,
     http_client: Option<tokio::task::JoinHandle<()>>,
     market_client: Option<MarketClient>,
+    jobs_state: Jobs
 }
 
 #[derive(Serialize, Deserialize)]
@@ -20,7 +21,7 @@ pub struct Properties {
     market: String,
     files: HashMap<String, PathBuf>,
     prices: HashMap<String, i64>,
-    filenames: HashMap<String, String>,
+    file_names: HashMap<String, String>,
     tokens: HashMap<String, String>,
     port: String,
     // wallet: String, // not sure about implementation details, will revisit later
@@ -51,6 +52,7 @@ impl Configurations {
             props,
             http_client: None,
             market_client: None,
+            jobs_state: Jobs::new()
         }
     }
 
@@ -60,7 +62,7 @@ impl Configurations {
             props: Properties {
                 name: "default".to_string(),
                 market: "localhost:50051".to_string(),
-                filenames: HashMap::new(),
+                file_names: HashMap::new(),
                 files: HashMap::new(),
                 prices: HashMap::new(),
                 tokens: HashMap::new(),
@@ -68,6 +70,7 @@ impl Configurations {
             },
             http_client: None,
             market_client: None,
+            jobs_state: Jobs::new()
         };
         default.write();
         return default;
@@ -110,8 +113,21 @@ impl Configurations {
         self.props.files.clone()
     }
 
+    pub fn get_file_names(&self) -> HashMap<String, String> {
+        self.props.file_names.clone()
+    }
+
     pub fn get_prices(&self) -> HashMap<String, i64> {
         self.props.prices.clone()
+    }
+
+    pub fn get_file_size(&self, file_path: String) -> u64 {
+        let metadata = fs::metadata(file_path).unwrap();
+        metadata.len()
+    }
+
+    pub fn get_jobs_state(&self) -> Jobs {
+        self.jobs_state.clone()
     }
 
     pub fn get_port(&self) -> String {
@@ -179,6 +195,7 @@ impl Configurations {
             }
         };
 
+        self.props.file_names.insert(hash.clone(), file.clone());
         self.props.files.insert(hash.clone(), PathBuf::from(file));
         self.props.prices.insert(hash, price);
     }
@@ -251,7 +268,7 @@ impl Configurations {
         self.set_port(port.clone());
 
         let join = // must run in separate thread so does not block cli inputs
-            producer::start_server(self.props.files.clone(), self.props.prices.clone(), self.props.filenames.clone(), port).await;
+            producer::start_server(self.props.files.clone(), self.props.prices.clone(), self.props.file_names.clone(), port).await;
         self.set_http_client(join);
     }
 
