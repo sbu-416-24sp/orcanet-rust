@@ -1,6 +1,6 @@
 pub mod cli;
 pub mod consumer;
-pub mod grpc;
+pub mod peer;
 pub mod producer;
 pub mod store;
 

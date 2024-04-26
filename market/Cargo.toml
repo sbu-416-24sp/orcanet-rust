@@ -1,15 +1,49 @@
 [package]
-name = "orcanet-market-ferrous"
+name = "orcanet-market"
 version = "0.1.0"
 edition = "2021"
-default-run = "orcanet-market-ferrous"
+rust-version = "1.73.0"
+license = "MIT"
+repository = "https://github.com/sbu-416-24sp/orcanet-rust"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-prost = "0.12.3"
-tokio = { version = "1.36.0", features = ["full"] }
-tonic = "0.11.0"
+anyhow = { version = "1.0.81" }
+libp2p = { version = "0.53.2", features = [
+  "cbor",
+  "dns",
+  "kad",
+  "noise",
+  "tls",
+  "tokio",
+  "mdns",
+  "relay",
+  "dcutr",
+  "autonat",
+  "tcp",
+  "quic",
+  "ed25519",
+  "yamux",
+  "identify",
+  "macros",
+  "request-response",
+  "ping",
+] }
+futures = { version = "0.3.30" }
+thiserror = { version = "1.0.58" }
+log = { version = "0.4.21" }
+tokio = { version = "1.36.0", features = [
+  "rt-multi-thread",
+  "sync",
+  "macros",
+  "time",
+] }
+serde = { version = "1.0.130", features = ["derive"] }
 
-[build-dependencies]
-tonic-build = "0.11.0"
+[dev-dependencies]
+pretty_assertions = "1.4.0"
+tracing = { version = "0.1.40", features = ["log"] }
+tracing-subscriber = "0.3.18"
+tokio-test = { version = "0.4.4" }
+tracing-log = "0.2.0"
