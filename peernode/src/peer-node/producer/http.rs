@@ -6,6 +6,7 @@ use axum::{
     routing::get,
     Router,
 };
+use proto::market::FileInfoHash;
 use serde::Deserialize;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
@@ -91,7 +92,7 @@ async fn handle_file_request(
     }
 
     // Get the file path from the file map
-    let file_path = match state.files.get_file_path(&hash).await {
+    let file_path = match state.files.get_file_path(&FileInfoHash(hash)).await {
         Some(path) => path,
         None => {
             return (StatusCode::NOT_FOUND, "File not found").into_response();

@@ -74,11 +74,15 @@ async fn upload_file(
     // TODO: fetch the price from the config somehow, likely from somewhere not yet implemented
     let price = 416;
 
-    let hash = config.add_file(path, price);
+    let hash = match config.add_file(path, price).await {
+        Ok(hash) => hash,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to add file").into_response(),
+    };
+    let hash_str = hash.as_str();
 
     Response::builder()
         .status(StatusCode::OK)
-        .body(Body::from(format!(r#"{{"hash":{hash}}}"#)))
+        .body(Body::from(format!(r#"{{"hash":{hash_str}}}"#)))
         .unwrap()
 }
 
@@ -87,7 +91,10 @@ async fn delete_file(
     Path(hash): Path<String>,
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
-    config.remove_file(hash.clone());
+    match config.remove_file(hash.clone()).await {
+        Ok(_) => {}
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove file").into_response(),
+    }
 
     Response::builder()
         .status(StatusCode::OK)

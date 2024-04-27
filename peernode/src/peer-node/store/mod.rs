@@ -1,11 +1,17 @@
 use crate::{
     consumer::encode::EncodedUser,
     peer::MarketClient,
-    producer::{self, jobs::Jobs},
+    producer::{
+        self,
+        files::{get_file_info, FileHash, FileMap, LocalFileInfo},
+        jobs::Jobs,
+    },
 };
 use anyhow::Result;
+use async_recursion::async_recursion;
 use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
+use proto::market::FileInfoHash;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -23,8 +29,7 @@ pub struct Properties {
     // must be a separate serializable struct so can read from config.json file
     name: String,
     market: String,
-    files: HashMap<String, PathBuf>,
-    prices: HashMap<String, i64>,
+    files: HashMap<FileInfoHash, LocalFileInfo>,
     tokens: HashMap<EncodedUser, String>,
     port: String,
     // market config
@@ -79,7 +84,6 @@ impl Configurations {
                 name: "default".to_string(),
                 market: "localhost:50051".to_string(),
                 files: HashMap::new(),
-                prices: HashMap::new(),
                 tokens: HashMap::new(),
                 port: "8080".to_string(),
                 boot_nodes: None,
@@ -115,12 +119,10 @@ impl Configurations {
         }
     }
 
-    pub fn get_hash(&self, file_path: String) -> Result<String> {
-        // open the file
-        let mut file = std::fs::File::open(file_path)?;
-        // hash the file
-        let hash = producer::files::hash_file(&mut file)?;
-        Ok(hash)
+    pub async fn get_hash(&self, file_path: String) -> Result<FileInfoHash> {
+        Ok(producer::files::get_file_info(&PathBuf::from(file_path))
+            .await?
+            .get_hash())
     }
 
     pub fn jobs(&self) -> &Jobs {
@@ -131,12 +133,16 @@ impl Configurations {
         &mut self.jobs
     }
 
-    pub fn get_files(&self) -> HashMap<String, PathBuf> {
+    pub fn get_files(&self) -> HashMap<FileInfoHash, LocalFileInfo> {
         self.props.files.clone()
     }
 
-    pub fn get_prices(&self) -> HashMap<String, i64> {
-        self.props.prices.clone()
+    pub fn get_prices(&self) -> HashMap<FileInfoHash, i64> {
+        self.props
+            .files
+            .iter()
+            .map(|(hash, file_info)| (hash.clone(), file_info.price))
+            .collect()
     }
 
     pub fn get_port(&self) -> String {
@@ -193,7 +199,8 @@ impl Configurations {
     }
 
     // add every file in the directory to the list
-    pub fn add_dir(&mut self, file_path: String, price: i64) -> Result<()> {
+    #[async_recursion]
+    pub async fn add_dir(&mut self, file_path: String, price: i64) -> Result<()> {
         // assume that the file_path is a directory
         for entry in fs::read_dir(file_path)? {
             let path = entry?.path();
@@ -206,40 +213,44 @@ impl Configurations {
             };
             // check if this is a file or a directory
             if path.is_dir() {
-                self.add_dir(path_string.to_owned(), price)?;
+                self.add_dir(path_string.to_owned(), price).await?;
             }
             if path.is_file() {
-                self.add_file(path_string.to_owned(), price);
+                self.add_file(path_string.to_owned(), price).await?;
             }
         }
         Ok(())
     }
 
     // add a single file to the list
-    pub fn add_file(&mut self, file: String, price: i64) -> String {
-        // hash the file
-        let hash = match self.get_hash(file.clone()) {
-            Ok(hash) => hash,
-            Err(_) => {
-                panic!("Failed to hash file");
-            }
-        };
+    pub async fn add_file(&mut self, file_path: String, price: i64) -> Result<FileInfoHash> {
+        let file_info = get_file_info(&PathBuf::from(file_path.clone())).await?;
+        let file_info_hash = file_info.get_hash();
+        self.props.files.insert(
+            file_info_hash.clone(),
+            LocalFileInfo {
+                file_info,
+                path: PathBuf::from(file_path),
+                price,
+            },
+        );
 
-        self.props.files.insert(hash.clone(), PathBuf::from(file));
-        self.props.prices.insert(hash.clone(), price);
-        hash
+        Ok(file_info_hash)
     }
 
     // cli command to add a file/dir to the list
-    pub fn add_file_path(&mut self, file: String, price: i64) {
+    pub async fn add_file_path(&mut self, file: String, price: i64) {
         // check if this is a file or a directory
         match std::fs::metadata(&file) {
             Ok(metadata) => {
                 if metadata.is_file() {
-                    self.add_file(file.clone(), price);
+                    match self.add_file(file.clone(), price).await {
+                        Ok(_) => {}
+                        Err(e) => eprintln!("Failed to add file {e}"),
+                    }
                 }
                 if metadata.is_dir() {
-                    match self.add_dir(file.clone(), price) {
+                    match self.add_dir(file.clone(), price).await {
                         Ok(_) => {}
                         Err(_) => {
                             eprintln!("Failed to add directory {}", file);
@@ -254,22 +265,17 @@ impl Configurations {
         self.write();
     }
 
-    pub fn remove_file(&mut self, file_path: String) {
+    pub async fn remove_file(&mut self, file_path: String) -> Result<()> {
         // get the hash of the file
-        let hash = match self.get_hash(file_path.clone()) {
-            Ok(hash) => hash,
-            Err(_) => {
-                panic!("Failed to hash file");
-            }
-        };
+        let file_info = get_file_info(&PathBuf::from(file_path.clone())).await?;
+        let hash = file_info.get_hash();
 
-        // if file is not in the list, panic
-        if !self.props.files.contains_key(&hash) || !self.props.prices.contains_key(&hash) {
+        if !self.props.files.contains_key(&hash) {
             panic!("File [{}] not found", file_path);
         }
         self.props.files.remove(&hash);
-        self.props.prices.remove(&hash);
         self.write();
+        Ok(())
     }
 
     pub fn set_http_client(&mut self, http_client: tokio::task::JoinHandle<()>) {
@@ -299,7 +305,7 @@ impl Configurations {
         self.set_port(port.clone());
 
         let join = // must run in separate thread so does not block cli inputs
-            producer::start_server(self.props.files.clone(), self.props.prices.clone(), port).await;
+            producer::start_server(self.props.files.clone(), port).await;
         self.set_http_client(join);
     }
 
