@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{get, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use proto::market::User;
@@ -65,6 +65,39 @@ async fn get_file_info(
         .unwrap()
 }
 
+async fn upload_file(
+    State(state): State<ServerState>,
+    Path(path): Path<String>,
+) -> impl IntoResponse {
+    let mut config = state.config.lock().await;
+
+    // TODO: fetch the price from the config somehow, likely from somewhere not yet implemented
+    let price = 416;
+
+    let hash = config.add_file(path, price);
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::from(format!(r#"{{"hash":{hash}}}"#)))
+        .unwrap()
+}
+
+async fn delete_file(
+    State(state): State<ServerState>,
+    Path(hash): Path<String>,
+) -> impl IntoResponse {
+    let mut config = state.config.lock().await;
+    config.remove_file(hash.clone());
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::from(format!(r#"{{"hash": "{hash}"}}"#)))
+        .unwrap()
+}
+
 pub fn routes() -> Router<ServerState> {
-    Router::new().route("/file/:hash/info", put(get_file_info))
+    Router::new()
+        .route("/file/:hash/info", put(get_file_info))
+        .route("/upload", post(upload_file))
+        .route("/file/:hash", delete(delete_file))
 }
