@@ -10,7 +10,11 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{consumer::encode, producer, ServerState};
+use crate::{
+    consumer::encode::{self, try_decode_user},
+    producer::{self, jobs::JobListItem},
+    ServerState,
+};
 
 ///
 /// JOBS ENDPOINTS
@@ -117,20 +121,14 @@ async fn find_peer(
         .unwrap()
 }
 
-// AddJob - Adds a job to the producer's job queue
-// takes in a fileHash and peerID.
-// returns a jobId of the newly created job
-
-// Get Job - Adds a job to the producer's job queue
-// returns a list of jobs
 async fn get_job_list(State(state): State<ServerState>) -> impl IntoResponse {
     let mut config = state.config.lock().await;
     let jobs_list = config.jobs_mut().get_jobs_list().await;
 
-    let jobs_json = serde_json::to_string(&jobs_list).unwrap();
+    let jobs_json = serde_json::to_string(&jobs_list).expect("to serialize");
     Response::builder()
         .status(StatusCode::OK)
-        .body(Body::from(format!("{{\"jobs\": \"{:?}\"}}", jobs_json)))
+        .body(Body::from(format!(r#"{{"jobs": {jobs_json}}}"#)))
         .unwrap()
 }
 
@@ -143,12 +141,50 @@ async fn get_job_info(
 
     let job_info = match config.jobs_mut().get_job_info(&jobID).await {
         Some(job_info) => job_info,
-        None => {
-            return (StatusCode::NOT_FOUND, "Job not found").into_response();
-        }
+        None => return (StatusCode::NOT_FOUND, "Job not found").into_response(),
     };
 
     let info_json = serde_json::to_string(&job_info).unwrap();
+    Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::from(info_json))
+        .unwrap()
+}
+
+
+#[derive(Debug, Serialize)]
+#[allow(non_snake_case)]
+struct JobPeerInfo {
+    ipAddress: String,
+    region: String,
+    name: String,
+    price: i64,
+}
+async fn job_peer_info(
+    State(state): State<ServerState>,
+    Path(jobID): Path<String>,
+) -> impl IntoResponse {
+    let config = state.config.lock().await;
+
+    let user = match config.jobs().get_job(&jobID).await {
+        Some(job) => {
+            let lock = job.lock().await;
+            match try_decode_user(lock.encoded_producer.as_str()) {
+                Ok(user) => user,
+                Err(_) => return (StatusCode::NOT_FOUND, "Failed to decode user").into_response(),
+            }
+        },
+        None => return (StatusCode::NOT_FOUND, "Job not found").into_response(),
+    };
+
+    let peer_info = JobPeerInfo {
+        ipAddress: user.ip,
+        region: "US".into(),
+        name: user.name,
+        price: user.price,
+    };
+
+    let info_json = serde_json::to_string(&peer_info).unwrap();
     Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(info_json))
@@ -184,5 +220,7 @@ pub fn routes() -> Router<ServerState> {
         .route("/find-peer/:fileHash", get(find_peer))
         .route("/job-list", get(get_job_list))
         .route("/job-info/:jobID", get(get_job_info))
+        .route("/job-peer/:jobId", get(job_peer_info))
+
         .route("/start-jobs", put(start_jobs))
 }
