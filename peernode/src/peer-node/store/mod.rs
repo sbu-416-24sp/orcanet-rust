@@ -200,37 +200,30 @@ impl Configurations {
 
     // add every file in the directory to the list
     #[async_recursion]
-    pub async fn add_dir(&mut self, file_path: String, price: i64) -> Result<()> {
+    pub async fn add_dir(&mut self, file_path: &PathBuf, price: i64) -> Result<()> {
         // assume that the file_path is a directory
         for entry in fs::read_dir(file_path)? {
             let path = entry?.path();
-            // convert the path to a string
-            let path_string = match path.to_str() {
-                Some(path) => path,
-                None => {
-                    panic!("Failed to convert path to string");
-                }
-            };
             // check if this is a file or a directory
             if path.is_dir() {
-                self.add_dir(path_string.to_owned(), price).await?;
+                self.add_dir(file_path, price).await?;
             }
             if path.is_file() {
-                self.add_file(path_string.to_owned(), price).await?;
+                self.add_file(file_path, price).await?;
             }
         }
         Ok(())
     }
 
     // add a single file to the list
-    pub async fn add_file(&mut self, file_path: String, price: i64) -> Result<FileInfoHash> {
-        let file_info = get_file_info(&PathBuf::from(file_path.clone())).await?;
+    pub async fn add_file(&mut self, file_path: &PathBuf, price: i64) -> Result<FileInfoHash> {
+        let file_info = get_file_info(file_path).await?;
         let file_info_hash = file_info.get_hash();
         self.props.files.insert(
             file_info_hash.clone(),
             LocalFileInfo {
                 file_info,
-                path: PathBuf::from(file_path),
+                path: file_path.to_owned(),
                 price,
             },
         );
@@ -239,28 +232,21 @@ impl Configurations {
     }
 
     // cli command to add a file/dir to the list
-    pub async fn add_file_path(&mut self, file: String, price: i64) {
+    pub async fn add_file_path(&mut self, file_path: &PathBuf, price: i64) {
         // check if this is a file or a directory
-        match std::fs::metadata(&file) {
+        match std::fs::metadata(file_path) {
             Ok(metadata) => {
                 if metadata.is_file() {
-                    match self.add_file(file.clone(), price).await {
+                    match self.add_file(file_path, price).await {
                         Ok(_) => {}
                         Err(e) => eprintln!("Failed to add file {e}"),
                     }
                 }
-                if metadata.is_dir() {
-                    match self.add_dir(file.clone(), price).await {
-                        Ok(_) => {}
-                        Err(_) => {
-                            eprintln!("Failed to add directory {}", file);
-                        }
-                    };
+                if metadata.is_dir() && self.add_dir(file_path, price).await.is_err() {
+                    eprintln!("Failed to add directory {file_path:?}");
                 }
             }
-            Err(_) => {
-                eprintln!("Failed to open file {:?}", file);
-            }
+            Err(_) => eprintln!("Failed to open file {file_path:?}"),
         }
         self.write();
     }

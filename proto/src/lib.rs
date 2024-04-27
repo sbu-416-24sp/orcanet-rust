@@ -3,6 +3,7 @@ pub mod market {
 
     use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
+    use core::fmt;
     use std::hash::{Hash, Hasher};
 
     // this is unnecessary I think
@@ -51,6 +52,12 @@ pub mod market {
     impl FileInfoHash {
         pub fn as_str(&self) -> &str {
             self.0.as_str()
+        }
+    }
+    
+    impl fmt::Display for FileInfoHash {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{}", self.0)
         }
     }
 }

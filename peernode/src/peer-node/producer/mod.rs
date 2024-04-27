@@ -33,7 +33,7 @@ pub async fn stop_server(join_handle: tokio::task::JoinHandle<()>) -> Result<()>
 }
 
 pub async fn register_files(
-    prices: HashMap<String, i64>,
+    prices: HashMap<FileInfoHash, i64>,
     client: &mut MarketClient,
     port: String,
     ip: Option<String>,

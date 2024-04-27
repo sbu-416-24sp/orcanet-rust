@@ -1,6 +1,6 @@
 use orcanet_market::{bridge::spawn, Config, Peer};
 
-use proto::market::{FileInfo, HoldersResponse, User};
+use proto::market::{FileInfo, FileInfoHash, HoldersResponse, User};
 
 use anyhow::Result;
 
@@ -32,7 +32,7 @@ impl MarketClient {
                 name: "user".into(),
                 ip: "0.0.0.0".into(),
                 port: 80,
-                price: 0,
+                price: 9999,
             }],
         });
         todo!()
@@ -52,7 +52,7 @@ impl MarketClient {
         ip: String,
         port: i32,
         price: i64,
-        file_hash: String,
+        file_info_hash: FileInfoHash,
     ) -> Result<()> {
         todo!()
         // let user = User {

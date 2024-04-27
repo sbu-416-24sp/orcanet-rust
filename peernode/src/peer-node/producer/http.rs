@@ -111,7 +111,7 @@ async fn handle_file_request(
     let file = match FileAccessType::new(&file_path.to_string_lossy().to_string()) {
         Ok(file) => file,
         Err(_) => {
-            eprintln!("Failed to open file {:?}", file_path);
+            eprintln!("Failed to open file {file_path:?}");
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };

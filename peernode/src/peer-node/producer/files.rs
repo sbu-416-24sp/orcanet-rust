@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -157,9 +156,7 @@ impl FileMap {
                         self.add_dir(&file, price).await?;
                     }
                 }
-                Err(_) => {
-                    eprintln!("Failed to open file {}", &file);
-                }
+                Err(_) => eprintln!("Failed to open file {file}"),
             }
         }
         Ok(())

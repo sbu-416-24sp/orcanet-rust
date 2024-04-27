@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::consumer;
@@ -221,7 +222,7 @@ pub async fn handle_arg_matches(
                             return Err(anyhow!("Invalid price"));
                         }
                     };
-                    config.add_file_path(file_name.to_string(), price);
+                    config.add_file_path(&PathBuf::from(file_name), price).await;
                     // print
                     println!("File {} has been registered at price {}", file_name, price);
                     Ok(())
@@ -234,17 +235,17 @@ pub async fn handle_arg_matches(
                         Some(file_name) => file_name,
                         _ => Err(anyhow!("Invalid file name"))?,
                     };
-                    config.remove_file(file_name.to_string());
+                    config.remove_file(file_name.to_string()).await?;
                     Ok(())
                 }
                 Some(("ls", _)) => {
                     let files = config.get_files();
                     let prices = config.get_prices();
 
-                    for (hash, path) in files {
+                    for (hash, info) in files {
                         println!(
-                            "File: {}, Price: {}",
-                            path.to_string_lossy(),
+                            "File: {}, Price: {}, Hash: {hash}",
+                            info.path.to_string_lossy(),
                             *prices.get(&hash).unwrap_or(&0)
                         );
                     }
