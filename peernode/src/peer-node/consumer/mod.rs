@@ -15,7 +15,8 @@ pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Res
         let encoded_producer = encode::encode_user(&producer);
         println!(
             "Producer:\n  id: {}\n  Price: {}",
-            encoded_producer.as_str(), producer.price
+            encoded_producer.as_str(),
+            producer.price
         );
     }
     Ok(())
