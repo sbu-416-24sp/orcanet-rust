@@ -3,7 +3,7 @@ use std::{net::Ipv4Addr, time::Duration};
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::{multiaddr::Protocol, Multiaddr, Swarm};
-use log::error;
+use log::{error, warn};
 use tokio::{
     select,
     sync::mpsc,
@@ -70,6 +70,11 @@ impl Coordinator {
     pub(super) async fn run(mut self) {
         loop {
             select! {
+                _ = self.bootstrap_interval.tick() => {
+                    if let Err(err) = self.swarm.behaviour_mut().kad.bootstrap() {
+                        warn!("Failed to bootstrap: {}", err);
+                    }
+                }
                 event = self.swarm.select_next_some() => {
                     let mut handler = Handler::new(&mut self.swarm, &mut self.lmm, &mut self.query_handler, self.boot_nodes.as_ref());
                     handler.handle_event(event);
