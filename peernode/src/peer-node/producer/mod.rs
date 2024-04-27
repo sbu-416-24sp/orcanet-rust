@@ -5,7 +5,6 @@ pub mod jobs;
 
 use crate::peer::MarketClient;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};

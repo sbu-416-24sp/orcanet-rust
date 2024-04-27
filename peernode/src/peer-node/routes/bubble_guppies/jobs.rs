@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 use axum::{
     body::Body,
-    debug_handler,
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},

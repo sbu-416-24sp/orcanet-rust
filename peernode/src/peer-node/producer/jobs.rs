@@ -11,13 +11,10 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::{
-    consumer::{
-        encode::{self, EncodedUser},
-        get_file_chunk,
-        http::GetFileResponse,
-    },
-    store::Configurations,
+use crate::consumer::{
+    encode::{self, EncodedUser},
+    get_file_chunk,
+    http::GetFileResponse,
 };
 
 type AsyncJob = Arc<Mutex<Job>>;

@@ -1,24 +1,18 @@
 #![allow(non_snake_case)]
+use std::path::PathBuf;
+
 use axum::{
     body::Body,
-    debug_handler,
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{delete, get, post, put},
-    Json, Router,
+    routing::{delete, get, post},
+    Router,
 };
 use proto::market::User;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    consumer::encode::{self, try_decode_user},
-    producer::{
-        self,
-        jobs::{JobListItem, JobStatus},
-    },
-    ServerState,
-};
+use crate::ServerState;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(non_snake_case)]
@@ -74,7 +68,7 @@ async fn upload_file(
     // TODO: fetch the price from the config somehow, likely from somewhere not yet implemented
     let price = 416;
 
-    let hash = match config.add_file(path, price).await {
+    let hash = match config.add_file(&PathBuf::from(path), price).await {
         Ok(hash) => hash,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to add file").into_response(),
     };
@@ -93,7 +87,9 @@ async fn delete_file(
     let mut config = state.config.lock().await;
     match config.remove_file(hash.clone()).await {
         Ok(_) => {}
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove file").into_response(),
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove file").into_response()
+        }
     }
 
     Response::builder()
@@ -104,7 +100,7 @@ async fn delete_file(
 
 pub fn routes() -> Router<ServerState> {
     Router::new()
-        .route("/file/:hash/info", put(get_file_info))
+        .route("/file/:hash/info", get(get_file_info))
         .route("/upload", post(upload_file))
         .route("/file/:hash", delete(delete_file))
 }
