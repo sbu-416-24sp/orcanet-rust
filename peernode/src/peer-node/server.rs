@@ -36,6 +36,9 @@ async fn main() {
     let app = Router::new()
         .merge(routes::file_routes::routes())
         .merge(routes::job_routes::routes())
+        .merge(routes::bubble_guppies::routes())
+        .merge(routes::manta::routes())
+        .merge(routes::sea_pig::routes())
         .with_state(state);
 
     // Start the server
