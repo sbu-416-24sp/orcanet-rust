@@ -6,6 +6,7 @@ use crate::lmm::FILE_DEFAULT_TTL;
 
 const DEFAULT_COORDINATOR_THREAD_NAME: &str = "coordinator";
 const DEFAULT_PEER_TCP_PORT: u16 = 16899;
+const DEFAULT_BOOTSTRAP_TIME: Duration = Duration::from_secs(77);
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -24,6 +25,7 @@ pub struct Config {
     // server. The only other way is if you can get another (public?) node to try and confirm this
     // public address.
     pub(crate) public_address: Option<Multiaddr>,
+    pub(crate) bootstrap_time: Duration,
 }
 
 impl Config {
@@ -56,6 +58,11 @@ impl Config {
     pub const fn public_address(&self) -> Option<&Multiaddr> {
         self.public_address.as_ref()
     }
+
+    #[inline(always)]
+    pub const fn bootstrap_time(&self) -> Duration {
+        self.bootstrap_time
+    }
 }
 
 impl Default for Config {
@@ -66,6 +73,7 @@ impl Default for Config {
             coordinator_thread_name: DEFAULT_COORDINATOR_THREAD_NAME.to_owned(),
             file_ttl: FILE_DEFAULT_TTL,
             public_address: None,
+            bootstrap_time: DEFAULT_BOOTSTRAP_TIME,
         }
     }
 }
@@ -77,34 +85,47 @@ pub struct ConfigBuilder {
     coordinator_thread_name: Option<String>,
     file_ttl: Option<Duration>,
     public_address: Option<Multiaddr>,
+    bootstrap_time: Option<Duration>,
 }
 
 impl ConfigBuilder {
+    #[inline(always)]
     pub const fn set_peer_tcp_port(mut self, port: u16) -> Self {
         self.peer_tcp_port = Some(port);
         self
     }
 
+    #[inline(always)]
     pub fn set_boot_nodes(mut self, boot_nodes: BootNodes) -> Self {
         self.boot_nodes = Some(boot_nodes);
         self
     }
 
+    #[inline(always)]
     pub fn set_coordinator_thread_name(mut self, name: impl Into<String>) -> Self {
         self.coordinator_thread_name = Some(name.into());
         self
     }
 
+    #[inline(always)]
     pub const fn set_file_ttl(mut self, ttl: Duration) -> Self {
         self.file_ttl = Some(ttl);
         self
     }
 
+    #[inline(always)]
     pub fn set_public_address(mut self, addr: Multiaddr) -> Self {
         self.public_address = Some(addr);
         self
     }
 
+    #[inline(always)]
+    pub const fn set_bootstrap_time(mut self, time: Duration) -> Self {
+        self.bootstrap_time = Some(time);
+        self
+    }
+
+    #[inline(always)]
     pub fn build(self) -> Config {
         Config {
             peer_tcp_port: self.peer_tcp_port.unwrap_or(DEFAULT_PEER_TCP_PORT),
@@ -114,6 +135,7 @@ impl ConfigBuilder {
                 .unwrap_or(DEFAULT_COORDINATOR_THREAD_NAME.to_owned()),
             file_ttl: self.file_ttl.unwrap_or(FILE_DEFAULT_TTL),
             public_address: self.public_address,
+            bootstrap_time: self.bootstrap_time.unwrap_or(DEFAULT_BOOTSTRAP_TIME),
         }
     }
 }
