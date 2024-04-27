@@ -12,6 +12,6 @@ pub struct Cli {
     pub peer_port: Port,
     #[arg(short, long, value_parser, num_args = 0.., value_delimiter = ',')]
     pub boot_nodes: Option<Vec<Multiaddr>>,
-    #[arg(short, long)]
+    #[arg(long)]
     pub public_address: Option<Multiaddr>,
 }
