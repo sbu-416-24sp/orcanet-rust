@@ -151,7 +151,6 @@ async fn get_job_info(
         .unwrap()
 }
 
-
 #[derive(Debug, Serialize)]
 #[allow(non_snake_case)]
 struct JobPeerInfo {
@@ -173,7 +172,7 @@ async fn job_peer_info(
                 Ok(user) => user,
                 Err(_) => return (StatusCode::NOT_FOUND, "Failed to decode user").into_response(),
             }
-        },
+        }
         None => return (StatusCode::NOT_FOUND, "Job not found").into_response(),
     };
 
@@ -221,6 +220,5 @@ pub fn routes() -> Router<ServerState> {
         .route("/job-list", get(get_job_list))
         .route("/job-info/:jobID", get(get_job_info))
         .route("/job-peer/:jobId", get(job_peer_info))
-
         .route("/start-jobs", put(start_jobs))
 }
