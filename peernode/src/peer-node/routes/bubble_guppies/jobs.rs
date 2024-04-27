@@ -95,14 +95,17 @@ async fn find_peer(
                 .into_response()
         }
     };
-    let peers: Vec<_> = response.holders.into_iter().map(|user| Peer {
-        peerID: user.id,
-        ip: user.ip,
-        region: "US".into(),
-        price: user.price as f64,
-    }).collect();
+    let peers: Vec<_> = response
+        .holders
+        .into_iter()
+        .map(|user| Peer {
+            peerID: user.id,
+            ip: user.ip,
+            region: "US".into(),
+            price: user.price as f64,
+        })
+        .collect();
     let peers_serialized = serde_json::to_string(&peers).expect("to serialize");
-
 
     Response::builder()
         .status(StatusCode::OK)
