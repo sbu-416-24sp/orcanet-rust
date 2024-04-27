@@ -60,7 +60,6 @@ async fn clear_history(State(state): State<ServerState>) -> impl IntoResponse {
         .unwrap()
 }
 
-
 pub fn routes() -> Router<ServerState> {
     Router::new()
         .route("/get-history", get(get_history))

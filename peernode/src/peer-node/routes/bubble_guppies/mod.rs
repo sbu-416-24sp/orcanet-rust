@@ -1,7 +1,7 @@
-mod market;
+mod files;
 mod history;
 mod jobs;
-mod files;
+mod market;
 mod settings;
 
 use crate::ServerState;
