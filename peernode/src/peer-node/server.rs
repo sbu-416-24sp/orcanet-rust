@@ -4,6 +4,9 @@ pub mod producer;
 pub mod store;
 
 mod routes {
+    pub mod bubble_guppies;
+    pub mod manta;
+    pub mod sea_pig;
     pub mod file_routes;
     pub mod job_routes;
 }
