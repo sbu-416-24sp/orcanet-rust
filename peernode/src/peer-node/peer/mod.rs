@@ -1,4 +1,4 @@
-use orcanet_market::{bridge::spawn, Peer, SupplierInfo};
+use orcanet_market::{bridge::spawn, Config, Peer, SupplierInfo};
 
 use anyhow::Result;
 
@@ -10,8 +10,8 @@ impl MarketClient {
     // TODO: DO NOT PR MERGE FOR PEER NODE UNLESS WE PROVIDE A CONFIG HERE
     //
     // Initialize a new MarketClient, connecting to the given market service address
-    pub async fn new(market: String) -> Result<Self> {
-        let peer = spawn(Default::default())?;
+    pub async fn new(config: Config) -> Result<Self> {
+        let peer = spawn(config)?;
 
         Ok(MarketClient { inner: peer })
     }

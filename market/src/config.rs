@@ -1,6 +1,7 @@
 use std::{fmt::Debug, time::Duration};
 
 use libp2p::{multiaddr::Protocol, Multiaddr, PeerId};
+use serde::{Deserialize, Serialize};
 
 use crate::lmm::FILE_DEFAULT_TTL;
 
@@ -140,7 +141,7 @@ impl ConfigBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BootNodes {
     pub(crate) inner: Vec<Multiaddr>,
 }
