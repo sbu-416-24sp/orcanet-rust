@@ -32,7 +32,10 @@ impl LocalMarketMap {
             .insert(file_info_hash, (Instant::now(), supplier_info));
     }
 
-    pub(crate) fn get_if_not_expired(&mut self, file_info_hash: &FileInfoHash) -> Option<SupplierInfo> {
+    pub(crate) fn get_if_not_expired(
+        &mut self,
+        file_info_hash: &FileInfoHash,
+    ) -> Option<SupplierInfo> {
         if let Some(entry) = self.inner.get(file_info_hash) {
             let elapsed_time = Instant::now().duration_since(entry.0);
             if elapsed_time >= self.file_ttl {
@@ -88,10 +91,7 @@ mod tests {
             file_name: "a_file".to_string(),
         };
         let file_hash = FileInfoHash(file_info.hash_to_string());
-        let supplier_info = SupplierInfo {
-            file_info,
-            user,
-        };
+        let supplier_info = SupplierInfo { file_info, user };
         lmm.insert(file_hash.clone(), supplier_info.clone());
         assert_eq!(lmm.get_if_not_expired(&file_hash), Some(supplier_info));
     }
@@ -113,10 +113,7 @@ mod tests {
             name: "Alice".to_string(),
             id: "416".to_string(),
         };
-        let supplier_info = SupplierInfo {
-            file_info,
-            user,
-        };
+        let supplier_info = SupplierInfo { file_info, user };
         lmm.insert(file_hash.clone(), supplier_info);
         sleep(Duration::from_millis(20));
         assert_eq!(lmm.get_if_not_expired(&file_hash), None);

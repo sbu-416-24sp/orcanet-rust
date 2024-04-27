@@ -3,7 +3,7 @@ use libp2p::{request_response::Event, Swarm};
 use crate::{
     behaviour::Behaviour,
     command::QueryHandler,
-    lmm::{FileInfoHash, SupplierInfo, LocalMarketMap},
+    lmm::{FileInfoHash, LocalMarketMap, SupplierInfo},
 };
 
 use super::EventHandler;
