@@ -348,8 +348,9 @@ pub async fn handle_arg_matches(
                         }
                     }
                     None => {
-                        println!("Using existing boot nodes {:?}", config.get_boot_nodes());
-                        config.get_boot_nodes()
+                        let boot_nodes = config.get_boot_nodes();
+                        println!("Using existing boot nodes {boot_nodes:?}");
+                        boot_nodes
                     }
                 };
                 let public_address = match set_matches.get_many::<String>("PUBLIC_ADDRESS") {
@@ -375,11 +376,9 @@ pub async fn handle_arg_matches(
                         }
                     }
                     None => {
-                        println!(
-                            "Using existing public address {:?}",
-                            config.get_public_address()
-                        );
-                        config.get_public_address()
+                        let public_address = config.get_public_address();
+                        println!("Using existing public address {public_address:?}");
+                        public_address
                     }
                 };
                 config.set_boot_nodes(boot_nodes);
