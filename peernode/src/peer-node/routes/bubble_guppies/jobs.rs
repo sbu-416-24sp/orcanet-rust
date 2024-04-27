@@ -8,7 +8,7 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{consumer::encode, producer, ServerState};
 
@@ -68,6 +68,7 @@ async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> i
 
 // returns all peers hosting a given file
 #[allow(non_snake_case)]
+#[derive(Serialize)]
 struct Peer {
     peerID: String,
     ip: String,
@@ -94,18 +95,20 @@ async fn find_peer(
                 .into_response()
         }
     };
-    let peers = response.holders.into_iter().map(|user| Peer {
+    let peers: Vec<_> = response.holders.into_iter().map(|user| Peer {
         peerID: user.id,
         ip: user.ip,
         region: "US".into(),
         price: user.price as f64,
-    });
+    }).collect();
+    let peers_serialized = serde_json::to_string(&peers).expect("to serialize");
+
 
     Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(format!(
             r#"
-{{"peers": "{peers:?}"}}
+{{"peers": {peers_serialized}}}
 "#,
         )))
         .unwrap()

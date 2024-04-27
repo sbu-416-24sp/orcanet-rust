@@ -20,6 +20,9 @@ impl MarketClient {
 
     // Get a list of producers for a given file hash
     pub async fn check_holders(&mut self, file_hash: String) -> Result<HoldersResponse> {
+        return Ok(
+            HoldersResponse{ file_info: Some(FileInfo{file_hash:"x".into(), chunk_hashes: vec!["y".into()], file_size: 3, file_name: "z".into()}), holders: vec![User{id:"a".into(),name:"user".into(),ip:"0.0.0.0".into(),port:80,price:0}] }
+        );
         todo!()
         // println!("gRPC: Checking holders for file hash {}", file_hash);
         // let request = CheckHoldersRequest { file_hash };
