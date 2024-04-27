@@ -282,7 +282,9 @@ impl Configurations {
         if self.market_client.is_none() {
             let mut config = orcanet_market::Config::builder();
             if let Some(boot_nodes) = self.props.boot_nodes.clone() {
-                config = config.set_boot_nodes(boot_nodes);
+                if !boot_nodes.is_empty() {
+                    config = config.set_boot_nodes(boot_nodes);
+                }
             }
             if let Some(public_address) = self.props.public_address.clone() {
                 config = config.set_public_address(public_address.clone());
