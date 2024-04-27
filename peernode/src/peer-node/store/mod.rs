@@ -1,4 +1,4 @@
-use crate::peer::MarketClient;
+use crate::{peer::MarketClient, producer::jobs::Jobs};
 use crate::producer;
 use anyhow::Result;
 use config::{Config, File, FileFormat};
@@ -12,6 +12,7 @@ pub struct Configurations {
     props: Properties,
     http_client: Option<tokio::task::JoinHandle<()>>,
     market_client: Option<MarketClient>,
+    jobs: Jobs,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,6 +55,7 @@ impl Configurations {
             props,
             http_client: None,
             market_client: None,
+            jobs: Jobs::new(),
         }
     }
 
@@ -72,9 +74,10 @@ impl Configurations {
             },
             http_client: None,
             market_client: None,
+            jobs: Jobs::new()
         };
         default.write();
-        return default;
+        default
     }
 
     // write to config.json
@@ -104,6 +107,14 @@ impl Configurations {
         // hash the file
         let hash = producer::files::hash_file(&mut file)?;
         Ok(hash)
+    }
+
+    pub fn jobs(&self) -> & Jobs {
+        &self.jobs
+    }
+    
+    pub fn jobs_mut(&mut self) -> &mut Jobs {
+        &mut self.jobs
     }
 
     pub fn get_files(&self) -> HashMap<String, PathBuf> {
@@ -174,14 +185,14 @@ impl Configurations {
                 self.add_dir(path_string.to_owned(), price)?;
             }
             if path.is_file() {
-                self.add_file(path_string.to_owned(), price)
+                self.add_file(path_string.to_owned(), price);
             }
         }
         Ok(())
     }
 
     // add a single file to the list
-    pub fn add_file(&mut self, file: String, price: i64) {
+    pub fn add_file(&mut self, file: String, price: i64) -> String {
         // hash the file
         let hash = match self.get_hash(file.clone()) {
             Ok(hash) => hash,
@@ -191,7 +202,8 @@ impl Configurations {
         };
 
         self.props.files.insert(hash.clone(), PathBuf::from(file));
-        self.props.prices.insert(hash, price);
+        self.props.prices.insert(hash.clone(), price);
+        hash
     }
 
     // cli command to add a file/dir to the list
