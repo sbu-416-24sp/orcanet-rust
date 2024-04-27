@@ -1,8 +1,12 @@
 pub mod encode;
 pub mod http;
 
+use std::fmt::Write;
+
 use anyhow::Result;
 use proto::market::User;
+
+use crate::peer::MarketClient;
 
 use self::http::GetFileResponse;
 
@@ -16,7 +20,7 @@ pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Res
         if let Err(e) = writeln!(
             &mut producer_list,
             "Producer:\n  id: {}\n  Price: {}\n",
-            encoded_producer, producer.price
+            encoded_producer.as_str(), producer.price
         ) {
             eprintln!("Failed to write producer: {}", e);
             return Err(anyhow::anyhow!("Failed to write producer"));

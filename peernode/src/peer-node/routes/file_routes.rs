@@ -51,10 +51,10 @@ async fn find_peer(
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
                     serde_json::to_string(&FindPeerRet {
-                        peers: res
+                        peers: res.holders
                             .into_iter()
                             .map(|user| Peer {
-                                peerId: user.username,
+                                peerId: user.id,
                                 ip: user.ip.to_string(),
                                 region: "US".into(),
                                 price: user.price as f64,
@@ -93,7 +93,7 @@ async fn get_file_info(
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
-    config.set_token(producer.to_string(), ret_token.clone());
+    //config.set_token(producer.to_string(), ret_token.clone());
 
     // Build and return the response
     Response::builder()
@@ -122,7 +122,6 @@ async fn upload_file(
     let price = 416;
 
     let hash = config.add_file(file.filePath, price);
-
 
     Response::builder()
         .status(StatusCode::OK)

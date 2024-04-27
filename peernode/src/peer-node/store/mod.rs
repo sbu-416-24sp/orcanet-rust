@@ -1,6 +1,8 @@
-use crate::{peer::MarketClient, producer::jobs::Jobs};
-use crate::producer;
-use crate::{consumer::encode::EncodedUser, peer::MarketClient};
+use crate::{
+    consumer::encode::EncodedUser,
+    peer::MarketClient,
+    producer::{self, jobs::Jobs},
+};
 use anyhow::Result;
 use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
@@ -75,7 +77,7 @@ impl Configurations {
             },
             http_client: None,
             market_client: None,
-            jobs: Jobs::new()
+            jobs: Jobs::new(),
         };
         default.write();
         default
@@ -110,10 +112,10 @@ impl Configurations {
         Ok(hash)
     }
 
-    pub fn jobs(&self) -> & Jobs {
+    pub fn jobs(&self) -> &Jobs {
         &self.jobs
     }
-    
+
     pub fn jobs_mut(&mut self) -> &mut Jobs {
         &mut self.jobs
     }

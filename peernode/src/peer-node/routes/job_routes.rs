@@ -122,10 +122,7 @@ async fn remove_from_history(
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
 
-    let successful = config
-        .jobs_mut()
-        .remove_job_from_history(&job.jobID)
-        .await;
+    let successful = config.jobs_mut().remove_job_from_history(&job.jobID).await;
 
     if !successful {
         return (StatusCode::NOT_FOUND, "Job not found").into_response();

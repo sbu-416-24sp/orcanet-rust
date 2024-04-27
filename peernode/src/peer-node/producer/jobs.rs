@@ -12,7 +12,7 @@ use tokio::{
 };
 
 use crate::{
-    consumer::{encode, get_file_chunk, http::GetFileResponse},
+    consumer::{encode::{self, EncodedUser}, get_file_chunk, http::GetFileResponse},
     store::Configurations,
 };
 
@@ -36,7 +36,7 @@ pub struct Job {
     projected_cost: u64,
     eta: u64, // seconds
     pub peer_id: String,
-    pub encoded_producer: String, // User struct serialized through encode::encode_user
+    pub encoded_producer: EncodedUser,
 }
 
 #[derive(Debug)]
@@ -66,8 +66,7 @@ pub async fn start(job: AsyncJob, token: String) {
     if let JobStatus::Paused(next_chunk) = lock.status {
         let job = job.clone();
         dbg!(&lock);
-        let encoded_producer = lock.encoded_producer.clone();
-        let producer_user = match encode::decode_user(encoded_producer) {
+        let producer_user = match encode::try_decode_user(lock.encoded_producer.as_str()) {
             Ok(user) => user,
             Err(e) => {
                 eprintln!("Failed to decode producer: {}", e);
@@ -173,7 +172,7 @@ impl Jobs {
         file_name: String,
         price: i64,
         peer_id: String,
-        encoded_producer: String,
+        encoded_producer: EncodedUser,
     ) -> String {
         // generate a random job id
         let job_id = rand::thread_rng().gen::<u64>().to_string();

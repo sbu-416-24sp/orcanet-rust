@@ -1,7 +1,7 @@
 mod db;
 pub mod files;
-pub mod jobs;
 mod http;
+pub mod jobs;
 
 use crate::peer::MarketClient;
 use std::collections::HashMap;
