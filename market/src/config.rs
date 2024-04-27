@@ -120,7 +120,7 @@ impl ConfigBuilder {
     }
 
     #[inline(always)]
-    pub fn set_bootstrap_time(mut self, time: Duration) -> Self {
+    pub const fn set_bootstrap_time(mut self, time: Duration) -> Self {
         self.bootstrap_time = Some(time);
         self
     }
