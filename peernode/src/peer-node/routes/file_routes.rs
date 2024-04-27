@@ -30,46 +30,6 @@ struct Peer {
     region: String,
     price: f64,
 }
-// Finds all peers hosting a given file
-async fn find_peer(
-    State(state): State<ServerState>,
-    Path(fileHash): Path<String>,
-) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
-
-    let market_client = match config.get_market_client().await {
-        Ok(client) => client,
-        Err(_) => {
-            eprintln!("No market client initialized");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
-        }
-    };
-    match market_client.check_holders(fileHash).await {
-        Ok(res) => {
-            return Response::builder()
-                .status(StatusCode::OK)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(
-                    serde_json::to_string(&FindPeerRet {
-                        peers: res.holders
-                            .into_iter()
-                            .map(|user| Peer {
-                                peerId: user.id,
-                                ip: user.ip.to_string(),
-                                region: "US".into(),
-                                price: user.price as f64,
-                            })
-                            .collect(),
-                    })
-                    .unwrap(),
-                ))
-                .unwrap()
-        }
-        _ => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
-        }
-    }
-}
 
 // GetFileInfo - Fetches files info from a given hash/CID. Should return name, size, # of peers, whatever other info you can give.
 // TODO: update to the new spec on the doc
@@ -147,7 +107,6 @@ pub fn routes() -> Router<ServerState> {
     Router::new()
         // [Bubble Guppies]
         // ## Market Page
-        .route("/find-peer/:fileHash", get(find_peer))
         //.route("/file/:hash", get(get_file))
         .route("/upload", post(upload_file))
         .route("/file/:hash/info", get(get_file_info))

@@ -7,8 +7,6 @@ mod routes {
     pub mod bubble_guppies;
     pub mod manta;
     pub mod sea_pig;
-    pub mod file_routes;
-    pub mod job_routes;
 }
 
 use axum::Router;
@@ -34,8 +32,6 @@ async fn main() {
     };
 
     let app = Router::new()
-        .merge(routes::file_routes::routes())
-        .merge(routes::job_routes::routes())
         .merge(routes::bubble_guppies::routes())
         .merge(routes::manta::routes())
         .merge(routes::sea_pig::routes())

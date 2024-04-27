@@ -150,7 +150,7 @@ impl Configurations {
     pub fn get_public_address(&self) -> Option<Multiaddr> {
         self.props.public_address.clone()
     }
-    
+
     pub fn get_theme(&self) -> Theme {
         self.props.theme
     }
@@ -186,7 +186,7 @@ impl Configurations {
         self.props.public_address = public_address;
         self.write();
     }
-    
+
     pub fn set_theme(&mut self, theme: Theme) {
         self.props.theme = theme;
         self.write();

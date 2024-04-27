@@ -12,7 +12,11 @@ use tokio::{
 };
 
 use crate::{
-    consumer::{encode::{self, EncodedUser}, get_file_chunk, http::GetFileResponse},
+    consumer::{
+        encode::{self, EncodedUser},
+        get_file_chunk,
+        http::GetFileResponse,
+    },
     store::Configurations,
 };
 

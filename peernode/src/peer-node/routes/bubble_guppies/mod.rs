@@ -1,8 +1,11 @@
-pub mod market;
-pub mod settings;
+mod market;
+mod history;
+mod jobs;
+mod files;
+mod settings;
 
-use axum::Router;
 use crate::ServerState;
+use axum::Router;
 
 pub fn routes() -> Router<ServerState> {
     Router::new()

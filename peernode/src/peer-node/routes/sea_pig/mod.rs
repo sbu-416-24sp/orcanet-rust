@@ -1,8 +1,8 @@
 pub mod home;
 pub mod peer;
 
-use axum::Router;
 use crate::ServerState;
+use axum::Router;
 
 pub fn routes() -> Router<ServerState> {
     Router::new()

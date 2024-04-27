@@ -12,14 +12,16 @@ use serde::Deserialize;
 
 use crate::{consumer::encode, producer, ServerState};
 
+///
+/// JOBS ENDPOINTS
+///
+
 #[derive(Deserialize)]
 struct AddJob {
     fileHash: String,
     peerId: String,
 }
-// AddJob - Adds a job to the producer's job queue
-// takes in a fileHash and peerID.
-// returns a jobId of the newly created job
+// returns { jobId: JobID }
 async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> impl IntoResponse {
     let mut config = state.config.lock().await;
 
@@ -64,6 +66,55 @@ async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> i
     //    .unwrap()
 }
 
+// returns all peers hosting a given file
+#[allow(non_snake_case)]
+struct Peer {
+    peerID: String,
+    ip: String,
+    region: String,
+    price: f64,
+}
+async fn find_peer(
+    State(state): State<ServerState>,
+    Path(fileHash): Path<String>,
+) -> impl IntoResponse {
+    let mut config = state.config.lock().await;
+    let response = match config.get_market_client().await {
+        Ok(market) => match market.check_holders(fileHash).await {
+            Ok(holders) => holders,
+            Err(_) => {
+                return (StatusCode::SERVICE_UNAVAILABLE, "Could not check holders").into_response()
+            }
+        },
+        Err(_) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Could not connect to market",
+            )
+                .into_response()
+        }
+    };
+    let peers = response.holders.into_iter().map(|user| Peer {
+        peerID: user.id,
+        ip: user.ip,
+        region: "US".into(),
+        price: user.price as f64,
+    });
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::from(format!(
+            r#"
+{{"peers": "{peers:?}"}}
+"#,
+        )))
+        .unwrap()
+}
+
+// AddJob - Adds a job to the producer's job queue
+// takes in a fileHash and peerID.
+// returns a jobId of the newly created job
+
 // Get Job - Adds a job to the producer's job queue
 // returns a list of jobs
 async fn get_job_list(State(state): State<ServerState>) -> impl IntoResponse {
@@ -100,41 +151,6 @@ async fn get_job_info(
 
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
-struct RemoveFromHistory {
-    jobID: String,
-}
-// Remove From History
-async fn remove_from_history(
-    State(state): State<ServerState>,
-    Json(job): Json<RemoveFromHistory>,
-) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
-
-    let successful = config.jobs_mut().remove_job_from_history(&job.jobID).await;
-
-    if !successful {
-        return (StatusCode::NOT_FOUND, "Job not found").into_response();
-    }
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .body(Body::from("Job successfully removed from history"))
-        .unwrap()
-}
-
-// Clear History
-async fn clear_history(State(state): State<ServerState>) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
-    config.jobs_mut().clear_job_history().await;
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .body(Body::from("History cleared"))
-        .unwrap()
-}
-
-#[derive(Deserialize)]
-#[allow(non_snake_case)]
 struct StartJobIds {
     jobIDs: Vec<String>,
 }
@@ -158,11 +174,8 @@ async fn start_jobs(
 
 pub fn routes() -> Router<ServerState> {
     Router::new()
-        // [Bubble Guppies]
-        // ## Market Page
-        .route("/remove-from-history", put(remove_from_history))
-        .route("/clear-history", put(clear_history))
         .route("/add-job", put(add_job))
+        .route("/find-peer/:fileHash", get(find_peer))
         .route("/job-list", get(get_job_list))
         .route("/job-info/:jobID", get(get_job_info))
         .route("/start-jobs", put(start_jobs))
