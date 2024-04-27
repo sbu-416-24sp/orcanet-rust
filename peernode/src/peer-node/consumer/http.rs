@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use orcanet_market::SupplierInfo;
+use proto::market::User;
 
 use std::time::Instant;
 use tokio::fs::OpenOptions;
@@ -11,7 +11,7 @@ pub enum GetFileResponse {
 }
 
 pub async fn get_file_chunk(
-    producer: SupplierInfo,
+    producer: User,
     file_hash: String,
     token: String,
     chunk: u64,
@@ -19,16 +19,16 @@ pub async fn get_file_chunk(
     let start = Instant::now();
     // Get the link to the file
     let link = format!(
-        "http://{}:{}/file/{}?chunk={}",
-        producer.ip, producer.port, file_hash, chunk
+        "http://{}:{}/file/{file_hash}?chunk={chunk}",
+        producer.ip, producer.port
     );
-    println!("HTTP: Fetching file chunk from {}", link);
+    println!("HTTP: Fetching file chunk from {link}");
 
     // Fetch the file from the producer
     let client = reqwest::Client::new();
     let res = client
         .get(&link)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .send()
         .await?;
 
@@ -60,7 +60,7 @@ pub async fn get_file_chunk(
 
     // Save the file to disk
     let file = res.bytes().await?;
-    let file_path = format!("download/{}", file_name);
+    let file_path = format!("download/{file_name}");
     let mut download = OpenOptions::new()
         .create(true)
         .append(true)
@@ -70,9 +70,7 @@ pub async fn get_file_chunk(
     download.write_all(&file).await?;
     let duration = start.elapsed();
     println!(
-        "HTTP: Chunk [{}] saved to {} [{} ms]",
-        chunk,
-        file_name,
+        "HTTP: Chunk [{chunk}] saved to {file_name} [{} ms]",
         duration.as_millis()
     );
     Ok(GetFileResponse::Token(auth_token.to_string()))

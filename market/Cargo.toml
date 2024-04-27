@@ -40,6 +40,7 @@ tokio = { version = "1.36.0", features = [
   "time",
 ] }
 serde = { version = "1.0.130", features = ["derive"] }
+proto = { path = "../proto"}
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

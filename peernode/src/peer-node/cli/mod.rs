@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use crate::consumer;
+use crate::consumer::encode;
 use crate::producer;
 use crate::store;
 
@@ -290,6 +291,12 @@ pub async fn handle_arg_matches(
                         Some(producer) => producer.clone(),
                         None => Err(anyhow!("No producer provided"))?,
                     };
+                    let producer_user = match encode::try_decode_user(&producer) {
+                        Ok(user) => user,
+                        Err(e) => Err(anyhow::anyhow!("Failed to decode producer: {e}"))?,
+                    };
+                    let producer = encode::verify_encoding(&producer)
+                        .expect("We just successfully decoded it.");
                     let chunk_num = match get_matches.get_one::<u64>("CHUNK_NUM") {
                         Some(chunk_num) => *chunk_num,
                         None => 0,
@@ -300,7 +307,7 @@ pub async fn handle_arg_matches(
                     };
                     let token = config.get_token(producer.clone());
                     let ret_token = match consumer::get_file(
-                        producer.clone(),
+                        producer_user,
                         file_hash,
                         token,
                         chunk_num,
@@ -348,8 +355,9 @@ pub async fn handle_arg_matches(
                         }
                     }
                     None => {
-                        println!("Using existing boot nodes {:?}", config.get_boot_nodes());
-                        config.get_boot_nodes()
+                        let boot_nodes = config.get_boot_nodes();
+                        println!("Using existing boot nodes {boot_nodes:?}");
+                        boot_nodes
                     }
                 };
                 let public_address = match set_matches.get_many::<String>("PUBLIC_ADDRESS") {
@@ -375,11 +383,9 @@ pub async fn handle_arg_matches(
                         }
                     }
                     None => {
-                        println!(
-                            "Using existing public address {:?}",
-                            config.get_public_address()
-                        );
-                        config.get_public_address()
+                        let public_address = config.get_public_address();
+                        println!("Using existing public address {public_address:?}");
+                        public_address
                     }
                 };
                 config.set_boot_nodes(boot_nodes);

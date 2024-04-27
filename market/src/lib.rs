@@ -16,7 +16,6 @@ pub use libp2p::{
     multiaddr::{multiaddr, Protocol},
     Multiaddr,
 };
-pub use lmm::SupplierInfo;
 
 pub(crate) mod behaviour;
 pub(crate) mod command;

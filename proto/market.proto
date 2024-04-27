@@ -1,0 +1,54 @@
+// keep up to date with spec:
+// https://gist.github.com/snitski/83a603e926c973862370cba1d3cb1e87
+
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option go_package = "orcanet/market/market";
+
+package market;
+
+service Market {
+  // Register a file on the market
+  rpc RegisterFile (RegisterFileRequest) returns (google.protobuf.Empty) {}
+
+  // Check for holders of a file. returns a list of users
+  rpc CheckHolders (CheckHoldersRequest) returns (HoldersResponse) {}
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+
+  string ip = 3;
+  int32 port = 4;
+
+  // Price per MB for a file
+  int64 price = 5;
+}
+
+message FileInfo {
+  string fileHash = 1;
+  repeated string chunkHashes = 2;
+
+  // Size of the file in Bytes
+  int64 fileSize = 3;
+  string fileName = 4;
+}
+
+message CheckHoldersRequest {
+  // Hash of FileInfo
+  string fileKey = 1; 
+}
+
+message RegisterFileRequest {
+  User user = 1;
+  // Hash of FileInfo
+  string fileKey = 2;
+}
+
+message HoldersResponse {
+  FileInfo fileInfo = 1;
+  repeated User holders = 2;
+}

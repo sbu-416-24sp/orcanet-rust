@@ -3,8 +3,7 @@ use libp2p::{request_response::Event, Swarm};
 use crate::{
     behaviour::Behaviour,
     command::QueryHandler,
-    lmm::{FileHash, LocalMarketMap},
-    SupplierInfo,
+    lmm::{FileInfoHash, LocalMarketMap, SupplierInfo},
 };
 
 use super::EventHandler;
@@ -30,7 +29,7 @@ impl<'a> ReqResHandler<'a> {
 }
 
 impl<'a> EventHandler for ReqResHandler<'a> {
-    type Event = Event<FileHash, SupplierInfo>;
+    type Event = Event<FileInfoHash, SupplierInfo>;
 
     fn handle_event(&mut self, event: Self::Event) {
         match event {

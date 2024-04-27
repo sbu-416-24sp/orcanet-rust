@@ -2,18 +2,15 @@ pub mod encode;
 pub mod http;
 
 use anyhow::Result;
-use orcanet_market::SupplierInfo;
-use std::fmt::Write;
-
-use crate::peer::MarketClient;
+use proto::market::User;
 
 use self::http::GetFileResponse;
 
 // list every producer who holds the file hash I want
 pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Result<String> {
-    let producers = client.check_holders(file_hash.clone()).await?;
+    let response = client.check_holders(file_hash.clone()).await?;
     let mut producer_list = String::new();
-    for producer in producers {
+    for producer in response.holders {
         // serialize the producer struct to a string
         let encoded_producer = encode::encode_user(&producer);
         if let Err(e) = writeln!(
@@ -26,7 +23,8 @@ pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Res
         }
         println!(
             "Producer:\n  id: {}\n  Price: {}",
-            encoded_producer, producer.price
+            encoded_producer.as_str(),
+            producer.price
         );
     }
     Ok(producer_list)
@@ -34,24 +32,17 @@ pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Res
 
 // get file I want by hash from producer
 pub async fn get_file(
-    producer: String,
+    user: User,
     file_hash: String,
     token: String,
     chunk: u64,
     continue_download: bool,
 ) -> Result<String> {
-    let producer_user = match encode::decode_user(producer.clone()) {
-        Ok(user) => user,
-        Err(e) => {
-            eprintln!("Failed to decode producer: {}", e);
-            return Err(anyhow::anyhow!("Failed to decode producer"));
-        }
-    };
     let mut chunk_num = chunk;
     let mut return_token = String::from(token);
     loop {
         match get_file_chunk(
-            producer_user.clone(),
+            user.clone(),
             file_hash.clone(),
             return_token.clone(),
             chunk_num,
@@ -83,7 +74,7 @@ pub async fn get_file(
 
 // get individual chunk of file from producer by hash
 pub async fn get_file_chunk(
-    producer: SupplierInfo,
+    producer: User,
     file_hash: String,
     token: String,
     chunk: u64,
