@@ -1,5 +1,5 @@
-use crate::peer::MarketClient;
 use crate::producer;
+use crate::{consumer::encode::EncodedUser, peer::MarketClient};
 use anyhow::Result;
 use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
@@ -21,7 +21,7 @@ pub struct Properties {
     market: String,
     files: HashMap<String, PathBuf>,
     prices: HashMap<String, i64>,
-    tokens: HashMap<String, String>,
+    tokens: HashMap<EncodedUser, String>,
     port: String,
     // market config
     boot_nodes: Option<BootNodes>,
@@ -126,7 +126,7 @@ impl Configurations {
         self.props.public_address.clone()
     }
 
-    pub fn get_token(&mut self, producer_id: String) -> String {
+    pub fn get_token(&mut self, producer_id: EncodedUser) -> String {
         match self.props.tokens.get(&producer_id).cloned() {
             Some(token) => token,
             None => {
@@ -138,7 +138,7 @@ impl Configurations {
         }
     }
 
-    pub fn set_token(&mut self, producer_id: String, token: String) {
+    pub fn set_token(&mut self, producer_id: EncodedUser, token: String) {
         self.props.tokens.insert(producer_id, token);
         self.write();
     }
@@ -155,6 +155,7 @@ impl Configurations {
 
     pub fn set_public_address(&mut self, public_address: Option<Multiaddr>) {
         self.props.public_address = public_address;
+        self.write();
     }
 
     // add every file in the directory to the list

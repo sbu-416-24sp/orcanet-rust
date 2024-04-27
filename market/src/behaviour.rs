@@ -9,7 +9,7 @@ use libp2p::{
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour},
 };
 
-use crate::{lmm::FileHash, SupplierInfo};
+use crate::lmm::{FileInfoHash, SupplierInfo};
 
 // TODO: maybe do somethign with toggle in future?
 
@@ -22,5 +22,5 @@ pub(crate) struct Behaviour {
     pub(crate) relay_server: Toggle<RelayServerBehaviour>,
     pub(crate) dcutr: Toggle<DcutrBehaviour>,
     pub(crate) relay_client: Toggle<RelayClientBehaviour>,
-    pub(crate) req_res: CborReqResBehaviour<FileHash, SupplierInfo>,
+    pub(crate) req_res: CborReqResBehaviour<FileInfoHash, SupplierInfo>,
 }
