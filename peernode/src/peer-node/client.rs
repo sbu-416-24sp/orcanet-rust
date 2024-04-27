@@ -20,6 +20,9 @@ async fn main() {
     let cli = cli();
     // Load the configuration
     let mut config = store::Configurations::new().await;
+    
+    // Run market client if it was previously configured
+    let _ = config.get_market_client().await;
 
     // check if there are any arguments passed to the program
     // if there are, process them and then exit
