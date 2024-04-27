@@ -5,7 +5,7 @@ use crate::peer::MarketClient;
 use anyhow::Result;
 use proto::market::User;
 
-use self::http::GetFileResponse;
+use self::{encode::EncodedUser, http::GetFileResponse};
 
 // list every producer who holds the file hash I want
 pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Result<()> {
@@ -15,7 +15,7 @@ pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Res
         let encoded_producer = encode::encode_user(&producer);
         println!(
             "Producer:\n  id: {}\n  Price: {}",
-            encoded_producer, producer.price
+            encoded_producer.as_str(), producer.price
         );
     }
     Ok(())
@@ -23,13 +23,13 @@ pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Res
 
 // get file I want by hash from producer
 pub async fn get_file(
-    producer: String,
+    encoded_producer: String,
     file_hash: String,
     token: String,
     chunk: u64,
     continue_download: bool,
 ) -> Result<String> {
-    let producer_user = match encode::decode_user(producer.clone()) {
+    let producer_user = match encode::decode_user(&encoded_producer) {
         Ok(user) => user,
         Err(e) => {
             eprintln!("Failed to decode producer: {}", e);
