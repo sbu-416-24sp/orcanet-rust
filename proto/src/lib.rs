@@ -3,7 +3,7 @@ pub mod market {
 
     use sha2::{Digest, Sha256};
     use std::hash::{Hash, Hasher};
-    
+
     // this is unnecessary I think
     impl Hash for FileInfo {
         fn hash<H: Hasher>(&self, state: &mut H) {
@@ -31,5 +31,4 @@ pub mod market {
             format!("{:x}", sha256.finalize())
         }
     }
-
 }
