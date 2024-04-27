@@ -5,5 +5,5 @@ use crate::ServerState;
 use axum::Router;
 
 pub fn routes() -> Router<ServerState> {
-    Router::new()
+    Router::new().merge(home::routes())
 }
