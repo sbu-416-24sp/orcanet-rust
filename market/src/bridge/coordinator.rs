@@ -1,10 +1,14 @@
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, time::Duration};
 
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::{multiaddr::Protocol, Multiaddr, Swarm};
 use log::error;
-use tokio::{select, sync::mpsc};
+use tokio::{
+    select,
+    sync::mpsc,
+    time::{interval, Interval},
+};
 
 use crate::{
     behaviour::Behaviour,
@@ -20,6 +24,7 @@ pub(super) struct Coordinator {
     lmm: LocalMarketMap,
     boot_nodes: Option<BootNodes>,
     command_receiver: mpsc::UnboundedReceiver<Message>,
+    bootstrap_interval: Interval,
 }
 
 impl Coordinator {
@@ -29,6 +34,7 @@ impl Coordinator {
         boot_nodes: Option<BootNodes>,
         peer_tcp_port: u16,
         command_receiver: mpsc::UnboundedReceiver<Message>,
+        bootstrap_time: Duration,
     ) -> Result<Self> {
         let listen_addr = Multiaddr::from(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
             .with(Protocol::Tcp(peer_tcp_port));
@@ -57,6 +63,7 @@ impl Coordinator {
             query_handler: Default::default(),
             swarm,
             command_receiver,
+            bootstrap_interval: interval(bootstrap_time),
         })
     }
 

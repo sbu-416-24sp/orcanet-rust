@@ -34,6 +34,7 @@ pub fn spawn(config: Config) -> Result<Peer, BridgeError> {
         coordinator_thread_name,
         file_ttl,
         public_address,
+        bootstrap_time,
     } = config;
 
     // TODO: use the zeroize crate for zeroing memory after move of public/priv key
@@ -120,6 +121,7 @@ pub fn spawn(config: Config) -> Result<Peer, BridgeError> {
                     boot_nodes,
                     peer_tcp_port,
                     command_receiver,
+                    bootstrap_time,
                 );
                 match maybe_coordinator {
                     Ok(coordinator) => {
