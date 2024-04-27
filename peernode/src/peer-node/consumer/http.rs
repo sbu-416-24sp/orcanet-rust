@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use orcanet_market::SupplierInfo;
+use proto::market::User;
 
 use std::time::Instant;
 use tokio::fs::OpenOptions;
@@ -11,7 +11,7 @@ pub enum GetFileResponse {
 }
 
 pub async fn get_file_chunk(
-    producer: SupplierInfo,
+    producer: User,
     file_hash: String,
     token: String,
     chunk: u64,

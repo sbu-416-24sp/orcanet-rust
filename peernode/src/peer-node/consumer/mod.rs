@@ -3,14 +3,14 @@ pub mod http;
 
 use crate::peer::MarketClient;
 use anyhow::Result;
-use orcanet_market::SupplierInfo;
+use proto::market::User;
 
 use self::http::GetFileResponse;
 
 // list every producer who holds the file hash I want
 pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Result<()> {
-    let producers = client.check_holders(file_hash).await?;
-    for producer in producers {
+    let response = client.check_holders(file_hash).await?;
+    for producer in response.holders {
         // serialize the producer struct to a string
         let encoded_producer = encode::encode_user(&producer);
         println!(
@@ -72,7 +72,7 @@ pub async fn get_file(
 
 // get individual chunk of file from producer by hash
 pub async fn get_file_chunk(
-    producer: SupplierInfo,
+    producer: User,
     file_hash: String,
     token: String,
     chunk: u64,

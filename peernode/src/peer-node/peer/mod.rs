@@ -1,4 +1,6 @@
-use orcanet_market::{bridge::spawn, Config, Peer, SupplierInfo};
+use orcanet_market::{bridge::spawn, Config, Peer};
+
+use proto::market::{FileInfo, HoldersResponse, User};
 
 use anyhow::Result;
 
@@ -17,7 +19,7 @@ impl MarketClient {
     }
 
     // Get a list of producers for a given file hash
-    pub async fn check_holders(&mut self, file_hash: String) -> Result<Vec<SupplierInfo>> {
+    pub async fn check_holders(&mut self, file_hash: String) -> Result<HoldersResponse> {
         todo!()
         // println!("gRPC: Checking holders for file hash {}", file_hash);
         // let request = CheckHoldersRequest { file_hash };
