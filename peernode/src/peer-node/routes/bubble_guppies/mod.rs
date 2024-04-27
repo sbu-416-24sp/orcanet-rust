@@ -6,4 +6,6 @@ use crate::ServerState;
 
 pub fn routes() -> Router<ServerState> {
     Router::new()
+        .merge(market::routes())
+        .merge(settings::routes())
 }

@@ -31,6 +31,16 @@ pub struct Properties {
     boot_nodes: Option<BootNodes>,
     public_address: Option<Multiaddr>,
     // wallet: String, // not sure about implementation details, will revisit later
+    theme: Theme,
+}
+
+// ok whatever just add it
+#[allow(non_camel_case_types)]
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Theme {
+    #[default]
+    dark,
+    light,
 }
 
 // TODO: Put prices and path attached to the same hash in config file, and then construct the hashmaps from that
@@ -74,6 +84,7 @@ impl Configurations {
                 port: "8080".to_string(),
                 boot_nodes: None,
                 public_address: None,
+                theme: Theme::dark,
             },
             http_client: None,
             market_client: None,
@@ -139,6 +150,10 @@ impl Configurations {
     pub fn get_public_address(&self) -> Option<Multiaddr> {
         self.props.public_address.clone()
     }
+    
+    pub fn get_theme(&self) -> Theme {
+        self.props.theme
+    }
 
     pub fn get_token(&mut self, producer_id: EncodedUser) -> String {
         match self.props.tokens.get(&producer_id).cloned() {
@@ -169,6 +184,11 @@ impl Configurations {
 
     pub fn set_public_address(&mut self, public_address: Option<Multiaddr>) {
         self.props.public_address = public_address;
+        self.write();
+    }
+    
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.props.theme = theme;
         self.write();
     }
 

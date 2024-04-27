@@ -98,18 +98,6 @@ async fn get_job_info(
         .unwrap()
 }
 
-// Get History
-async fn get_history(State(state): State<ServerState>) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
-    let history = config.jobs_mut().get_job_history().await;
-
-    let history_json = serde_json::to_string(&history).unwrap();
-    Response::builder()
-        .status(StatusCode::OK)
-        .body(Body::from(format!("{{\"jobs\": \"{:?}\"}}", history_json)))
-        .unwrap()
-}
-
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
 struct RemoveFromHistory {
@@ -172,7 +160,6 @@ pub fn routes() -> Router<ServerState> {
     Router::new()
         // [Bubble Guppies]
         // ## Market Page
-        .route("/get-history", get(get_history))
         .route("/remove-from-history", put(remove_from_history))
         .route("/clear-history", put(clear_history))
         .route("/add-job", put(add_job))
