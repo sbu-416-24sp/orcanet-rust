@@ -43,6 +43,24 @@ pub struct Job {
     pub encoded_producer: EncodedUser,
 }
 
+impl Job {
+    pub fn pause(&mut self) {
+        if let JobStatus::Active(_) = self.status {
+            self.status = JobStatus::Stop;
+        }
+    }
+    pub fn terminate(&mut self) {
+        match &mut self.status {
+            JobStatus::Active(handle) => {
+                handle.abort();
+                self.status = JobStatus::Failed;
+            }
+            JobStatus::Completed => {}
+            _ => self.status = JobStatus::Failed,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum JobStatus {
     Active(JoinHandle<()>),

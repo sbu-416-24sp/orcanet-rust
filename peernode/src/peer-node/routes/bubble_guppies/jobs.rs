@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     consumer::encode::{self, try_decode_user},
-    producer::{self, jobs::JobListItem},
+    producer::{
+        self,
+        jobs::{JobListItem, JobStatus},
+    },
     ServerState,
 };
 
@@ -132,7 +135,6 @@ async fn get_job_list(State(state): State<ServerState>) -> impl IntoResponse {
         .unwrap()
 }
 
-// Get Job Info
 async fn get_job_info(
     State(state): State<ServerState>,
     Path(jobID): Path<String>,
@@ -192,13 +194,12 @@ async fn job_peer_info(
 
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
-struct StartJobIds {
+struct JobIds {
     jobIDs: Vec<String>,
 }
-// Start Jobs
 async fn start_jobs(
     State(state): State<ServerState>,
-    Json(arg): Json<StartJobIds>,
+    Json(arg): Json<JobIds>,
 ) -> impl IntoResponse {
     for job_id in arg.jobIDs {
         let mut config = state.config.lock().await;
@@ -213,6 +214,58 @@ async fn start_jobs(
     StatusCode::OK.into_response()
 }
 
+async fn pause_jobs(
+    State(state): State<ServerState>,
+    Json(arg): Json<JobIds>,
+) -> impl IntoResponse {
+    let mut num_failed = 0;
+    for job_id in arg.jobIDs {
+        let config = state.config.lock().await;
+        match config.jobs().get_job(&job_id).await {
+            Some(job) => {
+                let mut lock = job.lock().await;
+                lock.pause();
+            }
+            None => num_failed += 1,
+        }
+    }
+    if num_failed > 0 {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Failed to find {num_failed} jobs"),
+        )
+            .into_response()
+    } else {
+        (StatusCode::OK, Body::empty()).into_response()
+    }
+}
+
+async fn terminate_jobs(
+    State(state): State<ServerState>,
+    Json(arg): Json<JobIds>,
+) -> impl IntoResponse {
+    let mut num_failed = 0;
+    for job_id in arg.jobIDs {
+        let config = state.config.lock().await;
+        match config.jobs().get_job(&job_id).await {
+            Some(job) => {
+                let mut lock = job.lock().await;
+                lock.terminate();
+            }
+            None => num_failed += 1,
+        }
+    }
+    if num_failed > 0 {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Failed to find {num_failed} jobs"),
+        )
+            .into_response()
+    } else {
+        (StatusCode::OK, Body::empty()).into_response()
+    }
+}
+
 pub fn routes() -> Router<ServerState> {
     Router::new()
         .route("/add-job", put(add_job))
@@ -221,4 +274,6 @@ pub fn routes() -> Router<ServerState> {
         .route("/job-info/:jobID", get(get_job_info))
         .route("/job-peer/:jobId", get(job_peer_info))
         .route("/start-jobs", put(start_jobs))
+        .route("/pause-jobs", put(pause_jobs))
+        .route("/terminate-jobs", put(terminate_jobs))
 }

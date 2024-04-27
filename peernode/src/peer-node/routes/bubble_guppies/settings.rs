@@ -27,7 +27,7 @@ async fn set_settings(
 
     Response::builder()
         .status(StatusCode::OK)
-        .body(Body::from(()))
+        .body(Body::empty())
         .unwrap()
 }
 
