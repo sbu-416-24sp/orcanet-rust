@@ -67,7 +67,7 @@ impl MarketClient {
     }
 
     // Get a list of producers for a given file hash
-    pub async fn check_holders(&mut self, file_hash: String) -> Result<HoldersResponse> {
+    pub async fn check_holders(&mut self, file_info_hash: FileInfoHash) -> Result<HoldersResponse> {
         return Ok(HoldersResponse {
             file_info: Some(FileInfo {
                 file_hash: "x".into(),
@@ -95,12 +95,9 @@ impl MarketClient {
     // Register a new producer
     pub async fn register_file(
         &mut self,
-        id: String,
-        name: String,
-        ip: String,
-        port: i32,
-        price: i64,
+        user: User,
         file_info_hash: FileInfoHash,
+        file_info: FileInfo,
     ) -> Result<()> {
         todo!()
         // let user = User {
