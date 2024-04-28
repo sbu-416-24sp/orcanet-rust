@@ -13,7 +13,11 @@ use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
 use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive()]
 pub struct Configurations {

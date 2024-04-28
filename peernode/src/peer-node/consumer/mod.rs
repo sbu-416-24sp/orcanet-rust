@@ -69,9 +69,7 @@ pub async fn get_file(
                 }
                 chunk_num += 1;
             }
-            Err(e) => {
-                Err(anyhow::anyhow!("Failed to download chunk {chunk_num}: {e}"))?
-            }
+            Err(e) => Err(anyhow::anyhow!("Failed to download chunk {chunk_num}: {e}"))?,
         }
         if continue_download == false {
             return Ok(return_token);
