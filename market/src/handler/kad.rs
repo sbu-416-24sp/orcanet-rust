@@ -27,7 +27,7 @@ impl<'a> KadHandler<'a> {
         }
     }
 
-    fn handle_inbound_request(&mut self, request: InboundRequest) {
+    fn handle_inbound_request(&self, request: InboundRequest) {
         match request {
             InboundRequest::FindNode { num_closer_peers } => {
                 warn!("[Kademlia] - FindNode request received and handled");
