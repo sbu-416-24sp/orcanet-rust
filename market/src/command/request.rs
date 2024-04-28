@@ -11,7 +11,7 @@ pub(crate) enum Request {
     Listeners,
     ConnectedPeers,
     ConnectedTo { peer_id: PeerId },
-    KadRequest(KadRequest),
+    Kad(KadRequest),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]

@@ -261,7 +261,7 @@ impl<'a> CommandRequestHandler for Handler<'a> {
                 let connected = self.swarm.is_connected(&peer_id);
                 send_ok!(responder, SuccessfulResponse::ConnectedTo { connected });
             }
-            Request::KadRequest(kad_request) => {
+            Request::Kad(kad_request) => {
                 let mut handler = KadHandler::new(self.swarm, self.lmm, self.query_handler);
                 handler.handle_command(kad_request, responder);
             }
