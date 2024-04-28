@@ -32,7 +32,11 @@ async fn get_file_info(
         Ok(market) => match market.check_holders(FileInfoHash(hash)).await {
             Ok(holders) => holders,
             Err(e) => {
-                return (StatusCode::SERVICE_UNAVAILABLE, format!("Could not check holders: {e}")).into_response()
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    format!("Could not check holders: {e}"),
+                )
+                    .into_response()
             }
         },
         Err(_) => {
@@ -101,14 +105,12 @@ async fn delete_file(
     }
 }
 
-
 pub fn routes() -> Router<ServerState> {
     Router::new()
         .route("/file/:hash/info", get(get_file_info))
         .route("/upload", post(upload_file))
         .route("/file/:hash", delete(delete_file))
 }
-
 
 /// TESTS
 
