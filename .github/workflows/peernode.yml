@@ -50,8 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Start server and run tests
+      working-directory: peernode
       run: |
-        cd peernode &&
         cargo run --bin peer-node-server -F test_local_market &
         sleep 5 &&
         cargo test api_test --verbose -- --ignored
