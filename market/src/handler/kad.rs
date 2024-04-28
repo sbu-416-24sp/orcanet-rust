@@ -109,10 +109,7 @@ impl<'a> KadHandler<'a> {
             }
             QueryResult::GetProviders(_) => todo!(),
             QueryResult::StartProviding(_) => todo!(),
-            QueryResult::RepublishProvider(_) => todo!(),
-            QueryResult::GetRecord(_) => todo!(),
-            QueryResult::PutRecord(_) => todo!(),
-            QueryResult::RepublishRecord(_) => todo!(),
+            _ => {}
         }
     }
 }
