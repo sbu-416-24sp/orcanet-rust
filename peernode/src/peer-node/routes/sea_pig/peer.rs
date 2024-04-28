@@ -29,27 +29,42 @@ async fn get_peer(
     Path(peer_id): Path<String>,
 ) -> impl IntoResponse {
     let config = state.config.lock().await;
+    let peer_info = config.get_peer(&peer_id);
+    match peer_info {
+        Some(peer_info) => {
+            let peer_info = PeerInfo {
+                Location: "US".into(),
+                Latency: "999ms".into(),
+                PeerID: peer_id,
+                Connection: "connected".into(),
+                OpenStreams: "none".into(),
+            };
 
-    let peer_info = PeerInfo {
-        Location: "US".into(),
-        Latency: "999ms".into(),
-        PeerID: "id".into(),
-        Connection: "connected".into(),
-        OpenStreams: "none".into(),
-    };
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .body(Body::from(
-            serde_json::to_string(&peer_info).expect("to serialize"),
-        ))
-        .unwrap()
+            Response::builder()
+                .status(StatusCode::OK)
+                .body(Body::from(
+                    serde_json::to_string(&peer_info).expect("to serialize"),
+                ))
+                .unwrap()
+        }
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 async fn get_peers(State(state): State<ServerState>) -> impl IntoResponse {
     let config = state.config.lock().await;
 
-    let peers: Vec<PeerInfo> = vec![];
+    let peers: Vec<_> = config
+        .get_peers()
+        .into_iter()
+        .map(|peer| PeerInfo {
+            Location: todo!(),
+            Latency: todo!(),
+            PeerID: peer.id,
+            Connection: todo!(),
+            OpenStreams: todo!(),
+        })
+        .collect();
 
     Response::builder()
         .status(StatusCode::OK)
@@ -63,14 +78,11 @@ async fn remove_peer(
     State(state): State<ServerState>,
     Path(peer_id): Path<String>,
 ) -> impl IntoResponse {
-    let config = state.config.lock().await;
+    let mut config = state.config.lock().await;
 
-    todo!();
-
-    if true {
-        StatusCode::OK.into_response()
-    } else {
-        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove peer").into_response()
+    match config.remove_peer(&peer_id) {
+        Some(_) => StatusCode::OK.into_response(),
+        None => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove peer").into_response(),
     }
 }
 

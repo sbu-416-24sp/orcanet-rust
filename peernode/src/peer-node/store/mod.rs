@@ -7,11 +7,11 @@ use crate::{
         jobs::Jobs,
     },
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
-use proto::market::FileInfoHash;
+use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -21,6 +21,9 @@ pub struct Configurations {
     props: Properties,
     http_client: Option<tokio::task::JoinHandle<()>>,
     market_client: Option<MarketClient>,
+    // and shared state apparently
+    // {Peer Id -> Peer Info}
+    discovered_peers: HashMap<String, PeerInfo>,
     jobs: Jobs,
 }
 
@@ -46,6 +49,12 @@ pub enum Theme {
     #[default]
     dark,
     light,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerInfo {
+    pub id: String,
+    pub user: User,
 }
 
 // TODO: Put prices and path attached to the same hash in config file, and then construct the hashmaps from that
@@ -74,6 +83,7 @@ impl Configurations {
             http_client: None,
             market_client: None,
             jobs: Jobs::new(),
+            discovered_peers: HashMap::new(),
         }
     }
 
@@ -93,6 +103,7 @@ impl Configurations {
             http_client: None,
             market_client: None,
             jobs: Jobs::new(),
+            discovered_peers: HashMap::new(),
         };
         default.write();
         default
@@ -322,5 +333,19 @@ impl Configurations {
         }
         let market_client = self.market_client.as_mut().unwrap(); // safe to unwrap because we just set it
         Ok(market_client)
+    }
+
+    pub fn get_peer(&self, peer_id: &str) -> Option<&PeerInfo> {
+        self.discovered_peers.get(peer_id)
+    }
+    pub fn get_peers(&self) -> Vec<PeerInfo> {
+        self.discovered_peers
+            .values()
+            .clone()
+            .map(|v| v.clone())
+            .collect()
+    }
+    pub fn remove_peer(&mut self, peer_id: &str) -> Option<PeerInfo> {
+        self.discovered_peers.remove(peer_id)
     }
 }

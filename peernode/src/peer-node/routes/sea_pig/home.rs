@@ -86,16 +86,12 @@ async fn delete_file(
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
     match config.remove_file(hash.clone()).await {
-        Ok(_) => {}
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove file").into_response()
-        }
+        Ok(_) => Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from(format!(r#"{{"hash": "{hash}"}}"#)))
+            .unwrap(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove file").into_response(),
     }
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .body(Body::from(format!(r#"{{"hash": "{hash}"}}"#)))
-        .unwrap()
 }
 
 pub fn routes() -> Router<ServerState> {
