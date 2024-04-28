@@ -1,5 +1,5 @@
-use libp2p::{swarm::SwarmEvent, Swarm};
-use log::error;
+use libp2p::{core::ConnectedPoint, swarm::SwarmEvent, Swarm};
+use log::{error, info, warn};
 use tokio::sync::oneshot;
 
 use crate::{
@@ -101,53 +101,144 @@ impl<'a> EventHandler for Handler<'a> {
                 connection_id,
                 endpoint,
                 num_established,
-                concurrent_dial_errors,
                 established_in,
-            } => todo!(),
+                ..
+            } => {
+                match endpoint {
+                    ConnectedPoint::Dialer { address, .. } => {
+                        info!("[Swarm ConnectionId {connection_id}] - Connection established by dialing {peer_id} at {address}");
+                    }
+                    ConnectedPoint::Listener {
+                        local_addr,
+                        send_back_addr,
+                    } => {
+                        info!("[Swarm ConnectionId {connection_id}] - Connection established by listening on {local_addr} from {peer_id}'s {send_back_addr}.");
+                    }
+                };
+                info!("[Swarm ConnectionId {connection_id}] - Connections Established with this peer: {num_established}");
+                info!("[Swarm ConnectionId {connection_id}] - Established in: {established_in:?}");
+            }
             SwarmEvent::ConnectionClosed {
                 peer_id,
                 connection_id,
                 endpoint,
                 num_established,
                 cause,
-            } => todo!(),
+            } => {
+                match endpoint {
+                    ConnectedPoint::Dialer { address, .. } => {
+                        warn!("[Swarm ConnectionId {connection_id}] - Connection closed with {peer_id} at {address}. Dialing was used to initially establish the connection.");
+                    }
+                    ConnectedPoint::Listener {
+                        local_addr,
+                        send_back_addr,
+                    } => {
+                        warn!("[Swarm ConnectionId {connection_id}] - Connection closed with {peer_id} at {send_back_addr}. Listening on {local_addr} was used to initially establish the connection.");
+                    }
+                };
+                warn!("[Swarm ConnectionId {connection_id}] - Connections Established with this peer: {num_established}");
+                if let Some(cause) = cause {
+                    error!(
+                        "[Swarm ConnectionId {connection_id}] - Connection closed due to: {cause}"
+                    );
+                }
+            }
             SwarmEvent::IncomingConnection {
                 connection_id,
                 local_addr,
                 send_back_addr,
-            } => todo!(),
+            } => {
+                info!(
+                    "[Swarm ConnectionId {connection_id}] - Incoming Connection from a peer with {send_back_addr}. We're listening on {local_addr}."
+                );
+            }
             SwarmEvent::IncomingConnectionError {
                 connection_id,
                 local_addr,
                 send_back_addr,
                 error,
-            } => todo!(),
+            } => {
+                error!(
+                    "[Swarm ConnectionId {connection_id}] - Incoming Connection Error from a peer with {send_back_addr} to {local_addr}. Reason: {error}"
+                );
+            }
             SwarmEvent::OutgoingConnectionError {
                 connection_id,
-                peer_id,
+                peer_id: Some(peer_id),
                 error,
-            } => todo!(),
+            } => {
+                error!("[Swarm ConnectionId {connection_id}] - Outgoing Connection Error to {peer_id}. Reason: {error:?}");
+            }
             SwarmEvent::NewListenAddr {
-                listener_id,
                 address,
-            } => todo!(),
+                listener_id,
+            } => {
+                info!(
+                    "[Swarm ListenerId {listener_id}] - New Listen Address: {}",
+                    address
+                );
+            }
             SwarmEvent::ExpiredListenAddr {
-                listener_id,
                 address,
-            } => todo!(),
-            SwarmEvent::ListenerClosed {
                 listener_id,
+            } => {
+                // NOTE: relay client automatically renews reservations
+                warn!(
+                    "[Swarm ListenerId {listener_id}] - Expired Listen Address: {}",
+                    address
+                );
+            }
+            SwarmEvent::ListenerClosed {
                 addresses,
                 reason,
-            } => todo!(),
-            SwarmEvent::ListenerError { listener_id, error } => todo!(),
+                listener_id,
+            } => {
+                if let Err(err) = reason {
+                    warn!(
+                        "[Swarm ListenerId {listener_id}] - Listener closed due to error: {}",
+                        err
+                    );
+                } else {
+                    warn!("[Swarm ListenerId {listener_id}] - Listener closed");
+                }
+                warn!("[Swarm ListenerId {listener_id}] - {addresses:?} are now expired");
+            }
+            SwarmEvent::ListenerError { listener_id, error } => {
+                error!("[Swarm ListenerId {listener_id}] - Listener reported an error: {error}")
+            }
             SwarmEvent::Dialing {
                 peer_id,
                 connection_id,
-            } => todo!(),
-            SwarmEvent::NewExternalAddrCandidate { address } => todo!(),
-            SwarmEvent::ExternalAddrConfirmed { address } => todo!(),
-            SwarmEvent::ExternalAddrExpired { address } => todo!(),
+            } => {
+                if let Some(peer_id) = peer_id {
+                    info!(
+                        "[Swarm ConnectionId {connection_id}] - Dialing peer: {}",
+                        peer_id
+                    );
+                } else {
+                    warn!(
+                        "[Swarm ConnectionId {connection_id}] - Dialing a peer without a peer id"
+                    );
+                }
+            }
+            SwarmEvent::NewExternalAddrCandidate { address } => {
+                warn!(
+                    "[Swarm ExternalAddr] - New External Address Candidate: {}",
+                    address
+                );
+            }
+            SwarmEvent::ExternalAddrConfirmed { address } => {
+                info!(
+                    "[Swarm ExternalAddr] - External Address Confirmed: {}",
+                    address
+                );
+            }
+            SwarmEvent::ExternalAddrExpired { address } => {
+                warn!(
+                    "[Swarm ExternalAddr] - External Address Expired: {}",
+                    address
+                );
+            }
             _ => {}
         }
     }
