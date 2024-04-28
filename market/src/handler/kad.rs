@@ -65,13 +65,33 @@ impl<'a> EventHandler for KadHandler<'a> {
                 peer,
                 is_new_peer,
                 addresses,
-                bucket_range,
                 old_peer,
-            } => todo!(),
-            Event::UnroutablePeer { peer } => todo!(),
-            Event::RoutablePeer { peer, address } => todo!(),
-            Event::PendingRoutablePeer { peer, address } => todo!(),
-            Event::ModeChanged { new_mode } => todo!(),
+                ..
+            } => {
+                warn!("[Kademlia] - Routing table updated");
+                info!("[Kademlia] - Peer {peer} has been updated in the routing table");
+                if is_new_peer {
+                    warn!("[Kademlia] - Peer {peer} is a new peer that has been added to the routing table");
+                }
+                info!("[Kademlia] - Peer {peer} has the following addresses: {addresses:?}");
+                if let Some(old_peer) = old_peer {
+                    warn!("[Kademlia] - Peer {old_peer} has been replaced by peer {peer}. The old peer has been evicted.");
+                }
+            }
+            Event::UnroutablePeer { peer } => {
+                warn!("[Kademlia] - Peer {peer} is unroutable. Peer {peer} has connected, but has no known listening addresses.");
+            }
+            Event::RoutablePeer { peer, address } => {
+                // TODO: contemplating if we still need to actually add it into the routing table?
+                // not sure if it does it automatically? Can't find any other documentation on this
+                // or examples
+                warn!("[Kademlia] - Peer {peer} is routable");
+                warn!("[Kademlia] - Peer {peer} has the following address: {address}");
+            }
+            Event::ModeChanged { new_mode } => {
+                warn!("[Kademlia] - Mode changed to {new_mode}");
+            }
+            _ => {}
         }
     }
 }
