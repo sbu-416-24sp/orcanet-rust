@@ -73,10 +73,7 @@ impl Peer {
     #[inline(always)]
     pub async fn register_file(
         &self,
-        name: impl Into<String>,
-        ip: impl Into<String>,
-        port: impl Into<u32>,
-        price: impl Into<i64>,
+        user: impl Into<User>,
         fileinfo: impl Into<FileInfo>,
     ) -> Response {
         todo!()
