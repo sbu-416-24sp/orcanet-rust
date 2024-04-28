@@ -59,7 +59,7 @@ async fn get_file_info(
         .unwrap()
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[allow(non_snake_case)]
 struct UploadParams {
     filePath: String,
@@ -99,6 +99,54 @@ async fn delete_file(
         )
             .into_response(),
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct HashBody {
+    hash: String,
+}
+
+#[allow(dead_code)]
+const BASE_URL: &str = "http://localhost:3000";
+#[allow(dead_code)]
+const GIRAFFE_HASH: &str = "908b7415fea62428bb69eb01d8a3ce64190814cc01f01cae0289939e72909227";
+
+#[tokio::test]
+#[ignore]
+async fn api_test_upload_delete() {
+    let client = reqwest::Client::new();
+    let upload_res = client
+        .post(format!("{BASE_URL}/upload"))
+        .json(&UploadParams {
+            filePath: "files/giraffe.jpg".into(),
+            price: 416,
+        })
+        .send()
+        .await
+        .expect("a response");
+
+    let HashBody { hash } = upload_res.json().await.expect("to deserialize");
+    assert_eq!(hash, GIRAFFE_HASH);
+
+    // should be successful
+    let delete_res = client
+        .delete(format!("{BASE_URL}/file/{GIRAFFE_HASH}"))
+        .send()
+        .await
+        .expect("a response");
+
+    let HashBody { hash } = delete_res.json().await.expect("to deserialize");
+    assert_eq!(hash, GIRAFFE_HASH);
+
+    // should fail
+    let delete_res = client
+        .delete(format!("{BASE_URL}/file/{GIRAFFE_HASH}"))
+        .send()
+        .await
+        .expect("a response");
+
+    assert_ne!(delete_res.status(), StatusCode::OK);
 }
 
 pub fn routes() -> Router<ServerState> {

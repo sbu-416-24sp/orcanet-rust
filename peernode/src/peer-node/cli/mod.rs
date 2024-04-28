@@ -240,7 +240,7 @@ pub async fn handle_arg_matches(
                         Some(file_name) => file_name,
                         _ => Err(anyhow!("Invalid file name"))?,
                     };
-                    config.remove_file(file_name.to_string()).await?;
+                    config.remove_file(&PathBuf::from(file_name)).await?;
                     Ok(())
                 }
                 Some(("ls", _)) => {

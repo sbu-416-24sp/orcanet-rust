@@ -29,7 +29,7 @@ jobs:
           ~/peernode/.cargo/registry/index/
           ~/peernode/.cargo/registry/cache/
           ~/peernode/.cargo/git/db/
-          peernode/target/            
+          peernode/target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: ${{ runner.os }}-cargo-
     - name: Build
@@ -45,4 +45,14 @@ jobs:
     uses: ./.github/workflows/fmt.yml # use current repo's fmt.yml
     with:
       config-path: "peernode"
-    
+  test-server:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Start server and run tests
+      run: |
+        cd peernode &&
+        cargo run --bin peer-node-server -F test_local_market &
+        sleep 5 &&
+        cargo test api_test --verbose -- --ignored
+
