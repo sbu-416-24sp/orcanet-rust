@@ -1,9 +1,9 @@
 pub mod market {
     tonic::include_proto!("market"); // The string specified here must match the proto package name
 
+    use core::fmt;
     use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
-    use core::fmt;
     use std::hash::{Hash, Hasher};
 
     // this is unnecessary I think
@@ -54,7 +54,7 @@ pub mod market {
             self.0.as_str()
         }
     }
-    
+
     impl fmt::Display for FileInfoHash {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{}", self.0)
