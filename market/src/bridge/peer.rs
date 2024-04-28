@@ -67,9 +67,11 @@ impl Peer {
     }
 
     #[inline(always)]
-    pub async fn get_closest_peers(&self, key: Vec<u8>) -> Response {
-        self.send(Request::KadRequest(KadRequest::GetClosestPeers { key }))
-            .await
+    pub async fn get_closest_peers(&self, key: impl Into<Vec<u8>>) -> Response {
+        self.send(Request::KadRequest(KadRequest::GetClosestPeers {
+            key: key.into(),
+        }))
+        .await
     }
 
     #[inline(always)]
