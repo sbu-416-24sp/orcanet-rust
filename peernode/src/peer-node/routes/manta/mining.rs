@@ -1,8 +1,8 @@
 use axum::{
     body::Body,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 use reqwest::StatusCode;

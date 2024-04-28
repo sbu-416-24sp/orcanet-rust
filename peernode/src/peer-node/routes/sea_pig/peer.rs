@@ -17,11 +17,11 @@ use crate::ServerState;
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 struct PeerInfo {
-    Location: String,
+    Location: String, // country code
     Latency: String,
     PeerID: String,
-    Connection: String,
-    OpenStreams: String,
+    Connection: String,  // ipv4/ipv6 current node's multiaddr
+    OpenStreams: String, // list of all the connected peer's multiaddr
 }
 
 async fn get_peer(
