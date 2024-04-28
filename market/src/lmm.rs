@@ -60,7 +60,13 @@ pub(crate) type LocalMarketEntry = (Instant, SupplierInfo);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
-pub(crate) struct FileInfoHash(pub(crate) String);
+pub struct FileInfoHash(String);
+
+impl From<String> for FileInfoHash {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) struct SupplierInfo {

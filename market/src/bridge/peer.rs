@@ -1,10 +1,13 @@
 use libp2p::identity::Keypair;
 use libp2p::PeerId;
+use proto::market::FileInfo;
+use proto::market::User;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
 use crate::command::Message;
 use crate::FailureResponse;
+use crate::FileInfoHash;
 use crate::{command::request::Request, Response};
 
 #[derive(Debug)]
@@ -60,5 +63,22 @@ impl Peer {
     #[inline(always)]
     pub async fn connected_to(&self, peer_id: PeerId) -> Response {
         self.send(Request::ConnectedTo { peer_id }).await
+    }
+
+    #[inline(always)]
+    pub async fn check_holders(&self, file_info: impl Into<FileInfoHash>) -> Response {
+        todo!()
+    }
+
+    #[inline(always)]
+    pub async fn register_file(
+        &self,
+        name: impl Into<String>,
+        ip: impl Into<String>,
+        port: impl Into<u32>,
+        price: impl Into<i64>,
+        fileinfo: impl Into<FileInfo>,
+    ) -> Response {
+        todo!()
     }
 }
