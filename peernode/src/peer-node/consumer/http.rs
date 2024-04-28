@@ -68,10 +68,7 @@ pub async fn get_file_chunk(
         .await?;
 
     download.write_all(&file).await?;
-    let duration = start.elapsed();
-    println!(
-        "HTTP: Chunk [{chunk}] saved to {file_name} [{} ms]",
-        duration.as_millis()
-    );
+    let duration = start.elapsed().as_millis();
+    println!("HTTP: Chunk [{chunk}] saved to {file_name} [{duration} ms]");
     Ok(GetFileResponse::Token(auth_token.to_string()))
 }

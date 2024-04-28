@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -29,6 +30,7 @@ pub type AsyncFileMap = Arc<FileMap>;
 
 pub async fn hash_file(file: &mut File) -> Result<FileHash> {
     // Get the hash of a file
+    // the last chunk hash is the hash of the file
     Ok(FileHash(
         generate_chunk_hashes(file)
             .await?
@@ -39,7 +41,6 @@ pub async fn hash_file(file: &mut File) -> Result<FileHash> {
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct FileHash(String);
-
 impl FileHash {
     #[allow(dead_code)]
     fn as_str(&self) -> &str {
@@ -47,6 +48,13 @@ impl FileHash {
     }
 }
 
+/// # Chunking
+/// Files are split into 4MB (4 * 1024 * 1024 bytes) chunks.
+/// The last chunk of the file can be less than 4MB.
+/// Hashes of each of these chunks will be stored in the order that the chunks appear.
+/// The hashes of these chunks should be computed with the hasher’s update function.
+/// Creating a new hasher for each chunk will result in a different set of hashes [source].
+/// Using the update function, the final hash in the list will be the hash of the entire file.
 pub async fn generate_chunk_hashes(file: &mut File) -> Result<Vec<String>> {
     let mut chunk_hashes = vec![];
 
@@ -66,7 +74,10 @@ pub async fn generate_chunk_hashes(file: &mut File) -> Result<Vec<String>> {
     Ok(chunk_hashes)
 }
 
-pub async fn get_file_info(path: &PathBuf) -> Result<FileInfo> {
+pub async fn get_file_info(path: &Path) -> Result<FileInfo> {
+    // FileInfo requires
+    //   hash of entire file (=== last chunk hash)
+    //   chunk hashes
     let mut file = tokio::fs::File::open(path).await?;
     let file_hash = hash_file(&mut file).await?.0;
     let chunk_hashes = generate_chunk_hashes(&mut file).await?;
@@ -99,23 +110,23 @@ impl FileMap {
         }
     }
 
-    pub async fn set(&self, files: HashMap<FileInfoHash, LocalFileInfo>) -> Result<()> {
+    pub async fn set(&self, files: HashMap<FileInfoHash, LocalFileInfo>) {
         let mut file_map = self.files.write().await;
         *file_map = files;
-        Ok(())
     }
 
-    pub async fn add_file(&self, file_path: &str, price: i64) -> Result<FileInfoHash> {
+    pub async fn add_file(&self, file_path: &Path, price: i64) -> Result<FileInfoHash> {
         // Get a write lock on the files map
         let mut files = self.files.write().await;
 
-        let file_info = get_file_info(&PathBuf::from(file_path)).await?;
+        // compute file info and add to map
+        let file_info = get_file_info(file_path).await?;
         let file_info_hash = file_info.get_hash();
         files.insert(
             file_info_hash.clone(),
             LocalFileInfo {
                 file_info,
-                path: PathBuf::from(file_path),
+                path: file_path.to_owned(),
                 price,
             },
         );
@@ -124,10 +135,14 @@ impl FileMap {
     }
 
     // Add all the files in a Unix-style glob to the map
-    pub async fn add_dir(&self, file_path: &str, price: i64) -> Result<()> {
+    pub async fn add_dir(&self, file_path: &Path, price: i64) -> Result<()> {
         // Get a write lock on the files map
         let mut files = self.files.write().await;
-        for entry in glob(file_path)? {
+        let path_str = match file_path.to_str() {
+            Some(path_str) => path_str,
+            None => return Err(anyhow!("Failed to convert path to str")),
+        };
+        for entry in glob(path_str)? {
             let path = entry?;
             let file_info = get_file_info(&path).await?;
             let file_info_hash = file_info.get_hash();
@@ -150,10 +165,10 @@ impl FileMap {
             match std::fs::metadata(&file) {
                 Ok(metadata) => {
                     if metadata.is_file() {
-                        self.add_file(&file, price).await?;
+                        self.add_file(Path::new(&file), price).await?;
                     }
                     if metadata.is_dir() {
-                        self.add_dir(&file, price).await?;
+                        self.add_dir(Path::new(&file), price).await?;
                     }
                 }
                 Err(_) => eprintln!("Failed to open file {file}"),

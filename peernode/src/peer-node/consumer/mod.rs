@@ -23,7 +23,7 @@ pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Res
             encoded_producer.as_str(),
             producer.price
         ) {
-            eprintln!("Failed to write producer: {}", e);
+            eprintln!("Failed to write producer: {e}");
             return Err(anyhow::anyhow!("Failed to write producer"));
         }
         println!(
@@ -67,7 +67,7 @@ pub async fn get_file(
                 chunk_num += 1;
             }
             Err(e) => {
-                eprintln!("Failed to download chunk {}: {}", chunk_num, e);
+                eprintln!("Failed to download chunk {chunk_num}: {e}");
                 return Err(anyhow::anyhow!("Failed to download chunk"));
             }
         }
