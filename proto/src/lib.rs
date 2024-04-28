@@ -47,6 +47,7 @@ pub mod market {
     }
 
     #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+    #[repr(transparent)]
     pub struct FileInfoHash(pub String);
 
     impl FileInfoHash {
