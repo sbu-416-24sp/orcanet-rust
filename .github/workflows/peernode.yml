@@ -54,5 +54,5 @@ jobs:
       run: |
         cargo run --bin peer-node-server -F test_local_market &
         sleep 5 &&
-        cargo test api_test --verbose -- --ignored
+        cargo test seapig_test --verbose -- --test-threads=1 --ignored
 

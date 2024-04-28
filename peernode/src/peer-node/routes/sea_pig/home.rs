@@ -31,8 +31,8 @@ async fn get_file_info(
     let response = match config.get_market_client().await {
         Ok(market) => match market.check_holders(FileInfoHash(hash)).await {
             Ok(holders) => holders,
-            Err(_) => {
-                return (StatusCode::SERVICE_UNAVAILABLE, "Could not check holders").into_response()
+            Err(e) => {
+                return (StatusCode::SERVICE_UNAVAILABLE, format!("Could not check holders: {e}")).into_response()
             }
         },
         Err(_) => {
@@ -101,6 +101,17 @@ async fn delete_file(
     }
 }
 
+
+pub fn routes() -> Router<ServerState> {
+    Router::new()
+        .route("/file/:hash/info", get(get_file_info))
+        .route("/upload", post(upload_file))
+        .route("/file/:hash", delete(delete_file))
+}
+
+
+/// TESTS
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct HashBody {
@@ -114,7 +125,20 @@ const GIRAFFE_HASH: &str = "908b7415fea62428bb69eb01d8a3ce64190814cc01f01cae0289
 
 #[tokio::test]
 #[ignore]
-async fn api_test_upload_delete() {
+async fn seapig_test_file_info() {
+    let client = reqwest::Client::new();
+    // not registered in market
+    let info_res = client
+        .get(format!("{BASE_URL}/file/{GIRAFFE_HASH}/info"))
+        .send()
+        .await
+        .expect("a response");
+    assert_ne!(info_res.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+#[ignore]
+async fn seapig_test_upload_delete() {
     let client = reqwest::Client::new();
     let upload_res = client
         .post(format!("{BASE_URL}/upload"))
@@ -147,11 +171,4 @@ async fn api_test_upload_delete() {
         .expect("a response");
 
     assert_ne!(delete_res.status(), StatusCode::OK);
-}
-
-pub fn routes() -> Router<ServerState> {
-    Router::new()
-        .route("/file/:hash/info", get(get_file_info))
-        .route("/upload", post(upload_file))
-        .route("/file/:hash", delete(delete_file))
 }
