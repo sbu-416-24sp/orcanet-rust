@@ -5,6 +5,7 @@ use proto::market::User;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
+use crate::command::request::KadRequest;
 use crate::command::Message;
 use crate::FailureResponse;
 use crate::FileInfoHash;
@@ -63,6 +64,14 @@ impl Peer {
     #[inline(always)]
     pub async fn connected_to(&self, peer_id: PeerId) -> Response {
         self.send(Request::ConnectedTo { peer_id }).await
+    }
+
+    #[inline(always)]
+    pub async fn get_closest_peers(&self, key: impl Into<Vec<u8>>) -> Response {
+        self.send(Request::KadRequest(KadRequest::GetClosestPeers {
+            key: key.into(),
+        }))
+        .await
     }
 
     #[inline(always)]

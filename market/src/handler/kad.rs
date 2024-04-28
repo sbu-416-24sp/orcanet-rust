@@ -1,12 +1,24 @@
 use libp2p::{
-    kad::{Event, InboundRequest},
+    kad::{
+        BootstrapError, Event, GetClosestPeersError, InboundRequest, ProgressStep, QueryId,
+        QueryResult, QueryStats,
+    },
     Swarm,
 };
-use log::{info, warn};
+use log::{debug, error, info, warn};
+use tokio::sync::oneshot;
 
-use crate::{behaviour::Behaviour, command::QueryHandler, lmm::LocalMarketMap};
+use crate::{
+    behaviour::Behaviour,
+    command::{
+        request::{KadRequest, Query, Request},
+        QueryHandler,
+    },
+    lmm::LocalMarketMap,
+    FailureResponse, KadFailureResponse, KadSuccessfulResponse, Response, SuccessfulResponse,
+};
 
-use super::EventHandler;
+use super::{CommandRequestHandler, EventHandler};
 
 pub(crate) struct KadHandler<'a> {
     swarm: &'a mut Swarm<Behaviour>,
@@ -47,6 +59,62 @@ impl<'a> KadHandler<'a> {
             _ => {}
         }
     }
+
+    fn handle_outbound_event(
+        &mut self,
+        qid: QueryId,
+        result: QueryResult,
+        stats: QueryStats,
+        step: ProgressStep,
+    ) {
+        match result {
+            QueryResult::Bootstrap(result) => match result {
+                Ok(ok) => {
+                    info!("[Kademlia] - Bootstrap query successful");
+                    info!("[Kademlia] - Successfully bootstrapped to {}", ok.peer)
+                }
+                Err(BootstrapError::Timeout { peer, .. }) => {
+                    error!("[Kademlia] - Bootstrap query failed due to timeout. Could not bootstrap to peer {peer} in time.");
+                }
+            },
+            QueryResult::GetClosestPeers(result) => {
+                if step.last {
+                    match result {
+                        Ok(ok) => {
+                            info!("[Kademlia] - GetClosestPeers query successful");
+                            for peer in &ok.peers {
+                                info!("[Kademlia] - Peer {peer} is one of the closest peers found");
+                            }
+                            self.query_handler.respond(
+                                Query::Kad(qid),
+                                Ok(SuccessfulResponse::KadResponse(
+                                    KadSuccessfulResponse::GetClosestPeers { peers: ok.peers },
+                                )),
+                            )
+                        }
+                        Err(GetClosestPeersError::Timeout { key, .. }) => {
+                            error!("[Kademlia] - GetClosestPeers query failed due to timeout.");
+                            self.query_handler.respond(
+                                Query::Kad(qid),
+                                Err(FailureResponse::KadError(
+                                    KadFailureResponse::GetClosestPeers {
+                                        key,
+                                        error: "timeout".to_owned(),
+                                    },
+                                )),
+                            )
+                        }
+                    }
+                }
+            }
+            QueryResult::GetProviders(_) => todo!(),
+            QueryResult::StartProviding(_) => todo!(),
+            QueryResult::RepublishProvider(_) => todo!(),
+            QueryResult::GetRecord(_) => todo!(),
+            QueryResult::PutRecord(_) => todo!(),
+            QueryResult::RepublishRecord(_) => todo!(),
+        }
+    }
 }
 
 impl<'a> EventHandler for KadHandler<'a> {
@@ -58,9 +126,11 @@ impl<'a> EventHandler for KadHandler<'a> {
             Event::OutboundQueryProgressed {
                 id,
                 result,
-                stats,
                 step,
-            } => todo!(),
+                stats,
+            } => {
+                self.handle_outbound_event(id, result, stats, step);
+            }
             Event::RoutingUpdated {
                 peer,
                 is_new_peer,
@@ -86,12 +156,24 @@ impl<'a> EventHandler for KadHandler<'a> {
                 // not sure if it does it automatically? Can't find any other documentation on this
                 // or examples
                 warn!("[Kademlia] - Peer {peer} is routable");
-                warn!("[Kademlia] - Peer {peer} has the following address: {address}");
+                info!("[Kademlia] - Peer {peer} has the following address: {address}");
             }
             Event::ModeChanged { new_mode } => {
                 warn!("[Kademlia] - Mode changed to {new_mode}");
             }
             _ => {}
+        }
+    }
+}
+
+impl<'a> CommandRequestHandler for KadHandler<'a> {
+    type Request = KadRequest;
+    fn handle_command(&mut self, request: Self::Request, responder: oneshot::Sender<Response>) {
+        match request {
+            KadRequest::GetClosestPeers { key } => {
+                let qid = self.swarm.behaviour_mut().kad.get_closest_peers(key);
+                self.query_handler.add_query(Query::Kad(qid), responder);
+            }
         }
     }
 }
