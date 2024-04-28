@@ -1,14 +1,20 @@
 use libp2p::{kad::QueryId, request_response::OutboundRequestId, PeerId};
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) enum Query {
     Kad(QueryId),
     ReqRes(OutboundRequestId),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) enum Request {
     Listeners,
     ConnectedPeers,
     ConnectedTo { peer_id: PeerId },
+    KadRequest(KadRequest),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub(crate) enum KadRequest {
+    GetClosestPeers { key: Vec<u8> },
 }

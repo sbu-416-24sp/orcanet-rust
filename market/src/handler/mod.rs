@@ -27,7 +27,8 @@ pub(crate) trait EventHandler {
 }
 
 pub(crate) trait CommandRequestHandler {
-    fn handle_command(&mut self, request: Request, responder: oneshot::Sender<Response>);
+    type Request;
+    fn handle_command(&mut self, request: Self::Request, responder: oneshot::Sender<Response>);
 }
 
 // NOTE: one lifetime should be covariant enough?
@@ -245,6 +246,7 @@ impl<'a> EventHandler for Handler<'a> {
 }
 
 impl<'a> CommandRequestHandler for Handler<'a> {
+    type Request = Request;
     fn handle_command(&mut self, request: Request, responder: oneshot::Sender<Response>) {
         match request {
             Request::Listeners => {
@@ -259,6 +261,7 @@ impl<'a> CommandRequestHandler for Handler<'a> {
                 let connected = self.swarm.is_connected(&peer_id);
                 send_ok!(responder, SuccessfulResponse::ConnectedTo { connected });
             }
+            Request::KadRequest(kad_request) => {}
         };
     }
 }
