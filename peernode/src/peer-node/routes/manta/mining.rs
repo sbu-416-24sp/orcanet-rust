@@ -86,22 +86,23 @@ async fn device(
         .unwrap()
 }
 
-
 #[derive(Debug, Deserialize)]
 struct WalletId {
     wallet_id: String,
 }
-async fn unpaid_balance(State(state): State<ServerState>, Json(WalletId{wallet_id}): Json<WalletId>) -> impl IntoResponse {
-    
+async fn unpaid_balance(
+    State(state): State<ServerState>,
+    Json(WalletId { wallet_id }): Json<WalletId>,
+) -> impl IntoResponse {
     let unpaid_balance = "100.00".to_owned();
-    
+
     Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(format!(
             r#"
 {{"wallet_id":{wallet_id},"unpaidBalance":{}}}
 "#,
-unpaid_balance
+            unpaid_balance
         )))
         .unwrap()
 }
