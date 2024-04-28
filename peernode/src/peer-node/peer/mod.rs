@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
 use orcanet_market::{bridge::spawn, Config, Peer};
 
 use proto::market::{FileInfo, FileInfoHash, HoldersResponse, User};
 
 use anyhow::{anyhow, Result};
+use std::collections::HashMap;
 
 // test market
 #[cfg(feature = "test_local_market")]
@@ -13,7 +12,7 @@ pub struct MarketClient {
 }
 #[cfg(feature = "test_local_market")]
 impl MarketClient {
-    pub async fn new(config: Config) -> Result<Self> {
+    pub async fn new(_config: Config) -> Result<Self> {
         Ok(MarketClient {
             local: Default::default(),
         })

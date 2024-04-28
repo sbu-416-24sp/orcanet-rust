@@ -7,7 +7,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Router,
+    Json, Router,
 };
 use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
@@ -59,16 +59,19 @@ async fn get_file_info(
         .unwrap()
 }
 
+#[derive(Deserialize)]
+#[allow(non_snake_case)]
+struct UploadParams {
+    filePath: String,
+    price: i64,
+}
 async fn upload_file(
     State(state): State<ServerState>,
-    Path(path): Path<String>,
+    Json(UploadParams { filePath, price }): Json<UploadParams>,
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
 
-    // TODO: fetch the price from the config somehow, likely from somewhere not yet implemented
-    let price = 416;
-
-    let hash = match config.add_file(&PathBuf::from(path), price).await {
+    let hash = match config.add_file(&PathBuf::from(filePath), price).await {
         Ok(hash) => hash,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to add file").into_response(),
     };
@@ -76,7 +79,7 @@ async fn upload_file(
 
     Response::builder()
         .status(StatusCode::OK)
-        .body(Body::from(format!(r#"{{"hash":{hash_str}}}"#)))
+        .body(Body::from(format!(r#"{{"hash":"{hash_str}"}}"#)))
         .unwrap()
 }
 
@@ -85,12 +88,16 @@ async fn delete_file(
     Path(hash): Path<String>,
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
-    match config.remove_file(hash.clone()).await {
+    match config.remove_file_by_hash(FileInfoHash(hash.clone())).await {
         Ok(_) => Response::builder()
             .status(StatusCode::OK)
             .body(Body::from(format!(r#"{{"hash": "{hash}"}}"#)))
             .unwrap(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove file").into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to remove file: {e}"),
+        )
+            .into_response(),
     }
 }
 

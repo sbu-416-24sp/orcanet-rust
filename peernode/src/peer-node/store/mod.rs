@@ -268,13 +268,22 @@ impl Configurations {
         Ok(num_added)
     }
 
-    pub async fn remove_file(&mut self, file_path: String) -> Result<()> {
+    pub async fn remove_file(&mut self, file_path: &Path) -> Result<()> {
         // get the hash of the file
-        let file_info = get_file_info(&PathBuf::from(file_path.clone())).await?;
+        let file_info = get_file_info(file_path).await?;
         let hash = file_info.get_hash();
 
         if !self.props.files.contains_key(&hash) {
-            panic!("File [{}] not found", file_path);
+            Err(anyhow!("File [{file_path:?}] not found"))?;
+        }
+        self.props.files.remove(&hash);
+        self.write();
+        Ok(())
+    }
+
+    pub async fn remove_file_by_hash(&mut self, hash: FileInfoHash) -> Result<()> {
+        if !self.props.files.contains_key(&hash) {
+            Err(anyhow!("File with FileInfoHash {hash} not found"))?;
         }
         self.props.files.remove(&hash);
         self.write();
