@@ -1,4 +1,8 @@
-use libp2p::{kad::Event, Swarm};
+use libp2p::{
+    kad::{Event, InboundRequest},
+    Swarm,
+};
+use log::{info, warn};
 
 use crate::{behaviour::Behaviour, command::QueryHandler, lmm::LocalMarketMap};
 
@@ -22,6 +26,27 @@ impl<'a> KadHandler<'a> {
             query_handler,
         }
     }
+
+    pub(crate) fn handle_inbound_request(&mut self, request: InboundRequest) {
+        match request {
+            InboundRequest::FindNode { num_closer_peers } => {
+                warn!("[Kademlia] - FindNode request received and handled");
+                info!("[Kademlia] - The number of closest peers found {num_closer_peers}");
+            }
+            InboundRequest::GetProvider {
+                num_closer_peers,
+                num_provider_peers,
+            } => {
+                warn!("[Kademlia] - GetProvider request received and handled");
+                info!("[Kademlia] - The number of closest peers found {num_closer_peers}");
+                info!("[Kademlia] - The number of provider peers found {num_provider_peers} for this particular key");
+            }
+            InboundRequest::AddProvider { .. } => {
+                warn!("[Kademlia] - AddProvider request received and handled");
+            }
+            _ => {}
+        }
+    }
 }
 
 impl<'a> EventHandler for KadHandler<'a> {
@@ -29,7 +54,7 @@ impl<'a> EventHandler for KadHandler<'a> {
 
     fn handle_event(&mut self, event: Self::Event) {
         match event {
-            Event::InboundRequest { request } => todo!(),
+            Event::InboundRequest { request } => self.handle_inbound_request(request),
             Event::OutboundQueryProgressed {
                 id,
                 result,
@@ -40,13 +65,33 @@ impl<'a> EventHandler for KadHandler<'a> {
                 peer,
                 is_new_peer,
                 addresses,
-                bucket_range,
                 old_peer,
-            } => todo!(),
-            Event::UnroutablePeer { peer } => todo!(),
-            Event::RoutablePeer { peer, address } => todo!(),
-            Event::PendingRoutablePeer { peer, address } => todo!(),
-            Event::ModeChanged { new_mode } => todo!(),
+                ..
+            } => {
+                warn!("[Kademlia] - Routing table updated");
+                info!("[Kademlia] - Peer {peer} has been updated in the routing table");
+                if is_new_peer {
+                    warn!("[Kademlia] - Peer {peer} is a new peer that has been added to the routing table");
+                }
+                info!("[Kademlia] - Peer {peer} has the following addresses: {addresses:?}");
+                if let Some(old_peer) = old_peer {
+                    warn!("[Kademlia] - Peer {old_peer} has been replaced by peer {peer}. The old peer has been evicted.");
+                }
+            }
+            Event::UnroutablePeer { peer } => {
+                warn!("[Kademlia] - Peer {peer} is unroutable. Peer {peer} has connected, but has no known listening addresses.");
+            }
+            Event::RoutablePeer { peer, address } => {
+                // TODO: contemplating if we still need to actually add it into the routing table?
+                // not sure if it does it automatically? Can't find any other documentation on this
+                // or examples
+                warn!("[Kademlia] - Peer {peer} is routable");
+                warn!("[Kademlia] - Peer {peer} has the following address: {address}");
+            }
+            Event::ModeChanged { new_mode } => {
+                warn!("[Kademlia] - Mode changed to {new_mode}");
+            }
+            _ => {}
         }
     }
 }
