@@ -123,7 +123,7 @@ pub async fn start(job: AsyncJob, token: String) {
                         chunk_num += 1;
                     }
                     Err(e) => {
-                        eprintln!("Failed to download chunk {}: {}", chunk_num, e);
+                        eprintln!("Failed to download chunk {chunk_num}: {e}");
                         lock = job.lock().await;
                         lock.status = JobStatus::Failed;
                         return;

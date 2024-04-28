@@ -7,6 +7,7 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
+use proto::market::FileInfoHash;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -87,7 +88,7 @@ async fn find_peer(
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
     let response = match config.get_market_client().await {
-        Ok(market) => match market.check_holders(fileHash).await {
+        Ok(market) => match market.check_holders(FileInfoHash(fileHash)).await {
             Ok(holders) => holders,
             Err(_) => {
                 return (StatusCode::SERVICE_UNAVAILABLE, "Could not check holders").into_response()

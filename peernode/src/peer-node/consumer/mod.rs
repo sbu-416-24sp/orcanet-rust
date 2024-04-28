@@ -4,15 +4,18 @@ pub mod http;
 use std::fmt::Write;
 
 use anyhow::Result;
-use proto::market::User;
+use proto::market::{FileInfoHash, User};
 
 use crate::peer::MarketClient;
 
 use self::http::GetFileResponse;
 
 // list every producer who holds the file hash I want
-pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Result<String> {
-    let response = client.check_holders(file_hash.clone()).await?;
+pub async fn list_producers(
+    file_info_hash: FileInfoHash,
+    client: &mut MarketClient,
+) -> Result<String> {
+    let response = client.check_holders(file_info_hash).await?;
     let mut producer_list = String::new();
     for producer in response.holders {
         // serialize the producer struct to a string
@@ -67,8 +70,7 @@ pub async fn get_file(
                 chunk_num += 1;
             }
             Err(e) => {
-                eprintln!("Failed to download chunk {chunk_num}: {e}");
-                return Err(anyhow::anyhow!("Failed to download chunk"));
+                Err(anyhow::anyhow!("Failed to download chunk {chunk_num}: {e}"))?
             }
         }
         if continue_download == false {

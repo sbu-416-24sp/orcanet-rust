@@ -9,7 +9,7 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
-use proto::market::User;
+use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
 
 use crate::ServerState;
@@ -29,7 +29,7 @@ async fn get_file_info(
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
     let response = match config.get_market_client().await {
-        Ok(market) => match market.check_holders(hash).await {
+        Ok(market) => match market.check_holders(FileInfoHash(hash)).await {
             Ok(holders) => holders,
             Err(_) => {
                 return (StatusCode::SERVICE_UNAVAILABLE, "Could not check holders").into_response()

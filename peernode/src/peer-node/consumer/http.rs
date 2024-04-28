@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use proto::market::User;
 
+use std::path::PathBuf;
 use std::time::Instant;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
@@ -60,7 +61,11 @@ pub async fn get_file_chunk(
 
     // Save the file to disk
     let file = res.bytes().await?;
-    let file_path = format!("download/{file_name}");
+    // for now, add customization option?
+    if !PathBuf::from("download").exists() {
+        return Err(anyhow!("download folder does not exist, cannot proceed"));
+    }
+    let file_path: PathBuf = ["download", file_name].iter().collect();
     let mut download = OpenOptions::new()
         .create(true)
         .append(true)

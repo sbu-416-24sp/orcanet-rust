@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use proto::market::FileInfoHash;
+use proto::market::{FileInfoHash, User};
 
 use self::files::LocalFileInfo;
 
@@ -32,7 +32,7 @@ pub async fn stop_server(join_handle: tokio::task::JoinHandle<()>) -> Result<()>
 }
 
 pub async fn register_files(
-    prices: HashMap<FileInfoHash, i64>,
+    files: HashMap<FileInfoHash, LocalFileInfo>,
     client: &mut MarketClient,
     port: String,
     ip: Option<String>,
@@ -62,24 +62,32 @@ pub async fn register_files(
             }
         },
     };
-    println!("Producer: IP address is {}", ip);
+    // for testing
+    let ip = "0.0.0.0".to_string();
+    println!("Producer: IP address is {ip}");
 
     // Generate a random Producer ID
     let producer_id = uuid::Uuid::new_v4().to_string();
 
-    for (hash, price) in prices {
-        println!(
-            "Producer: Registering file with hash {} and price {}",
-            hash, price
-        );
+    for (
+        hash,
+        LocalFileInfo {
+            file_info, price, ..
+        },
+    ) in files
+    {
+        println!("Producer: Registering file with hash {hash} and price {price}",);
         client
             .register_file(
-                producer_id.clone(),
-                "producer".to_string(),
-                ip.clone(),
-                port,
-                price,
+                User {
+                    id: producer_id.clone(),
+                    name: "producer".into(),
+                    ip: ip.clone(),
+                    port,
+                    price,
+                },
                 hash,
+                file_info,
             )
             .await?;
     }

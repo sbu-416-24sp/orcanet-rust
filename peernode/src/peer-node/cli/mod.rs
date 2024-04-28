@@ -10,6 +10,7 @@ use anyhow::{anyhow, Result};
 use clap::{arg, Command};
 use orcanet_market::BootNodes;
 use orcanet_market::Multiaddr;
+use proto::market::FileInfoHash;
 use store::Configurations;
 
 #[cfg(test)]
@@ -173,7 +174,7 @@ pub async fn handle_arg_matches(
         Some(("producer", producer_matches)) => {
             match producer_matches.subcommand() {
                 Some(("register", register_matches)) => {
-                    let prices = config.get_prices();
+                    let files = config.get_files();
                     // register files with the market service
                     let port = match register_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
@@ -184,7 +185,7 @@ pub async fn handle_arg_matches(
                         Some(ip) => Some(ip.clone()),
                         None => None,
                     };
-                    producer::register_files(prices, market_client, port.clone(), ip).await?;
+                    producer::register_files(files, market_client, port.clone(), ip).await?;
                     config.start_http_client(port).await;
                     Ok(())
                 }
@@ -222,9 +223,13 @@ pub async fn handle_arg_matches(
                             return Err(anyhow!("Invalid price"));
                         }
                     };
-                    config.add_file_path(&PathBuf::from(file_name), price).await;
+                    match config.add_file_path(&PathBuf::from(file_name), price).await {
+                        Ok(num_added) => {
+                            println!("{num_added} file(s) at {file_name} have been registered at price {price}")
+                        }
+                        Err(e) => println!("Failed to register file: {e}"),
+                    }
                     // print
-                    println!("File {} has been registered at price {}", file_name, price);
                     Ok(())
                 }
                 Some(("rm", rm_matches)) => {
@@ -242,6 +247,9 @@ pub async fn handle_arg_matches(
                     let files = config.get_files();
                     let prices = config.get_prices();
 
+                    if files.is_empty() {
+                        println!("No files registered!");
+                    }
                     for (hash, info) in files {
                         println!(
                             "File: {}, Price: {}, Hash: {hash}",
@@ -279,7 +287,8 @@ pub async fn handle_arg_matches(
                         None => Err(anyhow!("No file hash provided"))?,
                     };
                     let market_client = config.get_market_client().await?;
-                    consumer::list_producers(file_hash, market_client).await?;
+                    let file_info_hash = FileInfoHash(file_hash);
+                    consumer::list_producers(file_info_hash, market_client).await?;
                     Ok(())
                 }
                 // get file from producer
@@ -320,11 +329,9 @@ pub async fn handle_arg_matches(
                         Err(e) => {
                             match e.to_string().as_str() {
                                 "Request failed with status code: 404" => {
-                                    println!("Consumer: File downloaded successfully");
+                                    println!("Consumer: File downloaded successfully (404 EOF)");
                                 }
-                                _ => {
-                                    eprintln!("Failed to download chunk {}: {}", chunk_num, e);
-                                }
+                                _ => eprintln!("{e}"),
                             };
                             return Ok(());
                         }

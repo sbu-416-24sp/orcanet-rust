@@ -1,3 +1,4 @@
+use anyhow::Result;
 use axum::{
     body::Body,
     extract::{ConnectInfo, Path, Query, State},
@@ -85,9 +86,12 @@ async fn handle_file_request(
     };
 
     // Check if an access token is expected (first chunk is "free")
+    println!("expected: {}, got: {}", request.access_token, auth_token);
     if request.chunks_sent == 0 {
         request.access_token = db::generate_access_token();
     } else if request.access_token != auth_token {
+        // throw out request to prevent blocking transfers on subsequent requests
+        consumer.requests.remove(&hash);
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
 
@@ -133,10 +137,7 @@ async fn handle_file_request(
             }
         },
         Err(e) => {
-            eprintln!(
-                "Failed to get chunk {} from {:?}: {:?}",
-                chunk, file_path, e
-            );
+            eprintln!("Failed to get chunk {chunk} from {file_path:?}: {e:?}");
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response();
         }
     };
@@ -150,25 +151,22 @@ async fn handle_file_request(
     // Increment the chunks sent
     request.chunks_sent += 1;
 
-    println!(
-        "HTTP: Sending Chunk [{}] for file {:?} to consumer {}",
-        chunk, file_path, address
-    );
+    println!("HTTP: Sending Chunk [{chunk}] for file {file_path:?} to consumer {address}");
 
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, mime.to_string())
         .header(
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", file_name),
+            format!("attachment; filename=\"{file_name}\""),
         )
         .header("X-Access-Token", request.access_token.as_str())
         .body(body)
         .unwrap()
 }
 
-pub async fn run(files: AsyncFileMap, port: String) -> Result<(), Box<dyn std::error::Error>> {
-    let addr = format!("0.0.0.0:{}", port);
+pub async fn run(files: AsyncFileMap, port: String) -> Result<()> {
+    let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("HTTP: Listening on {}", listener.local_addr()?);
 

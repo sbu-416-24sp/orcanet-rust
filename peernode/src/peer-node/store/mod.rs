@@ -13,7 +13,7 @@ use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
 use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::{Path, PathBuf}};
 
 #[derive()]
 pub struct Configurations {
@@ -211,19 +211,21 @@ impl Configurations {
 
     // add every file in the directory to the list
     #[async_recursion]
-    pub async fn add_dir(&mut self, file_path: &PathBuf, price: i64) -> Result<()> {
+    pub async fn add_dir(&mut self, file_path: &Path, price: i64) -> Result<usize> {
         // assume that the file_path is a directory
+        let mut num_added = 0;
         for entry in fs::read_dir(file_path)? {
-            let path = entry?.path();
+            let path = &entry?.path();
             // check if this is a file or a directory
             if path.is_dir() {
-                self.add_dir(file_path, price).await?;
+                num_added += self.add_dir(path, price).await?;
             }
             if path.is_file() {
-                self.add_file(file_path, price).await?;
+                self.add_file(path, price).await?;
+                num_added += 1;
             }
         }
-        Ok(())
+        Ok(num_added)
     }
 
     // add a single file to the list
@@ -243,23 +245,23 @@ impl Configurations {
     }
 
     // cli command to add a file/dir to the list
-    pub async fn add_file_path(&mut self, file_path: &PathBuf, price: i64) {
+    pub async fn add_file_path(&mut self, file_path: &PathBuf, price: i64) -> Result<usize> {
         // check if this is a file or a directory
+        let mut num_added = 0;
         match std::fs::metadata(file_path) {
             Ok(metadata) => {
                 if metadata.is_file() {
-                    match self.add_file(file_path, price).await {
-                        Ok(_) => {}
-                        Err(e) => eprintln!("Failed to add file {e}"),
-                    }
+                    self.add_file(file_path, price).await?;
+                    num_added += 1;
                 }
-                if metadata.is_dir() && self.add_dir(file_path, price).await.is_err() {
-                    eprintln!("Failed to add directory {file_path:?}");
+                if metadata.is_dir() {
+                    num_added += self.add_dir(file_path, price).await?
                 }
             }
-            Err(_) => eprintln!("Failed to open file {file_path:?}"),
+            Err(e) => Err(anyhow!("Failed to open file {file_path:?}: {e}"))?,
         }
         self.write();
+        Ok(num_added)
     }
 
     pub async fn remove_file(&mut self, file_path: String) -> Result<()> {
@@ -339,11 +341,7 @@ impl Configurations {
         self.discovered_peers.get(peer_id)
     }
     pub fn get_peers(&self) -> Vec<PeerInfo> {
-        self.discovered_peers
-            .values()
-            .clone()
-            .map(|v| v.clone())
-            .collect()
+        self.discovered_peers.values().cloned().collect()
     }
     pub fn remove_peer(&mut self, peer_id: &str) -> Option<PeerInfo> {
         self.discovered_peers.remove(peer_id)

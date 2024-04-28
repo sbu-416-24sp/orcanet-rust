@@ -12,6 +12,9 @@ path = "src/peer-node/client.rs"
 name = "peer-node-server"
 path = "src/peer-node/server.rs"
 
+[features]
+test_local_market = []
+
 [dependencies]
 tonic = "0.11"
 prost = "0.12"
