@@ -266,7 +266,7 @@ impl Jobs {
 
         // add the completed job to history
         let mut history = self.history.write().await;
-        let history_entry = HistoryEntry {
+        let history_entry: HistoryEntry = HistoryEntry {
             fileName: job.file_name.clone(),
             timeCompleted: 0,
         };

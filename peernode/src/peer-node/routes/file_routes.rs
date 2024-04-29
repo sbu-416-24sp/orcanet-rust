@@ -111,6 +111,7 @@ async fn get_file_info(
 #[derive(Deserialize)]
 struct UploadFile {
     filePath: String,
+    price: i64,
 }
 // UploadFile - To upload a file. This endpoint should accept a file (likely in Base64) and handle the storage and processing of the file on the server. Returns the file hash.
 // For Now, upload a file path?
@@ -121,9 +122,8 @@ async fn upload_file(
     let mut config = state.config.lock().await;
 
     // TODO: fetch the price from the config somehow, likely from somewhere not yet implemented
-    let price = 416;
 
-    let hash = config.add_file(file.filePath, price);
+    let hash = config.add_file(file.filePath, file.price);
 
     Response::builder()
         .status(StatusCode::OK)
