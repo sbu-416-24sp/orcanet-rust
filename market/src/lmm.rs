@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    net::Ipv4Addr,
     time::{Duration, Instant},
 };
 
@@ -62,9 +61,27 @@ pub(crate) type LocalMarketEntry = (Instant, SupplierInfo);
 #[repr(transparent)]
 pub struct FileInfoHash(String);
 
+impl FileInfoHash {
+    #[inline(always)]
+    pub const fn new(s: String) -> Self {
+        Self(s)
+    }
+
+    #[inline(always)]
+    pub(crate) fn into_bytes(self) -> Vec<u8> {
+        self.into()
+    }
+}
+
 impl From<String> for FileInfoHash {
     fn from(s: String) -> Self {
         Self(s)
+    }
+}
+
+impl From<FileInfoHash> for Vec<u8> {
+    fn from(value: FileInfoHash) -> Self {
+        value.0.into_bytes()
     }
 }
 
@@ -78,7 +95,7 @@ pub(crate) struct SupplierInfo {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use std::thread::sleep;
+    use std::{net::Ipv4Addr, thread::sleep};
 
     #[test]
     fn test_insert_and_get_if_not_expired() {
