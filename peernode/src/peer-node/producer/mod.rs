@@ -1,7 +1,5 @@
 mod db;
-pub mod files;
 mod http;
-pub mod jobs;
 
 use crate::peer::MarketClient;
 use std::collections::HashMap;
@@ -10,14 +8,14 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use proto::market::{FileInfoHash, User};
 
-use self::files::LocalFileInfo;
+use crate::transfer::files::{FileMap, LocalFileInfo};
 
 pub async fn start_server(
     files: HashMap<FileInfoHash, LocalFileInfo>,
     port: String,
 ) -> tokio::task::JoinHandle<()> {
     // Launch the HTTP server in the background
-    let http_file_map = Arc::new(files::FileMap::new(files));
+    let http_file_map = Arc::new(FileMap::new(files));
     tokio::spawn(async move {
         if let Err(e) = http::run(http_file_map, port).await {
             eprintln!("HTTP server error: {}", e);

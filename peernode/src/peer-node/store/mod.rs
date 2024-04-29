@@ -1,9 +1,9 @@
 use crate::{
     consumer::encode::EncodedUser,
     peer::MarketClient,
-    producer::{
-        self,
-        files::{get_file_info, FileHash, FileMap, LocalFileInfo},
+    producer,
+    transfer::{
+        files::{get_file_info, LocalFileInfo},
         jobs::Jobs,
     },
 };
@@ -135,9 +135,7 @@ impl Configurations {
     }
 
     pub async fn get_hash(&self, file_path: String) -> Result<FileInfoHash> {
-        Ok(producer::files::get_file_info(&PathBuf::from(file_path))
-            .await?
-            .get_hash())
+        Ok(get_file_info(&PathBuf::from(file_path)).await?.get_hash())
     }
 
     pub fn jobs(&self) -> &Jobs {

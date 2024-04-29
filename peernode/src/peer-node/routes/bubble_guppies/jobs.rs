@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     consumer::encode::{self, encode_user, try_decode_user, EncodedUser},
-    producer::{
+    producer,
+    transfer::{
         self,
         jobs::{JobListItem, JobStatus},
     },
@@ -213,7 +214,7 @@ async fn start_jobs(
         match config.jobs().get_job(&job_id).await {
             Some(job) => {
                 let token = config.get_token(job.lock().await.encoded_producer.clone());
-                producer::jobs::start(job, token).await;
+                transfer::jobs::start(job, token).await;
             }
             None => return (StatusCode::NOT_FOUND, "Job not found").into_response(),
         }

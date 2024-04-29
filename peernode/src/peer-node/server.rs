@@ -2,6 +2,7 @@ pub mod consumer;
 pub mod peer;
 pub mod producer;
 pub mod store;
+pub mod transfer;
 
 mod routes {
     pub mod bubble_guppies;
