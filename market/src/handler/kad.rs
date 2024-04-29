@@ -111,18 +111,19 @@ impl<'a> KadHandler<'a> {
                                 self.query_handler.respond(
                                     Query::Kad(qid),
                                     Ok(SuccessfulResponse::KadResponse(
-                                        KadSuccessfulResponse::GetProviders { providers },
+                                        KadSuccessfulResponse::GetProviders {
+                                            providers: providers.into_iter().collect(),
+                                        },
                                     )),
                                 );
                             }
-                            GetProvidersOk::FinishedWithNoAdditionalRecord { closest_peers } => {
+                            GetProvidersOk::FinishedWithNoAdditionalRecord { .. } => {
                                 warn!("[Kademlia] - GetProviders query didn't necessarily fail, but no additional records were found.");
                                 self.query_handler.respond(
                                     Query::Kad(qid),
-                                    Err(FailureResponse::KadError(
-                                        KadFailureResponse::GetProviders {
-                                            closest_peers,
-                                            error: "no additional records found".to_owned(),
+                                    Ok(SuccessfulResponse::KadResponse(
+                                        KadSuccessfulResponse::GetProviders {
+                                            providers: Default::default(),
                                         },
                                     )),
                                 );
@@ -130,13 +131,12 @@ impl<'a> KadHandler<'a> {
                         }
                     };
                 }
-                Err(GetProvidersError::Timeout { closest_peers, .. }) => {
+                Err(GetProvidersError::Timeout { .. }) => {
                     error!("[Kademlia] - GetProviders query failed due to timeout.");
                     self.query_handler.respond(
                         Query::Kad(qid),
                         Err(FailureResponse::KadError(
                             KadFailureResponse::GetProviders {
-                                closest_peers,
                                 error: "timeout".to_owned(),
                             },
                         )),

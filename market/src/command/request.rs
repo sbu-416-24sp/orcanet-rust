@@ -15,6 +15,7 @@ pub(crate) enum Request {
     ConnectedPeers,
     ConnectedTo { peer_id: PeerId },
     Kad(KadRequest),
+    LocalMarketMap(LmmRequest),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -30,4 +31,9 @@ pub(crate) enum KadRequest {
     GetProviders {
         file_info_hash: FileInfoHash,
     },
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub(crate) enum LmmRequest {
+    IsLocalFileOwner { file_info_hash: FileInfoHash },
 }

@@ -6,9 +6,13 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
 use crate::command::request::KadRequest;
+use crate::command::request::LmmRequest;
 use crate::command::Message;
 use crate::FailureResponse;
 use crate::FileInfoHash;
+use crate::KadSuccessfulResponse;
+use crate::LmmSuccessfulResponse;
+use crate::SuccessfulResponse;
 use crate::{command::request::Request, Response};
 
 #[derive(Debug)]
@@ -75,11 +79,37 @@ impl Peer {
     }
 
     #[inline(always)]
+    pub async fn is_local_file_owner(&self, file_info_hash: impl Into<FileInfoHash>) -> bool {
+        if let Ok(SuccessfulResponse::LmmResponse(LmmSuccessfulResponse::IsLocalFileOwner {
+            is_owner,
+        })) = self
+            .send(Request::LocalMarketMap(LmmRequest::IsLocalFileOwner {
+                file_info_hash: file_info_hash.into(),
+            }))
+            .await
+        {
+            is_owner
+        } else {
+            panic!("This should never run since there is no error ever sent back.")
+        }
+    }
+
+    #[inline(always)]
     pub async fn get_providers(&self, file_info_hash: impl Into<FileInfoHash>) -> Response {
-        self.send(Request::Kad(KadRequest::GetProviders {
-            file_info_hash: file_info_hash.into(),
-        }))
-        .await
+        let file_info_hash: FileInfoHash = file_info_hash.into();
+        let is_local_file_owner = self.is_local_file_owner(file_info_hash.clone()).await;
+        let mut res = self
+            .send(Request::Kad(KadRequest::GetProviders { file_info_hash }))
+            .await;
+        if let Ok(SuccessfulResponse::KadResponse(KadSuccessfulResponse::GetProviders {
+            ref mut providers,
+        })) = res
+        {
+            if is_local_file_owner {
+                providers.push(*self.peer_id());
+            }
+        }
+        res
     }
 
     #[inline(always)]
