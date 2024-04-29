@@ -1,6 +1,7 @@
 use libp2p::identity::Keypair;
 use libp2p::PeerId;
 use proto::market::FileInfo;
+use proto::market::HoldersResponse;
 use proto::market::User;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -11,8 +12,10 @@ use crate::command::request::ReqResRequest;
 use crate::command::Message;
 use crate::FailureResponse;
 use crate::FileInfoHash;
+use crate::FileResponse;
 use crate::KadSuccessfulResponse;
 use crate::LmmSuccessfulResponse;
+use crate::ReqResSuccessfulResponse;
 use crate::SuccessfulResponse;
 use crate::{command::request::Request, Response};
 
@@ -108,7 +111,6 @@ impl Peer {
         .await
     }
 
-    #[inline(always)]
     pub async fn get_providers(&self, file_info_hash: impl Into<FileInfoHash>) -> Response {
         let file_info_hash: FileInfoHash = file_info_hash.into();
         let is_local_file_owner = self.is_local_file_owner(file_info_hash.clone()).await;
@@ -127,8 +129,39 @@ impl Peer {
     }
 
     #[inline(always)]
-    pub async fn check_holders(&self, file_info: impl Into<FileInfoHash>) -> Response {
-        todo!()
+    pub async fn check_holders(&self, file_info_hash: impl Into<FileInfoHash>) -> Response {
+        let file_info_hash: FileInfoHash = file_info_hash.into();
+        let res = self.get_providers(file_info_hash.clone()).await;
+        if let Ok(SuccessfulResponse::KadResponse(KadSuccessfulResponse::GetProviders {
+            providers,
+        })) = res
+        {
+            let mut holders = Vec::new();
+            let mut file_info = None;
+            for provider in providers {
+                // TODO: can optimize this but lazy for now
+                let maybe_holder = self
+                    .get_holder_by_peer_id(provider, file_info_hash.clone())
+                    .await;
+                if let Ok(SuccessfulResponse::ReqResResponse(
+                    ReqResSuccessfulResponse::GetHolderByPeerId {
+                        holder: FileResponse::HasFile(holder),
+                    },
+                )) = maybe_holder
+                {
+                    if file_info.is_none() {
+                        file_info = Some(holder.file_info);
+                    }
+                    holders.push(holder.user);
+                }
+            }
+            Ok(SuccessfulResponse::CheckHolders(HoldersResponse {
+                file_info,
+                holders,
+            }))
+        } else {
+            res
+        }
     }
 
     #[inline(always)]
