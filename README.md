@@ -5,6 +5,7 @@ Orcanet is a distributed file network which allows users to buy and sell files b
 ## Todos
 - Implement KAD network to production
 - Combine peers and market to the same cargo package
+- Complete rest of routes as specified by [API Docs](https://docs.google.com/document/d/10wHEIvt0l4B_zKzHb0WI2yd87cnjuSQNuwaLOdUai40/)
 
 ## Setup
 
