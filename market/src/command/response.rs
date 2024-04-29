@@ -2,6 +2,8 @@ use libp2p::{Multiaddr, PeerId};
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 
+use crate::lmm::SupplierInfo;
+
 pub type Response = Result<SuccessfulResponse, FailureResponse>;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -55,3 +57,9 @@ pub enum KadFailureResponse {
 #[derive(Debug, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum LmmFailureResponse {}
+
+#[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ReqResSuccessfulResponse {
+    GetHolderByPeerId { holder: SupplierInfo },
+}

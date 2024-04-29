@@ -6,7 +6,7 @@ use crate::{
         request::{Query, ReqResRequest},
         QueryHandler,
     },
-    lmm::{FileInfoHash, FileResponse, LocalMarketMap, SupplierInfo},
+    lmm::{FileInfoHash, FileResponse, LocalMarketMap},
 };
 
 use super::{CommandRequestHandler, EventHandler};

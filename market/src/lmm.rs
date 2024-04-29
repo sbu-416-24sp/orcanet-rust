@@ -86,9 +86,9 @@ impl From<FileInfoHash> for Vec<u8> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) struct SupplierInfo {
-    pub(crate) file_info: FileInfo,
-    pub(crate) user: User,
+pub struct SupplierInfo {
+    pub file_info: FileInfo,
+    pub user: User,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
