@@ -1,4 +1,7 @@
 use libp2p::{kad::QueryId, request_response::OutboundRequestId, PeerId};
+use proto::market::{FileInfo, User};
+
+use crate::FileInfoHash;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) enum Query {
@@ -16,5 +19,12 @@ pub(crate) enum Request {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) enum KadRequest {
-    GetClosestPeers { key: Vec<u8> },
+    GetClosestPeers {
+        key: Vec<u8>,
+    },
+    RegisterFile {
+        file_info_hash: FileInfoHash,
+        file_info: FileInfo,
+        user: User,
+    },
 }

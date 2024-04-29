@@ -1,20 +1,21 @@
 use libp2p::{
     kad::{
-        BootstrapError, Event, GetClosestPeersError, InboundRequest, ProgressStep, QueryId,
-        QueryResult, QueryStats,
+        AddProviderError, AddProviderOk, BootstrapError, Event, GetClosestPeersError,
+        InboundRequest, ProgressStep, QueryId, QueryResult,
     },
     Swarm,
 };
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use tokio::sync::oneshot;
 
 use crate::{
     behaviour::Behaviour,
     command::{
-        request::{KadRequest, Query, Request},
+        request::{KadRequest, Query},
         QueryHandler,
     },
-    lmm::LocalMarketMap,
+    handler::send_err,
+    lmm::{LocalMarketMap, SupplierInfo},
     FailureResponse, KadFailureResponse, KadSuccessfulResponse, Response, SuccessfulResponse,
 };
 
@@ -60,13 +61,7 @@ impl<'a> KadHandler<'a> {
         }
     }
 
-    fn handle_outbound_event(
-        &mut self,
-        qid: QueryId,
-        result: QueryResult,
-        stats: QueryStats,
-        step: ProgressStep,
-    ) {
+    fn handle_outbound_event(&mut self, qid: QueryId, result: QueryResult, step: ProgressStep) {
         match result {
             QueryResult::Bootstrap(result) => match result {
                 Ok(ok) => {
@@ -108,7 +103,28 @@ impl<'a> KadHandler<'a> {
                 }
             }
             QueryResult::GetProviders(_) => todo!(),
-            QueryResult::StartProviding(_) => todo!(),
+            QueryResult::StartProviding(result) => match result {
+                Ok(AddProviderOk { .. }) => {
+                    info!("[Kademlia] - StartProviding query successful");
+                    self.query_handler.respond(
+                        Query::Kad(qid),
+                        Ok(SuccessfulResponse::KadResponse(
+                            KadSuccessfulResponse::RegisterFile,
+                        )),
+                    )
+                }
+                Err(AddProviderError::Timeout { .. }) => {
+                    error!("[Kademlia] - StartProviding query failed due to timeout.");
+                    self.query_handler.respond(
+                        Query::Kad(qid),
+                        Err(FailureResponse::KadError(
+                            KadFailureResponse::RegisterFile {
+                                error: "timeout".to_owned(),
+                            },
+                        )),
+                    )
+                }
+            },
             _ => {}
         }
     }
@@ -121,12 +137,9 @@ impl<'a> EventHandler for KadHandler<'a> {
         match event {
             Event::InboundRequest { request } => self.handle_inbound_request(request),
             Event::OutboundQueryProgressed {
-                id,
-                result,
-                step,
-                stats,
+                id, result, step, ..
             } => {
-                self.handle_outbound_event(id, result, stats, step);
+                self.handle_outbound_event(id, result, step);
             }
             Event::RoutingUpdated {
                 peer,
@@ -170,6 +183,32 @@ impl<'a> CommandRequestHandler for KadHandler<'a> {
             KadRequest::GetClosestPeers { key } => {
                 let qid = self.swarm.behaviour_mut().kad.get_closest_peers(key);
                 self.query_handler.add_query(Query::Kad(qid), responder);
+            }
+            KadRequest::RegisterFile {
+                file_info_hash,
+                file_info,
+                user,
+            } => {
+                let res = self
+                    .swarm
+                    .behaviour_mut()
+                    .kad
+                    .start_providing(file_info_hash.clone().into_bytes().into());
+                match res {
+                    Ok(qid) => {
+                        self.lmm
+                            .insert(file_info_hash, SupplierInfo { file_info, user });
+                        self.query_handler.add_query(Query::Kad(qid), responder);
+                    }
+                    Err(err) => {
+                        send_err!(
+                            responder,
+                            FailureResponse::KadError(KadFailureResponse::RegisterFile {
+                                error: err.to_string(),
+                            })
+                        );
+                    }
+                };
             }
         }
     }

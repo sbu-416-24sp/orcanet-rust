@@ -83,8 +83,14 @@ impl Peer {
     pub async fn register_file(
         &self,
         user: impl Into<User>,
-        fileinfo: impl Into<FileInfo>,
+        file_info_hash: impl Into<FileInfoHash>,
+        file_info: impl Into<FileInfo>,
     ) -> Response {
-        todo!()
+        self.send(Request::Kad(KadRequest::RegisterFile {
+            file_info_hash: file_info_hash.into(),
+            file_info: file_info.into(),
+            user: user.into(),
+        }))
+        .await
     }
 }

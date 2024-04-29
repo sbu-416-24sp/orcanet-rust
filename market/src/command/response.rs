@@ -25,10 +25,13 @@ pub enum FailureResponse {
 #[derive(Debug)]
 pub enum KadSuccessfulResponse {
     GetClosestPeers { peers: Vec<PeerId> },
+    RegisterFile,
 }
 
 #[derive(Debug, Error)]
 pub enum KadFailureResponse {
     #[error("Failed to get closest peers: {error}")]
     GetClosestPeers { key: Vec<u8>, error: String },
+    #[error("Failed to register file: {error}")]
+    RegisterFile { error: String },
 }
