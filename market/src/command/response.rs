@@ -4,7 +4,7 @@ use tokio::sync::oneshot::error::RecvError;
 
 pub type Response = Result<SuccessfulResponse, FailureResponse>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SuccessfulResponse {
     Listeners { listeners: Vec<Multiaddr> },
     ConnectedPeers { peers: Vec<PeerId> },
@@ -12,7 +12,7 @@ pub enum SuccessfulResponse {
     KadResponse(KadSuccessfulResponse),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum FailureResponse {
     #[error("Failed to send request: {0}")]
     SendError(String),
@@ -22,13 +22,16 @@ pub enum FailureResponse {
     KadError(KadFailureResponse),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum KadSuccessfulResponse {
     GetClosestPeers { peers: Vec<PeerId> },
+    RegisterFile,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum KadFailureResponse {
     #[error("Failed to get closest peers: {error}")]
     GetClosestPeers { key: Vec<u8>, error: String },
+    #[error("Failed to register file: {error}")]
+    RegisterFile { error: String },
 }
