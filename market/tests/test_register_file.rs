@@ -1,4 +1,6 @@
-use orcanet_market::{bridge::spawn, Config, FileInfoHash};
+use orcanet_market::{
+    bridge::spawn, Config, FileInfoHash, KadSuccessfulResponse, SuccessfulResponse,
+};
 use proto::market::{FileInfo, User};
 
 #[tokio::test]
@@ -19,5 +21,10 @@ async fn test_register_file() {
     };
     let file_info_hash = FileInfoHash::new(file_info.hash_to_string());
     let res = peer.register_file(user, file_info_hash, file_info).await;
-    println!("{:?}", res);
+    assert_eq!(
+        res,
+        Ok(SuccessfulResponse::KadResponse(
+            KadSuccessfulResponse::RegisterFile
+        ))
+    )
 }
