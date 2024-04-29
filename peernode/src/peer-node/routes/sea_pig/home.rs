@@ -12,7 +12,7 @@ use axum::{
 use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
 
-use crate::ServerState;
+use crate::{producer, ServerState};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(non_snake_case)]
@@ -75,10 +75,20 @@ async fn upload_file(
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
 
+    // add file to peer config
     let hash = match config.add_file(&PathBuf::from(filePath), price).await {
         Ok(hash) => hash,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to add file").into_response(),
     };
+    // register file in market
+    let port = config.get_port();
+    let _ = producer::register_files(
+        config.get_files(),
+        config.get_market_client().await.unwrap(),
+        port,
+        None,
+    )
+    .await;
     let hash_str = hash.as_str();
 
     Response::builder()
@@ -129,13 +139,57 @@ const GIRAFFE_HASH: &str = "908b7415fea62428bb69eb01d8a3ce64190814cc01f01cae0289
 #[ignore]
 async fn seapig_test_file_info() {
     let client = reqwest::Client::new();
-    // not registered in market
+
+    //// in case other test gets run first
+    //let _delete_res = client
+    //    .delete(format!("{BASE_URL}/file/{GIRAFFE_HASH}"))
+    //    .send()
+    //    .await
+    //    .expect("a response");
+
+    //// not registered in market
+    //let info_res = client
+    //    .get(format!("{BASE_URL}/file/{GIRAFFE_HASH}/info"))
+    //    .send()
+    //    .await
+    //    .expect("a response");
+
+    //assert_ne!(info_res.status(), StatusCode::OK);
+
+    let upload_res = client
+        .post(format!("{BASE_URL}/upload"))
+        .json(&UploadParams {
+            filePath: "files/giraffe.jpg".into(),
+            price: 416,
+        })
+        .send()
+        .await
+        .expect("a response");
+
+    let HashBody { hash } = upload_res.json().await.expect("to deserialize");
+    assert_eq!(hash, GIRAFFE_HASH);
+
     let info_res = client
         .get(format!("{BASE_URL}/file/{GIRAFFE_HASH}/info"))
         .send()
         .await
         .expect("a response");
-    assert_ne!(info_res.status(), StatusCode::OK);
+
+    let FileInfo {
+        name,
+        size,
+        numberOfPeers,
+        listProducers,
+    } = info_res.json().await.expect("to deserialize");
+    assert_eq!(name, "giraffe.jpg");
+    const GIRAFFE_SIZE: usize = 1167458;
+    assert_eq!(size as usize, GIRAFFE_SIZE);
+    assert!(numberOfPeers > 1);
+    
+    #[allow(dead_code)]
+    let &User { price , .. } = &listProducers[0];
+    //assert_eq!(port, 808o0);
+    assert_eq!(price, 416);
 }
 
 #[tokio::test]

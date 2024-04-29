@@ -293,16 +293,17 @@ const GIRAFFE_HASH: &str = "908b7415fea62428bb69eb01d8a3ce64190814cc01f01cae0289
 
 #[tokio::test]
 #[ignore]
-async fn manta_test_find_peers() {
+async fn bubbleguppies_test_find_peers() {
     let client = reqwest::Client::new();
     // not registered in market
     let find_res = client
-        .get(format!("{BASE_URL}/file/{GIRAFFE_HASH}"))
+        .get(format!("{BASE_URL}/find-peer/{GIRAFFE_HASH}"))
         .send()
         .await
         .expect("a response");
 
-    let PeerResponse { peers } = find_res.json().await.expect("to deserialize");
     // file should not have been added yet
-    assert!(peers.is_empty());
+    assert_ne!(find_res.status(), StatusCode::OK);
+
+    //let PeerResponse { peers } = find_res.json().await.expect("to deserialize");
 }
