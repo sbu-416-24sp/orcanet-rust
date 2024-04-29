@@ -18,7 +18,6 @@ struct FileParams {
     continue_download: String,
 }
 
-
 // GetFileInfo - Fetches files info from a given hash/CID. Should return name, size, # of peers, whatever other info you can give.
 // TODO: update to the new spec on the doc
 async fn get_file_info(
