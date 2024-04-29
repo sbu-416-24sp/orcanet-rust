@@ -1,5 +1,7 @@
 use crate::producer;
-use crate::{grpc::MarketClient, producer::jobs::Jobs};
+use crate::transfer::jobs::Jobs;
+use crate::transfer::files;
+use crate::grpc::MarketClient;
 use anyhow::Result;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
@@ -101,7 +103,7 @@ impl Configurations {
         // open the file
         let mut file = std::fs::File::open(file_path)?;
         // hash the file
-        let hash = producer::files::hash_file(&mut file)?;
+        let hash = files::hash_file(&mut file)?;
         Ok(hash)
     }
 

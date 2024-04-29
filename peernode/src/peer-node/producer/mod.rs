@@ -1,8 +1,7 @@
 mod db;
-pub mod files;
 mod http;
-pub mod jobs;
 
+use crate::transfer::files;
 use crate::grpc::MarketClient;
 use std::collections::HashMap;
 use std::path::PathBuf;

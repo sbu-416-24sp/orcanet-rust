@@ -2,6 +2,7 @@ pub mod consumer;
 pub mod grpc;
 pub mod producer;
 pub mod store;
+mod transfer;
 
 mod routes {
     pub mod file_routes;
