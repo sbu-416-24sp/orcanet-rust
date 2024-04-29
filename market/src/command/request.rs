@@ -16,7 +16,7 @@ pub(crate) enum Request {
     ConnectedTo { peer_id: PeerId },
     Kad(KadRequest),
     LocalMarketMap(LmmRequest),
-    RequestResponse(ReqResRequest),
+    ReqRes(ReqResRequest),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]

@@ -272,7 +272,7 @@ impl<'a> CommandRequestHandler for Handler<'a> {
                 let mut handler = LocalMarketMapHandler { lmm: self.lmm };
                 handler.handle_command(lmm_request, responder);
             }
-            Request::RequestResponse(req_res_request) => {
+            Request::ReqRes(req_res_request) => {
                 let mut handler = ReqResHandler::new(self.swarm, self.lmm, self.query_handler);
                 handler.handle_command(req_res_request, responder);
             }
