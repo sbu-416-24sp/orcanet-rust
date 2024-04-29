@@ -1,8 +1,8 @@
 mod db;
-pub mod files;
 mod http;
 
 use crate::grpc::MarketClient;
+use crate::transfer::files;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -12,10 +12,11 @@ use anyhow::{anyhow, Result};
 pub async fn start_server(
     files: HashMap<String, PathBuf>,
     prices: HashMap<String, i64>,
+    file_names: HashMap<String, String>,
     port: String,
 ) -> tokio::task::JoinHandle<()> {
     // Launch the HTTP server in the background
-    let http_file_map = Arc::new(files::FileMap::new(files, prices));
+    let http_file_map = Arc::new(files::FileMap::new(files, prices, file_names));
     tokio::spawn(async move {
         if let Err(e) = http::run(http_file_map, port).await {
             eprintln!("HTTP server error: {}", e);
