@@ -11,7 +11,7 @@ use proto::market::FileInfoHash;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    consumer::encode::{self, try_decode_user},
+    consumer::encode::{self, encode_user, try_decode_user, EncodedUser},
     producer::{
         self,
         jobs::{JobListItem, JobStatus},
@@ -28,49 +28,50 @@ struct AddJob {
     fileHash: String,
     peerId: String,
 }
-// returns { jobId: JobID }
 async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> impl IntoResponse {
     let mut config = state.config.lock().await;
 
-    let file_hash = job.fileHash;
+    let file_info_hash = FileInfoHash(job.fileHash);
     let peer_id = job.peerId;
+    let mut user = None;
+    let file_info = match config.get_market_client().await {
+        Ok(market) => {
+            match market.check_holders(file_info_hash).await {
+                Ok(res) => {
+                    for producer in res.holders {
+                        if peer_id == producer.id {
+                            user = Some(producer);
+                            break;
+                        }
+                    }
+                    res.file_info.unwrap()
+                }
+                _ => return (StatusCode::SERVICE_UNAVAILABLE, "No holders of file").into_response(),
+            }
+        }
+        Err(_) => return (StatusCode::SERVICE_UNAVAILABLE, "Market not available").into_response(),
+    };
+    let user = match user {
+        Some(user) => user,
+        None => return (StatusCode::BAD_REQUEST, format!("Holder {peer_id} not found")).into_response(),
+    };
 
-    todo!();
-    //let file_info;
-    //let user = match config.get_market_client().await {
-    //    Ok(market) => {
-    //        match market.check_holders(file_hash.clone()).await {
-    //            Ok(res) => {
-    //                res.into_iter().filter(|user| user.username == peer_id).next()
-    //            }
-    //            _ => return (StatusCode::SERVICE_UNAVAILABLE, "Could not check holders").into_response(),
-    //        }
-    //    }
-    //    Err(_) => return (StatusCode::SERVICE_UNAVAILABLE, "Market not available").into_response(),
-    //};
-    //let user = match user {
-    //    Some(user) => user,
-    //    None => return (StatusCode::NOT_FOUND, "Peer is not providing file").into_response(),
-    //};
-    //let encoded_producer = encode::encode_user(&user);
-    //println!("Encoded producer: {encoded_producer}");
-    //println!("id: {peer_id}");
-    //let job_id = config
-    //    .jobs_mut()
-    //    .add_job(
-    //        file_info.file_hash,
-    //        file_info.file_size as u64,
-    //        file_info.file_name,
-    //        user.price,
-    //        peer_id.clone(),
-    //        encoded_producer,
-    //    )
-    //    .await;
+    let job_id = config
+        .jobs_mut()
+        .add_job(
+            file_info.file_hash,
+            file_info.file_size as u64,
+            file_info.file_name,
+            user.price,
+            peer_id.clone(),
+            encode_user(&user),
+        )
+        .await;
 
-    //Response::builder()
-    //    .status(StatusCode::OK)
-    //    .body(Body::from(format!("{{\"jobID\": \"{}\"}}", job_id)))
-    //    .unwrap()
+    Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::from(format!(r#"{{"jobID":"{job_id}"}}"#)))
+        .unwrap()
 }
 
 // returns all peers hosting a given file
@@ -122,11 +123,7 @@ async fn find_peer(
 
     Response::builder()
         .status(StatusCode::OK)
-        .body(Body::from(format!(
-            r#"
-{{"peers": {peers_serialized}}}
-"#,
-        )))
+        .body(Body::from(format!(r#"{{"peers":{peers_serialized}}}"#)))
         .unwrap()
 }
 
