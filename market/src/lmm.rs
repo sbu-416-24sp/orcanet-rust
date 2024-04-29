@@ -91,6 +91,12 @@ pub(crate) struct SupplierInfo {
     pub(crate) user: User,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub(crate) enum FileResponse {
+    HasFile(SupplierInfo),
+    NoFile,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
