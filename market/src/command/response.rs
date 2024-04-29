@@ -2,7 +2,7 @@ use libp2p::{Multiaddr, PeerId};
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 
-use crate::lmm::SupplierInfo;
+use crate::lmm::FileResponse;
 
 pub type Response = Result<SuccessfulResponse, FailureResponse>;
 
@@ -14,6 +14,7 @@ pub enum SuccessfulResponse {
     ConnectedTo { connected: bool },
     KadResponse(KadSuccessfulResponse),
     LmmResponse(LmmSuccessfulResponse),
+    ReqResResponse(ReqResSuccessfulResponse),
 }
 
 #[derive(Debug, PartialEq, Eq, Error)]
@@ -27,6 +28,8 @@ pub enum FailureResponse {
     KadError(KadFailureResponse),
     #[error("[Local Market Map Error] - {0}")]
     LmmError(LmmFailureResponse),
+    #[error("[Request Response Error] - {0}")]
+    ReqResError(ReqResFailureResponse),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -61,5 +64,12 @@ pub enum LmmFailureResponse {}
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ReqResSuccessfulResponse {
-    GetHolderByPeerId { holder: SupplierInfo },
+    GetHolderByPeerId { holder: FileResponse },
+}
+
+#[derive(Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum ReqResFailureResponse {
+    #[error("Failed to get holder by peer id: {error}")]
+    GetHolderByPeerId { error: String },
 }

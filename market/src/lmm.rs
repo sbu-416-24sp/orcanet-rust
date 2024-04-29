@@ -92,7 +92,7 @@ pub struct SupplierInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum FileResponse {
+pub enum FileResponse {
     HasFile(SupplierInfo),
     NoFile,
 }
