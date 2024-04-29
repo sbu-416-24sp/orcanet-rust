@@ -1,5 +1,11 @@
 # Orcanet Rust
 
+Orcanet is a distributed file network which allows users to buy and sell files based on the hash of their data, with built in checksums per chunk to prevent scams or data corruption. Payment is managed through the Orcacoin fork of the Bitcoin network
+
+## Todos
+- Implement KAD network to production
+- Combine peers and market to the same cargo package
+
 ## Setup
 
 1. Install [Rust](https://www.rust-lang.org/tools/install)
