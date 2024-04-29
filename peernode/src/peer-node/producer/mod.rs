@@ -74,7 +74,7 @@ pub async fn register_files(
         },
     ) in files
     {
-        println!("Producer: Registering file with hash {hash} and price {price}",);
+        println!("Producer {producer_id}: Registering file with hash {hash} and price {price}",);
         client
             .register_file(
                 User {
