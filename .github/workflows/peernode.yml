@@ -39,6 +39,8 @@ jobs:
       working-directory: peernode
       run: cargo test --verbose
 
+# TODO: get this working on Github Actions
+# the tests currently work locally with a server running, but not on Github Actions
 #    - name: Start server and run sea pig tests
 #      working-directory: peernode
 #      run: |
