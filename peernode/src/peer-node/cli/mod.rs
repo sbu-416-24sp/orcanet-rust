@@ -297,6 +297,7 @@ pub async fn handle_arg_matches(
                         Some(file_hash) => file_hash.clone(),
                         None => Err(anyhow!("No file hash provided"))?,
                     };
+                    let file_info_hash = FileInfoHash(file_hash);
                     let producer = match get_matches.get_one::<String>("PRODUCER") {
                         Some(producer) => producer.clone(),
                         None => Err(anyhow!("No producer provided"))?,
@@ -318,7 +319,7 @@ pub async fn handle_arg_matches(
                     let token = config.get_token(producer.clone());
                     let ret_token = match consumer::get_file(
                         producer_user,
-                        file_hash,
+                        file_info_hash,
                         token,
                         chunk_num,
                         continue_download,

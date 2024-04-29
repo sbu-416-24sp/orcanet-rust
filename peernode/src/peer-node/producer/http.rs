@@ -86,8 +86,8 @@ async fn handle_file_request(
     };
 
     // Check if an access token is expected (first chunk is "free")
-    println!("expected: {}, got: {}", request.access_token, auth_token);
-    if request.chunks_sent == 0 {
+    //println!("expected token: {}, got: {}", request.access_token, auth_token);
+    if request.chunks_sent == 0 || chunk == 0 {
         request.access_token = db::generate_access_token();
     } else if request.access_token != auth_token {
         // throw out request to prevent blocking transfers on subsequent requests

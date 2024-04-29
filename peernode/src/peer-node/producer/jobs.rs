@@ -1,4 +1,5 @@
 use core::fmt;
+use proto::market::FileInfoHash;
 use rand::Rng;
 use serde::Serialize;
 use std::{
@@ -28,7 +29,7 @@ pub struct Jobs {
 #[derive(Debug)]
 pub struct Job {
     job_id: String,
-    file_hash: String,
+    file_info_hash: FileInfoHash,
     file_name: String,
     file_size: u64,
     time_queued: u64, // unix time in seconds
@@ -88,21 +89,21 @@ pub async fn start(job: AsyncJob, token: String) {
         let producer_user = match encode::try_decode_user(lock.encoded_producer.as_str()) {
             Ok(user) => user,
             Err(e) => {
-                eprintln!("Failed to decode producer: {}", e);
+                eprintln!("Failed to decode producer: {e}");
                 lock.status = JobStatus::Failed;
                 return;
             }
         };
         lock.status = JobStatus::Active(tokio::spawn(async move {
             let mut lock = job.lock().await;
-            let file_hash = lock.file_hash.clone();
+            let file_info_hash = lock.file_info_hash.clone();
             let mut chunk_num = next_chunk;
             let mut return_token = token;
             loop {
                 drop(lock);
                 match get_file_chunk(
                     producer_user.clone(),
-                    file_hash.clone(),
+                    file_info_hash.clone(),
                     return_token.clone(),
                     chunk_num,
                 )
@@ -186,7 +187,7 @@ impl Jobs {
 
     pub async fn add_job(
         &self,
-        file_hash: String,
+        file_info_hash: FileInfoHash,
         file_size: u64,
         file_name: String,
         price: i64,
@@ -202,7 +203,7 @@ impl Jobs {
         // Add the job to the map
         let job = Job {
             job_id: job_id.clone(),
-            file_hash: file_hash.clone(),
+            file_info_hash: file_info_hash.clone(),
             file_name: file_name.clone(),
             file_size,
             time_queued: current_time_secs(),
@@ -235,7 +236,7 @@ impl Jobs {
         let job = job.lock().await;
 
         let job_info = JobInfo {
-            fileHash: job.file_hash.clone(),
+            fileHash: job.file_info_hash.as_str().to_owned(),
             fileName: job.file_name.clone(),
             fileSize: job.file_size,
             accumulatedMemory: 0, //TODO

@@ -41,7 +41,7 @@ pub async fn list_producers(
 // get file I want by hash from producer
 pub async fn get_file(
     user: User,
-    file_hash: String,
+    file_info_hash: FileInfoHash,
     token: String,
     chunk: u64,
     continue_download: bool,
@@ -51,7 +51,7 @@ pub async fn get_file(
     loop {
         match get_file_chunk(
             user.clone(),
-            file_hash.clone(),
+            file_info_hash.clone(),
             return_token.clone(),
             chunk_num,
         )
@@ -80,11 +80,11 @@ pub async fn get_file(
 // get individual chunk of file from producer by hash
 pub async fn get_file_chunk(
     producer: User,
-    file_hash: String,
+    file_info_hash: FileInfoHash,
     token: String,
     chunk: u64,
 ) -> Result<GetFileResponse> {
-    return http::get_file_chunk(producer, file_hash.clone(), token, chunk).await;
+    return http::get_file_chunk(producer, file_info_hash.clone(), token, chunk).await;
 }
 
 // TODO: implement upload_file

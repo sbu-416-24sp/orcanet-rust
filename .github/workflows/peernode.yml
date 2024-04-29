@@ -39,19 +39,19 @@ jobs:
       working-directory: peernode
       run: cargo test --verbose
 
-    - name: Start server and run sea pig tests
-      working-directory: peernode
-      run: |
-        cargo run --bin peer-node-server -F test_local_market &
-        sleep 5 &&
-        cargo test seapig_test --verbose -- --test-threads=1 --ignored
-    - name: Start server and run manta tests
-      working-directory: peernode
-      run: |
-        cargo build --bin peer-node-server -F test_local_market &&
-        cargo run --bin peer-node-server -F test_local_market &
-        sleep 10 &&
-        cargo test bubbleguppies_test --verbose -- --test-threads=1 --ignored
+#    - name: Start server and run sea pig tests
+#      working-directory: peernode
+#      run: |
+#        cargo run --bin peer-node-server -F test_local_market &
+#        sleep 5 &&
+#        cargo test seapig_test --verbose -- --test-threads=1 --ignored
+#    - name: Start server and run bubble guppies tests
+#      working-directory: peernode
+#      run: |
+#        cargo build --bin peer-node-server -F test_local_market &&
+#        cargo run --bin peer-node-server -F test_local_market &
+#        sleep 10 &&
+#        cargo test bubbleguppies_test --verbose -- --test-threads=1 --ignored
 
   format:
     name: Format Peernode

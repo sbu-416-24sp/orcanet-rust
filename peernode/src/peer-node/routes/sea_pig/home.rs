@@ -185,9 +185,9 @@ async fn seapig_test_file_info() {
     const GIRAFFE_SIZE: usize = 1167458;
     assert_eq!(size as usize, GIRAFFE_SIZE);
     assert!(numberOfPeers > 1);
-    
+
     #[allow(dead_code)]
-    let &User { price , .. } = &listProducers[0];
+    let &User { price, .. } = &listProducers[0];
     //assert_eq!(port, 808o0);
     assert_eq!(price, 416);
 }

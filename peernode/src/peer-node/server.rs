@@ -24,6 +24,8 @@ pub struct ServerState {
 async fn main() {
     let mut config = store::Configurations::new().await;
 
+    // Run http client
+    config.start_http_client(config.get_port()).await;
     // Run market client if it was previously configured
     let _ = config.get_market_client().await;
 

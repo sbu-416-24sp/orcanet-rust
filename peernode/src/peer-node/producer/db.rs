@@ -8,13 +8,13 @@ pub struct Consumers {
     consumers: RwLock<HashMap<String, AsyncConsumer>>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ConsumerRequest {
     pub chunks_sent: u64,
     pub access_token: String,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Consumer {
     pub wallet_address: String,
     pub requests: HashMap<String, ConsumerRequest>,

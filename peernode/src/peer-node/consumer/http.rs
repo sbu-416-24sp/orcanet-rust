@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use proto::market::User;
+use proto::market::{FileInfoHash, User};
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -13,14 +13,14 @@ pub enum GetFileResponse {
 
 pub async fn get_file_chunk(
     producer: User,
-    file_hash: String,
+    file_info_hash: FileInfoHash,
     token: String,
     chunk: u64,
 ) -> Result<GetFileResponse> {
     let start = Instant::now();
     // Get the link to the file
     let link = format!(
-        "http://{}:{}/file/{file_hash}?chunk={chunk}",
+        "http://{}:{}/file/{file_info_hash}?chunk={chunk}",
         producer.ip, producer.port
     );
     println!("HTTP: Fetching file chunk from {link}");

@@ -35,31 +35,35 @@ async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> i
     let peer_id = job.peerId;
     let mut user = None;
     let file_info = match config.get_market_client().await {
-        Ok(market) => {
-            match market.check_holders(file_info_hash).await {
-                Ok(res) => {
-                    for producer in res.holders {
-                        if peer_id == producer.id {
-                            user = Some(producer);
-                            break;
-                        }
+        Ok(market) => match market.check_holders(file_info_hash.clone()).await {
+            Ok(res) => {
+                for producer in res.holders {
+                    if peer_id == producer.id {
+                        user = Some(producer);
+                        break;
                     }
-                    res.file_info.unwrap()
                 }
-                _ => return (StatusCode::SERVICE_UNAVAILABLE, "No holders of file").into_response(),
+                res.file_info.unwrap()
             }
-        }
+            _ => return (StatusCode::SERVICE_UNAVAILABLE, "No holders of file").into_response(),
+        },
         Err(_) => return (StatusCode::SERVICE_UNAVAILABLE, "Market not available").into_response(),
     };
     let user = match user {
         Some(user) => user,
-        None => return (StatusCode::BAD_REQUEST, format!("Holder {peer_id} not found")).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Holder {peer_id} not found"),
+            )
+                .into_response()
+        }
     };
 
     let job_id = config
         .jobs_mut()
         .add_job(
-            file_info.file_hash,
+            file_info_hash,
             file_info.file_size as u64,
             file_info.file_name,
             user.price,
