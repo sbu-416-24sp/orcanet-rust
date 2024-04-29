@@ -7,6 +7,7 @@ use tokio::sync::oneshot;
 
 use crate::command::request::KadRequest;
 use crate::command::request::LmmRequest;
+use crate::command::request::ReqResRequest;
 use crate::command::Message;
 use crate::FailureResponse;
 use crate::FileInfoHash;
@@ -92,6 +93,19 @@ impl Peer {
         } else {
             panic!("This should never run since there is no error ever sent back.")
         }
+    }
+
+    #[inline(always)]
+    pub async fn get_holder_by_peer_id(
+        &self,
+        peer_id: PeerId,
+        file_info_hash: impl Into<FileInfoHash>,
+    ) -> Response {
+        self.send(Request::ReqRes(ReqResRequest::GetHolderByPeerId {
+            peer_id,
+            file_info_hash: file_info_hash.into(),
+        }))
+        .await
     }
 
     #[inline(always)]
