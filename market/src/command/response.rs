@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use libp2p::{Multiaddr, PeerId};
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
@@ -26,6 +28,7 @@ pub enum FailureResponse {
 pub enum KadSuccessfulResponse {
     GetClosestPeers { peers: Vec<PeerId> },
     RegisterFile,
+    GetProviders { providers: HashSet<PeerId> },
 }
 
 #[derive(Debug, PartialEq, Eq, Error)]
@@ -34,4 +37,9 @@ pub enum KadFailureResponse {
     GetClosestPeers { key: Vec<u8>, error: String },
     #[error("Failed to register file: {error}")]
     RegisterFile { error: String },
+    #[error("Failed to get providers: {error}")]
+    GetProviders {
+        closest_peers: Vec<PeerId>,
+        error: String,
+    },
 }

@@ -75,6 +75,14 @@ impl Peer {
     }
 
     #[inline(always)]
+    pub async fn get_providers(&self, file_info_hash: impl Into<FileInfoHash>) -> Response {
+        self.send(Request::Kad(KadRequest::GetProviders {
+            file_info_hash: file_info_hash.into(),
+        }))
+        .await
+    }
+
+    #[inline(always)]
     pub async fn check_holders(&self, file_info: impl Into<FileInfoHash>) -> Response {
         todo!()
     }

@@ -27,4 +27,7 @@ pub(crate) enum KadRequest {
         file_info: FileInfo,
         user: User,
     },
+    GetProviders {
+        file_info_hash: FileInfoHash,
+    },
 }
