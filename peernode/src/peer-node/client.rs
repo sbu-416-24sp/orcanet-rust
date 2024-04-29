@@ -3,6 +3,7 @@ pub mod consumer;
 pub mod peer;
 pub mod producer;
 pub mod store;
+mod transfer;
 
 use std::io::{self, Write};
 use store::Configurations;

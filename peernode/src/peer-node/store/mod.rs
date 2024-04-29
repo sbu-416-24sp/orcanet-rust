@@ -1,5 +1,7 @@
 use crate::peer::MarketClient;
 use crate::producer;
+use crate::transfer::files;
+use crate::transfer::jobs::Jobs;
 use anyhow::Result;
 use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
@@ -12,6 +14,7 @@ pub struct Configurations {
     props: Properties,
     http_client: Option<tokio::task::JoinHandle<()>>,
     market_client: Option<MarketClient>,
+    jobs_state: Jobs,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -21,6 +24,7 @@ pub struct Properties {
     market: String,
     files: HashMap<String, PathBuf>,
     prices: HashMap<String, i64>,
+    file_names: HashMap<String, String>,
     tokens: HashMap<String, String>,
     port: String,
     // market config
@@ -54,6 +58,7 @@ impl Configurations {
             props,
             http_client: None,
             market_client: None,
+            jobs_state: Jobs::new(),
         }
     }
 
@@ -63,6 +68,7 @@ impl Configurations {
             props: Properties {
                 name: "default".to_string(),
                 market: "localhost:50051".to_string(),
+                file_names: HashMap::new(),
                 files: HashMap::new(),
                 prices: HashMap::new(),
                 tokens: HashMap::new(),
@@ -72,6 +78,7 @@ impl Configurations {
             },
             http_client: None,
             market_client: None,
+            jobs_state: Jobs::new(),
         };
         default.write();
         return default;
@@ -102,7 +109,7 @@ impl Configurations {
         // open the file
         let mut file = std::fs::File::open(file_path)?;
         // hash the file
-        let hash = producer::files::hash_file(&mut file)?;
+        let hash = files::hash_file(&mut file)?;
         Ok(hash)
     }
 
@@ -110,8 +117,21 @@ impl Configurations {
         self.props.files.clone()
     }
 
+    pub fn get_file_names(&self) -> HashMap<String, String> {
+        self.props.file_names.clone()
+    }
+
     pub fn get_prices(&self) -> HashMap<String, i64> {
         self.props.prices.clone()
+    }
+
+    pub fn get_file_size(&self, file_path: String) -> u64 {
+        let metadata = fs::metadata(file_path).unwrap();
+        metadata.len()
+    }
+
+    pub fn get_jobs_state(&self) -> Jobs {
+        self.jobs_state.clone()
     }
 
     pub fn get_port(&self) -> String {
@@ -174,14 +194,15 @@ impl Configurations {
                 self.add_dir(path_string.to_owned(), price)?;
             }
             if path.is_file() {
-                self.add_file(path_string.to_owned(), price)
+                self.add_file(path_string.to_owned(), price);
             }
         }
         Ok(())
     }
 
     // add a single file to the list
-    pub fn add_file(&mut self, file: String, price: i64) {
+    // returns the hash
+    pub fn add_file(&mut self, file: String, price: i64) -> String {
         // hash the file
         let hash = match self.get_hash(file.clone()) {
             Ok(hash) => hash,
@@ -190,8 +211,11 @@ impl Configurations {
             }
         };
 
+        self.props.file_names.insert(hash.clone(), file.clone());
         self.props.files.insert(hash.clone(), PathBuf::from(file));
-        self.props.prices.insert(hash, price);
+        self.props.prices.insert(hash.clone(), price);
+
+        hash
     }
 
     // cli command to add a file/dir to the list
@@ -263,7 +287,7 @@ impl Configurations {
         self.set_port(port.clone());
 
         let join = // must run in separate thread so does not block cli inputs
-            producer::start_server(self.props.files.clone(), self.props.prices.clone(), port).await;
+            producer::start_server(self.props.files.clone(), self.props.prices.clone(), self.props.file_names.clone(), port).await;
         self.set_http_client(join);
     }
 
