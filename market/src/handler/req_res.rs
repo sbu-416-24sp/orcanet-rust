@@ -3,6 +3,7 @@ use libp2p::{
     Swarm,
 };
 use log::{error, info, warn};
+use tokio::sync::oneshot::Sender;
 
 use crate::{
     behaviour::Behaviour,
@@ -12,7 +13,7 @@ use crate::{
     },
     handler::send_ok,
     lmm::{FileInfoHash, FileResponse, LocalMarketMap},
-    FailureResponse, ReqResFailureResponse, ReqResSuccessfulResponse, SuccessfulResponse,
+    FailureResponse, ReqResFailureResponse, ReqResSuccessfulResponse, Response, SuccessfulResponse,
 };
 
 use super::{CommandRequestHandler, EventHandler};
@@ -129,11 +130,7 @@ impl<'a> EventHandler for ReqResHandler<'a> {
 impl<'a> CommandRequestHandler for ReqResHandler<'a> {
     type Request = ReqResRequest;
 
-    fn handle_command(
-        &mut self,
-        request: Self::Request,
-        responder: tokio::sync::oneshot::Sender<crate::Response>,
-    ) {
+    fn handle_command(&mut self, request: Self::Request, responder: Sender<Response>) {
         match request {
             ReqResRequest::GetHolderByPeerId {
                 peer_id,
