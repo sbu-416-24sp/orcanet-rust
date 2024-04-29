@@ -1,7 +1,7 @@
-use crate::producer;
-use crate::transfer::jobs::Jobs;
-use crate::transfer::files;
 use crate::grpc::MarketClient;
+use crate::producer;
+use crate::transfer::files;
+use crate::transfer::jobs::Jobs;
 use anyhow::Result;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};

@@ -1,8 +1,8 @@
 mod db;
 mod http;
 
-use crate::transfer::files;
 use crate::grpc::MarketClient;
+use crate::transfer::files;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
