@@ -73,6 +73,11 @@ async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> i
         )
         .await;
 
+    // start job after adding
+    let job = config.jobs().get_job(&job_id).await.unwrap();
+    let token = config.get_token(job.lock().await.encoded_producer.clone());
+    transfer::jobs::start(job, token).await;
+
     Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(format!(r#"{{"jobID":"{job_id}"}}"#)))

@@ -88,7 +88,13 @@ producer ls
 consumer ls 908b7415fea62428bb69eb01d8a3ce64190814cc01f01cae0289939e72909227
 # make sure you're on a public ip (or edit producer/register_files)
 consumer get 908b7415fea62428bb69eb01d8a3ce64190814cc01f01cae0289939e72909227 {producer_id}
+```
 
+To test with HTTP server with local market: (file paths relative to where this is run)
+
+```shell
+cargo run --bin peer-node-server -F test_local_market
+```
 
 ## Running with Docker
 We also provide a Docker compose file to easily run the producer and market server together. To run it:
