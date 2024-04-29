@@ -4,10 +4,13 @@ use tokio::sync::oneshot;
 
 use crate::{
     behaviour::Behaviour,
-    command::{request::Request, QueryHandler},
+    command::{
+        request::{LmmRequest, Request},
+        QueryHandler,
+    },
     handler::req_res::ReqResHandler,
     lmm::LocalMarketMap,
-    BootNodes, Response, SuccessfulResponse,
+    BootNodes, LmmSuccessfulResponse, Response, SuccessfulResponse,
 };
 
 use self::{
@@ -265,7 +268,41 @@ impl<'a> CommandRequestHandler for Handler<'a> {
                 let mut handler = KadHandler::new(self.swarm, self.lmm, self.query_handler);
                 handler.handle_command(kad_request, responder);
             }
+            Request::LocalMarketMap(lmm_request) => {
+                let mut handler = LocalMarketMapHandler { lmm: self.lmm };
+                handler.handle_command(lmm_request, responder);
+            }
         };
+    }
+}
+
+struct LocalMarketMapHandler<'a> {
+    lmm: &'a mut LocalMarketMap,
+}
+
+impl<'a> CommandRequestHandler for LocalMarketMapHandler<'a> {
+    type Request = LmmRequest;
+
+    fn handle_command(&mut self, request: Self::Request, responder: oneshot::Sender<Response>) {
+        match request {
+            LmmRequest::IsLocalFileOwner { file_info_hash } => {
+                if self.lmm.get_if_not_expired(&file_info_hash).is_some() {
+                    send_ok!(
+                        responder,
+                        SuccessfulResponse::LmmResponse(LmmSuccessfulResponse::IsLocalFileOwner {
+                            is_owner: true
+                        })
+                    );
+                } else {
+                    send_ok!(
+                        responder,
+                        SuccessfulResponse::LmmResponse(LmmSuccessfulResponse::IsLocalFileOwner {
+                            is_owner: false
+                        })
+                    );
+                }
+            }
+        }
     }
 }
 

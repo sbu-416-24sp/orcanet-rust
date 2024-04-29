@@ -1,7 +1,7 @@
 use libp2p::{
     kad::{
         AddProviderError, AddProviderOk, BootstrapError, Event, GetClosestPeersError,
-        InboundRequest, ProgressStep, QueryId, QueryResult,
+        GetProvidersError, GetProvidersOk, InboundRequest, ProgressStep, QueryId, QueryResult,
     },
     Swarm,
 };
@@ -102,7 +102,47 @@ impl<'a> KadHandler<'a> {
                     }
                 }
             }
-            QueryResult::GetProviders(_) => todo!(),
+            QueryResult::GetProviders(result) => match result {
+                Ok(maybe_ok) => {
+                    if step.last {
+                        match maybe_ok {
+                            GetProvidersOk::FoundProviders { providers, .. } => {
+                                info!("[Kademlia] - GetProviders query successful");
+                                self.query_handler.respond(
+                                    Query::Kad(qid),
+                                    Ok(SuccessfulResponse::KadResponse(
+                                        KadSuccessfulResponse::GetProviders {
+                                            providers: providers.into_iter().collect(),
+                                        },
+                                    )),
+                                );
+                            }
+                            GetProvidersOk::FinishedWithNoAdditionalRecord { .. } => {
+                                warn!("[Kademlia] - GetProviders query didn't necessarily fail, but no additional records were found.");
+                                self.query_handler.respond(
+                                    Query::Kad(qid),
+                                    Ok(SuccessfulResponse::KadResponse(
+                                        KadSuccessfulResponse::GetProviders {
+                                            providers: Default::default(),
+                                        },
+                                    )),
+                                );
+                            }
+                        }
+                    };
+                }
+                Err(GetProvidersError::Timeout { .. }) => {
+                    error!("[Kademlia] - GetProviders query failed due to timeout.");
+                    self.query_handler.respond(
+                        Query::Kad(qid),
+                        Err(FailureResponse::KadError(
+                            KadFailureResponse::GetProviders {
+                                error: "timeout".to_owned(),
+                            },
+                        )),
+                    );
+                }
+            },
             QueryResult::StartProviding(result) => match result {
                 Ok(AddProviderOk { .. }) => {
                     info!("[Kademlia] - StartProviding query successful");
@@ -209,6 +249,14 @@ impl<'a> CommandRequestHandler for KadHandler<'a> {
                         );
                     }
                 };
+            }
+            KadRequest::GetProviders { file_info_hash } => {
+                let qid = self
+                    .swarm
+                    .behaviour_mut()
+                    .kad
+                    .get_providers(file_info_hash.into_bytes().into());
+                self.query_handler.add_query(Query::Kad(qid), responder);
             }
         }
     }
