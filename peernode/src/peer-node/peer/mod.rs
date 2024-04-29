@@ -21,14 +21,13 @@ impl MarketClient {
         })
     }
     pub async fn check_holders(&mut self, file_info_hash: String) -> Result<HoldersResponse> {
-    //// update in later commit
-    //pub async fn check_holders(&mut self, file_info_hash: FileInfoHash) -> Result<HoldersResponse> {
+        //// update in later commit
+        //pub async fn check_holders(&mut self, file_info_hash: FileInfoHash) -> Result<HoldersResponse> {
         match self.local.get(&file_info_hash) {
             Some(res) => Ok(res.clone()),
             None => Err(anyhow!("not found!")),
         }
     }
-    
 
     pub async fn register_file(
         &mut self,
@@ -39,14 +38,20 @@ impl MarketClient {
         price: i64,
         file_hash: String,
     ) -> Result<()> {
-    //// update in later commit
-    //pub async fn register_file(
-    //    &mut self,
-    //    user: User,
-    //    file_info_hash: FileInfoHash,
-    //    file_info: FileInfo,
-    //) -> Result<()> {
-        let user = User { id, name, ip, port, price };
+        //// update in later commit
+        //pub async fn register_file(
+        //    &mut self,
+        //    user: User,
+        //    file_info_hash: FileInfoHash,
+        //    file_info: FileInfo,
+        //) -> Result<()> {
+        let user = User {
+            id,
+            name,
+            ip,
+            port,
+            price,
+        };
         match self.local.get_mut(&file_hash) {
             Some(res) => {
                 res.holders.retain(|u| u.id != user.id);
@@ -57,7 +62,12 @@ impl MarketClient {
                 self.local.insert(
                     file_hash.clone(),
                     HoldersResponse {
-                        file_info: Some(FileInfo { file_hash, chunk_hashes: vec![], file_size: 0, file_name: "foo".into() }),
+                        file_info: Some(FileInfo {
+                            file_hash,
+                            chunk_hashes: vec![],
+                            file_size: 0,
+                            file_name: "foo".into(),
+                        }),
                         holders: vec![user],
                     },
                 );

@@ -61,12 +61,12 @@ pub async fn register_files(
             }
         },
     };
-    
+
     // for testing on local network
     if cfg!(feature = "test_local_market") {
         ip = "0.0.0.0".to_owned();
     }
-    
+
     println!("Producer: IP address is {}", ip);
 
     // Generate a random Producer ID
