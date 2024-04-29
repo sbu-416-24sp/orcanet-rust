@@ -291,7 +291,6 @@ const BASE_URL: &str = "http://localhost:3000";
 #[allow(dead_code)]
 const GIRAFFE_HASH: &str = "908b7415fea62428bb69eb01d8a3ce64190814cc01f01cae0289939e72909227";
 
-
 #[tokio::test]
 #[ignore]
 async fn manta_test_find_peers() {
@@ -302,7 +301,7 @@ async fn manta_test_find_peers() {
         .send()
         .await
         .expect("a response");
-    
+
     let PeerResponse { peers } = find_res.json().await.expect("to deserialize");
     // file should not have been added yet
     assert!(peers.is_empty());
