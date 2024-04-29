@@ -3,21 +3,31 @@ pub mod http;
 
 use crate::grpc::{orcanet::User, MarketClient};
 use anyhow::Result;
+use std::fmt::Write;
 
 use self::http::GetFileResponse;
 
 // list every producer who holds the file hash I want
-pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Result<()> {
+pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Result<String> {
     let producers = client.check_holders(file_hash).await?;
+    let mut producer_list = String::new();
     for producer in producers.holders {
         // serialize the producer struct to a string
         let encoded_producer = encode::encode_user(&producer);
+        if let Err(e) = writeln!(
+            &mut producer_list,
+            "Producer:\n  id: {}\n  Price: {}\n",
+            encoded_producer, producer.price
+        ) {
+            eprintln!("Failed to write producer: {}", e);
+            return Err(anyhow::anyhow!("Failed to write producer"));
+        }
         println!(
             "Producer:\n  id: {}\n  Price: {}",
             encoded_producer, producer.price
         );
     }
-    Ok(())
+    Ok(producer_list)
 }
 
 // get file I want by hash from producer
