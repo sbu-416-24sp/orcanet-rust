@@ -1,14 +1,10 @@
-pub mod cli;
-pub mod consumer;
-pub mod peer;
-pub mod producer;
-pub mod store;
-pub mod transfer;
 
 use std::io::{self, Write};
-use store::Configurations;
+use peernode::store;
+use peernode::store::Configurations;
 
 use cli::{cli, handle_arg_matches};
+
 async fn exit_gracefully(config: &mut Configurations) {
     if config.is_http_running() {
         // stop the current http client

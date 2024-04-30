@@ -1,12 +1,4 @@
-use crate::{
-    consumer::encode::EncodedUser,
-    peer::MarketClient,
-    producer,
-    transfer::{
-        files::{get_file_info, LocalFileInfo},
-        jobs::Jobs,
-    },
-};
+use crate::{consumer::encode::EncodedUser, peer::MarketClient, producer};
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use config::{Config, File, FileFormat};
@@ -19,6 +11,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub mod files;
+use files::{get_file_info, LocalFileInfo};
+
 #[derive()]
 pub struct Configurations {
     // this is the struct that will be used to store the configurations
@@ -28,7 +23,6 @@ pub struct Configurations {
     // and shared state apparently
     // {Peer Id -> Peer Info}
     discovered_peers: HashMap<String, PeerInfo>,
-    jobs: Jobs,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -76,7 +70,6 @@ impl Configurations {
             props,
             http_client: None,
             market_client: None,
-            jobs: Jobs::new(),
             discovered_peers: HashMap::new(),
         }
     }
@@ -95,7 +88,6 @@ impl Configurations {
             },
             http_client: None,
             market_client: None,
-            jobs: Jobs::new(),
             discovered_peers: HashMap::new(),
         };
         default.write();
@@ -125,14 +117,6 @@ impl Configurations {
 
     pub async fn get_hash(&self, file_path: String) -> Result<FileInfoHash> {
         Ok(get_file_info(&PathBuf::from(file_path)).await?.get_hash())
-    }
-
-    pub fn jobs(&self) -> &Jobs {
-        &self.jobs
-    }
-
-    pub fn jobs_mut(&mut self) -> &mut Jobs {
-        &mut self.jobs
     }
 
     pub fn get_files(&self) -> HashMap<FileInfoHash, LocalFileInfo> {

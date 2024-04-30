@@ -13,8 +13,8 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::producer::db;
 
-use crate::transfer::files::AsyncFileMap;
-use crate::transfer::files::FileAccessType;
+use crate::store::files::AsyncFileMap;
+use crate::store::files::FileAccessType;
 
 #[derive(Clone)]
 struct AppState {

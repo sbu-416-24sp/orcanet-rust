@@ -12,7 +12,9 @@ use axum::{
 use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
 
-use crate::{producer, ServerState};
+use peernode::producer;
+
+use crate::ServerState;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(non_snake_case)]

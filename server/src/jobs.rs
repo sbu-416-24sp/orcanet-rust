@@ -12,7 +12,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::consumer::{
+use peernode::consumer::{
     encode::{self, EncodedUser},
     get_file_chunk,
     http::GetFileResponse,

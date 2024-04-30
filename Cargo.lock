@@ -646,6 +646,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "axum 0.7.5",
+ "base64 0.22.0",
+ "clap",
+ "config",
+ "glob",
+ "mime_guess",
+ "orcanet-market",
+ "peernode",
+ "prost",
+ "proto",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-util",
+ "tonic",
+ "tonic-build",
+ "uuid",
+]
+
+[[package]]
 name = "clipboard-win"
 version = "5.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2815,8 +2843,6 @@ dependencies = [
  "async-recursion",
  "axum 0.7.5",
  "base64 0.22.0",
- "chrono",
- "clap",
  "config",
  "glob",
  "mime_guess",
@@ -3673,6 +3699,34 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "axum 0.7.5",
+ "base64 0.22.0",
+ "chrono",
+ "config",
+ "glob",
+ "mime_guess",
+ "orcanet-market",
+ "peernode",
+ "prost",
+ "proto",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-util",
+ "tonic",
+ "tonic-build",
+ "uuid",
 ]
 
 [[package]]
