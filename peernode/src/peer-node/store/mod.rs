@@ -158,7 +158,7 @@ impl Configurations {
     pub fn get_public_address(&self) -> Option<Multiaddr> {
         self.props.public_address.clone()
     }
-    
+
     pub fn get_token(&mut self, producer_id: EncodedUser) -> String {
         match self.props.tokens.get(&producer_id).cloned() {
             Some(token) => token,
@@ -190,7 +190,6 @@ impl Configurations {
         self.props.public_address = public_address;
         self.write();
     }
-
 
     // add every file in the directory to the list
     #[async_recursion]
