@@ -1,8 +1,4 @@
-use crate::{
-    consumer::encode::EncodedUser,
-    peer::MarketClient,
-    producer,
-};
+use crate::{consumer::encode::EncodedUser, peer::MarketClient, producer};
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use config::{Config, File, FileFormat};
@@ -26,7 +22,7 @@ pub struct Configurations {
     market_client: Option<MarketClient>,
     // and shared state apparently
     // {Peer Id -> Peer Info}
-    discovered_peers: HashMap<String, PeerInfo>
+    discovered_peers: HashMap<String, PeerInfo>,
 }
 
 #[derive(Serialize, Deserialize)]
