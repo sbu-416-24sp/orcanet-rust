@@ -2,7 +2,7 @@ use crate::producer;
 use crate::transfer::files::LocalFileInfo;
 use crate::transfer::{
     files::{self, get_file_info},
-    jobs::{self, Jobs},
+    jobs::Jobs,
 };
 use crate::{consumer::encode::EncodedUser, peer::MarketClient};
 use anyhow::{anyhow, Result};
@@ -17,7 +17,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive()]
 pub struct Configurations {
     // this is the struct that will be used to store the configurations
     props: Properties,
