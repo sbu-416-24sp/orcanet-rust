@@ -96,12 +96,6 @@ impl MarketClient {
     // Get a list of producers for a given file hash
     pub async fn check_holders(&mut self, file_hash: String) -> Result<HoldersResponse> {
         todo!()
-        // println!("gRPC: Checking holders for file hash {}", file_hash);
-        // let request = CheckHoldersRequest { file_hash };
-
-        // let response = self.client.check_holders(request).await?.into_inner();
-
-        // Ok(response)
     }
 
     // Register a new producer
@@ -115,21 +109,5 @@ impl MarketClient {
         file_hash: String,
     ) -> Result<()> {
         todo!()
-        // let user = User {
-        //     id,
-        //     name,
-        //     ip,
-        //     port,
-        //     price,
-        // };
-        // let file = RegisterFileRequest {
-        //     user: Some(user),
-        //     file_hash: file_hash.clone(),
-        // };
-
-        // self.client.register_file(file).await?;
-        // println!("gRPC: Registered producer for file hash {}", file_hash);
-
-        // Ok(())
     }
 }
