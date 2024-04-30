@@ -1,21 +1,21 @@
-use crate::{
-    consumer::encode::EncodedUser,
-    peer::MarketClient,
-    producer::{
-        self,
-        files::{get_file_info, FileHash, FileMap, LocalFileInfo},
-        jobs::Jobs,
-    },
+use crate::producer;
+use crate::transfer::files::LocalFileInfo;
+use crate::transfer::{
+    files::{self, get_file_info},
+    jobs::{self, Jobs},
 };
-use crate::transfer::files;
-use crate::transfer::jobs::Jobs;
+use crate::{consumer::encode::EncodedUser, peer::MarketClient};
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
 use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive()]
 pub struct Configurations {
@@ -26,7 +26,7 @@ pub struct Configurations {
     // and shared state apparently
     // {Peer Id -> Peer Info}
     discovered_peers: HashMap<String, PeerInfo>,
-    jobs: Jobs,
+    jobs_state: Jobs,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -84,7 +84,7 @@ impl Configurations {
             props,
             http_client: None,
             market_client: None,
-            jobs: Jobs::new(),
+            jobs_state: Jobs::new(),
             discovered_peers: HashMap::new(),
         }
     }
@@ -95,7 +95,6 @@ impl Configurations {
             props: Properties {
                 name: "default".to_string(),
                 market: "localhost:50051".to_string(),
-                file_names: HashMap::new(),
                 files: HashMap::new(),
                 tokens: HashMap::new(),
                 port: "8080".to_string(),
@@ -105,7 +104,7 @@ impl Configurations {
             },
             http_client: None,
             market_client: None,
-            jobs: Jobs::new(),
+            jobs_state: Jobs::new(),
             discovered_peers: HashMap::new(),
         };
         default.write();
@@ -134,29 +133,31 @@ impl Configurations {
     }
 
     pub async fn get_hash(&self, file_path: String) -> Result<FileInfoHash> {
-        Ok(producer::files::get_file_info(&PathBuf::from(file_path))
+        Ok(files::get_file_info(&PathBuf::from(file_path))
             .await?
             .get_hash())
     }
 
     pub fn jobs(&self) -> &Jobs {
-        &self.jobs
+        &self.jobs_state
     }
 
     pub fn jobs_mut(&mut self) -> &mut Jobs {
-        &mut self.jobs
+        &mut self.jobs_state
     }
 
     pub fn get_files(&self) -> HashMap<FileInfoHash, LocalFileInfo> {
         self.props.files.clone()
     }
 
-    pub fn get_file_names(&self) -> HashMap<String, String> {
-        self.props.file_names.clone()
-    }
-
-    pub fn get_file_names(&self) -> HashMap<String, String> {
-        self.props.file_names.clone()
+    pub fn get_file_names(&self) -> HashMap<FileInfoHash, String> {
+        self.props
+            .files
+            .iter()
+            .map(|(hash, LocalFileInfo { file_info, .. })| {
+                (hash.clone(), file_info.file_name.clone())
+            })
+            .collect()
     }
 
     pub fn get_prices(&self) -> HashMap<FileInfoHash, i64> {
@@ -167,22 +168,9 @@ impl Configurations {
             .collect()
     }
 
-    pub fn get_file_size(&self, file_path: String) -> u64 {
+    pub fn get_file_size(&self, file_path: &Path) -> u64 {
         let metadata = fs::metadata(file_path).unwrap();
         metadata.len()
-    }
-
-    pub fn get_jobs_state(&self) -> Jobs {
-        self.jobs_state.clone()
-    }
-
-    pub fn get_file_size(&self, file_path: String) -> u64 {
-        let metadata = fs::metadata(file_path).unwrap();
-        metadata.len()
-    }
-
-    pub fn get_jobs_state(&self) -> Jobs {
-        self.jobs_state.clone()
     }
 
     pub fn get_port(&self) -> String {

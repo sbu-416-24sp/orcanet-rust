@@ -5,7 +5,7 @@ pub mod market {
     use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
     use std::hash::{Hash, Hasher};
-    
+
     impl Hash for FileInfo {
         fn hash<H: Hasher>(&self, state: &mut H) {
             let mut input = self.file_hash.clone();

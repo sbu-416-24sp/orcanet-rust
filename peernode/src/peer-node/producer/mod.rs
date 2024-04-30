@@ -1,6 +1,5 @@
 mod db;
 mod http;
-pub mod jobs;
 
 use crate::peer::MarketClient;
 use crate::transfer::files;

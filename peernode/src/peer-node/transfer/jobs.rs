@@ -1,4 +1,5 @@
 use core::fmt;
+use proto::market::FileInfoHash;
 use rand::Rng;
 use serde::Serialize;
 use std::{
@@ -11,9 +12,10 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::{
-    consumer::{encode, get_file_chunk, http::GetFileResponse},
-    store::Configurations,
+use crate::consumer::{
+    encode::{self, EncodedUser},
+    get_file_chunk,
+    http::GetFileResponse,
 };
 
 type AsyncJob = Arc<Mutex<Job>>;
@@ -27,7 +29,7 @@ pub struct Jobs {
 #[derive(Debug)]
 pub struct Job {
     job_id: String,
-    file_hash: String,
+    file_info_hash: FileInfoHash,
     file_name: String,
     file_size: u64,
     time_queued: u64, // unix time in seconds
@@ -36,6 +38,25 @@ pub struct Job {
     projected_cost: u64,
     eta: u64, // seconds
     pub peer_id: String,
+    pub encoded_producer: EncodedUser,
+}
+
+impl Job {
+    pub fn pause(&mut self) {
+        if let JobStatus::Active(_) = self.status {
+            self.status = JobStatus::Stop;
+        }
+    }
+    pub fn terminate(&mut self) {
+        match &mut self.status {
+            JobStatus::Active(handle) => {
+                handle.abort();
+                self.status = JobStatus::Failed;
+            }
+            JobStatus::Completed => {}
+            _ => self.status = JobStatus::Failed,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -65,25 +86,24 @@ pub async fn start(job: AsyncJob, token: String) {
     if let JobStatus::Paused(next_chunk) = lock.status {
         let job = job.clone();
         dbg!(&lock);
-        let producer = lock.peer_id.clone();
-        let producer_user = match encode::decode_user(producer.clone()) {
+        let producer_user = match encode::try_decode_user(lock.encoded_producer.as_str()) {
             Ok(user) => user,
             Err(e) => {
-                eprintln!("Failed to decode producer: {}", e);
+                eprintln!("Failed to decode producer: {e}");
                 lock.status = JobStatus::Failed;
                 return;
             }
         };
         lock.status = JobStatus::Active(tokio::spawn(async move {
             let mut lock = job.lock().await;
-            let file_hash = lock.file_hash.clone();
+            let file_info_hash = lock.file_info_hash.clone();
             let mut chunk_num = next_chunk;
-            let mut return_token = String::from(token);
+            let mut return_token = token;
             loop {
                 drop(lock);
                 match get_file_chunk(
                     producer_user.clone(),
-                    file_hash.clone(),
+                    file_info_hash.to_string(),
                     return_token.clone(),
                     chunk_num,
                 )
@@ -104,15 +124,16 @@ pub async fn start(job: AsyncJob, token: String) {
                         chunk_num += 1;
                     }
                     Err(e) => {
-                        eprintln!("Failed to download chunk {}: {}", chunk_num, e);
+                        eprintln!("Failed to download chunk {chunk_num}: {e}");
                         lock = job.lock().await;
-                        lock.status = JobStatus::Completed;
+                        lock.status = JobStatus::Failed;
                         return;
                     }
                 }
                 lock = job.lock().await;
                 if let JobStatus::Stop = lock.status {
                     lock.status = JobStatus::Paused(chunk_num);
+                    return;
                 }
             }
         }));
@@ -120,12 +141,13 @@ pub async fn start(job: AsyncJob, token: String) {
 }
 
 #[derive(Serialize)]
+#[allow(non_snake_case)]
 pub struct JobListItem {
-    job_id: String,
-    file_name: String,
-    file_size: u64,
+    jobID: String,
+    fileName: String,
+    fileSize: u64,
     eta: u64,
-    time_queued: u64,
+    timeQueued: u64,
     status: String,
 }
 
@@ -141,6 +163,7 @@ pub struct JobInfo {
     eta: u64,
 }
 #[derive(Clone, Serialize)]
+#[allow(non_snake_case)]
 pub struct HistoryEntry {
     fileName: String,
     timeCompleted: u64, // unix time in seconds
@@ -164,11 +187,12 @@ impl Jobs {
 
     pub async fn add_job(
         &self,
-        file_hash: String,
+        file_info_hash: FileInfoHash,
         file_size: u64,
         file_name: String,
         price: i64,
         peer_id: String,
+        encoded_producer: EncodedUser,
     ) -> String {
         // generate a random job id
         let job_id = rand::thread_rng().gen::<u64>().to_string();
@@ -179,7 +203,7 @@ impl Jobs {
         // Add the job to the map
         let job = Job {
             job_id: job_id.clone(),
-            file_hash: file_hash.clone(),
+            file_info_hash: file_info_hash.clone(),
             file_name: file_name.clone(),
             file_size,
             time_queued: current_time_secs(),
@@ -188,6 +212,7 @@ impl Jobs {
             projected_cost: file_size * price as u64,
             eta: 0, // TODO, have correct eta
             peer_id: peer_id.clone(),
+            encoded_producer,
         };
         let async_job = Arc::new(Mutex::new(job));
         jobs.insert(job_id.clone(), async_job.clone());
@@ -211,7 +236,7 @@ impl Jobs {
         let job = job.lock().await;
 
         let job_info = JobInfo {
-            fileHash: job.file_hash.clone(),
+            fileHash: job.file_info_hash.as_str().to_owned(),
             fileName: job.file_name.clone(),
             fileSize: job.file_size,
             accumulatedMemory: 0, //TODO
@@ -233,11 +258,11 @@ impl Jobs {
             let job = job.lock().await;
 
             let job_item = JobListItem {
-                job_id: job.job_id.clone(),
-                file_name: job.file_name.clone(),
-                file_size: job.file_size,
+                jobID: job.job_id.clone(),
+                fileName: job.file_name.clone(),
+                fileSize: job.file_size,
                 eta: job.eta,
-                time_queued: job.time_queued,
+                timeQueued: job.time_queued,
                 status: job.status.to_string(),
             };
             jobs_list.push(job_item);
@@ -266,7 +291,7 @@ impl Jobs {
 
         // add the completed job to history
         let mut history = self.history.write().await;
-        let history_entry: HistoryEntry = HistoryEntry {
+        let history_entry = HistoryEntry {
             fileName: job.file_name.clone(),
             timeCompleted: 0,
         };

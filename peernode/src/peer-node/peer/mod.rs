@@ -5,7 +5,6 @@ use orcanet_market::{bridge::spawn, Config, Peer};
 use proto::market::{FileInfo, FileInfoHash, HoldersResponse, User};
 
 use anyhow::{anyhow, Result};
-use anyhow::{anyhow, Result};
 
 // test market
 #[cfg(feature = "test_local_market")]
@@ -14,7 +13,7 @@ pub struct MarketClient {
 }
 #[cfg(feature = "test_local_market")]
 impl MarketClient {
-    pub async fn new(config: Config) -> Result<Self> {
+    pub async fn new(_config: Config) -> Result<Self> {
         Ok(MarketClient {
             local: Default::default(),
         })
@@ -69,21 +68,6 @@ impl MarketClient {
 
     // Get a list of producers for a given file hash
     pub async fn check_holders(&mut self, file_info_hash: FileInfoHash) -> Result<HoldersResponse> {
-        return Ok(HoldersResponse {
-            file_info: Some(FileInfo {
-                file_hash: "x".into(),
-                chunk_hashes: vec!["y".into()],
-                file_size: 3,
-                file_name: "z".into(),
-            }),
-            holders: vec![User {
-                id: "a".into(),
-                name: "user".into(),
-                ip: "0.0.0.0".into(),
-                port: 80,
-                price: 9999,
-            }],
-        });
         todo!()
     }
 

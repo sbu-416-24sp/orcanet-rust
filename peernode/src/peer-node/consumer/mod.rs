@@ -3,15 +3,11 @@ pub mod http;
 
 use std::fmt::Write;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use proto::market::{FileInfoHash, User};
 
-use crate::peer::MarketClient;
-use anyhow::Result;
-use proto::market::User;
-use std::fmt::Write;
-
 use self::http::GetFileResponse;
+use crate::peer::MarketClient;
 
 // list every producer who holds the file hash I want
 pub async fn list_producers(
@@ -30,7 +26,7 @@ pub async fn list_producers(
             producer.price
         ) {
             eprintln!("Failed to write producer: {e}");
-            return Err(anyhow::anyhow!("Failed to write producer"));
+            return Err(anyhow!("Failed to write producer"));
         }
         println!(
             "Producer:\n  id: {}\n  Price: {}",
@@ -72,9 +68,7 @@ pub async fn get_file(
                 }
                 chunk_num += 1;
             }
-            Err(e) => {
-                Err(anyhow::anyhow!("Failed to download chunk {chunk_num}: {e}"))?
-            }
+            Err(e) => Err(anyhow::anyhow!("Failed to download chunk {chunk_num}: {e}"))?,
         }
         if continue_download == false {
             return Ok(return_token);

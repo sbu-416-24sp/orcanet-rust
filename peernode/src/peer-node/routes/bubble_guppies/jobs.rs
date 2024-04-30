@@ -10,18 +10,7 @@ use axum::{
 use proto::market::FileInfoHash;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    consumer::encode::{self, try_decode_user},
-    producer::{
-        self,
-        jobs::{JobListItem, JobStatus},
-    },
-    ServerState,
-};
-
-///
-/// JOBS ENDPOINTS
-///
+use crate::{consumer::encode::try_decode_user, producer, transfer::jobs, ServerState};
 
 #[derive(Deserialize)]
 struct AddJob {
@@ -36,41 +25,6 @@ async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> i
     let peer_id = job.peerId;
 
     todo!();
-    //let file_info;
-    //let user = match config.get_market_client().await {
-    //    Ok(market) => {
-    //        match market.check_holders(file_hash.clone()).await {
-    //            Ok(res) => {
-    //                res.into_iter().filter(|user| user.username == peer_id).next()
-    //            }
-    //            _ => return (StatusCode::SERVICE_UNAVAILABLE, "Could not check holders").into_response(),
-    //        }
-    //    }
-    //    Err(_) => return (StatusCode::SERVICE_UNAVAILABLE, "Market not available").into_response(),
-    //};
-    //let user = match user {
-    //    Some(user) => user,
-    //    None => return (StatusCode::NOT_FOUND, "Peer is not providing file").into_response(),
-    //};
-    //let encoded_producer = encode::encode_user(&user);
-    //println!("Encoded producer: {encoded_producer}");
-    //println!("id: {peer_id}");
-    //let job_id = config
-    //    .jobs_mut()
-    //    .add_job(
-    //        file_info.file_hash,
-    //        file_info.file_size as u64,
-    //        file_info.file_name,
-    //        user.price,
-    //        peer_id.clone(),
-    //        encoded_producer,
-    //    )
-    //    .await;
-
-    //Response::builder()
-    //    .status(StatusCode::OK)
-    //    .body(Body::from(format!("{{\"jobID\": \"{}\"}}", job_id)))
-    //    .unwrap()
 }
 
 // returns all peers hosting a given file
@@ -206,7 +160,7 @@ async fn start_jobs(
         match config.jobs().get_job(&job_id).await {
             Some(job) => {
                 let token = config.get_token(job.lock().await.encoded_producer.clone());
-                producer::jobs::start(job, token).await;
+                jobs::start(job, token).await;
             }
             None => return (StatusCode::NOT_FOUND, "Job not found").into_response(),
         }
