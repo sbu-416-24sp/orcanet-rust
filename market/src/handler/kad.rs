@@ -104,30 +104,28 @@ impl<'a> KadHandler<'a> {
             }
             QueryResult::GetProviders(result) => match result {
                 Ok(maybe_ok) => {
-                    if step.last {
-                        match maybe_ok {
-                            GetProvidersOk::FoundProviders { providers, .. } => {
-                                info!("[Kademlia] - GetProviders query successful");
-                                self.query_handler.respond(
-                                    Query::Kad(qid),
-                                    Ok(SuccessfulResponse::KadResponse(
-                                        KadSuccessfulResponse::GetProviders {
-                                            providers: providers.into_iter().collect(),
-                                        },
-                                    )),
-                                );
-                            }
-                            GetProvidersOk::FinishedWithNoAdditionalRecord { .. } => {
-                                warn!("[Kademlia] - GetProviders query didn't necessarily fail, but no additional records were found.");
-                                self.query_handler.respond(
-                                    Query::Kad(qid),
-                                    Ok(SuccessfulResponse::KadResponse(
-                                        KadSuccessfulResponse::GetProviders {
-                                            providers: Default::default(),
-                                        },
-                                    )),
-                                );
-                            }
+                    match maybe_ok {
+                        GetProvidersOk::FoundProviders { providers, .. } => {
+                            info!("[Kademlia] - GetProviders query successful");
+                            self.query_handler.respond(
+                                Query::Kad(qid),
+                                Ok(SuccessfulResponse::KadResponse(
+                                    KadSuccessfulResponse::GetProviders {
+                                        providers: providers.into_iter().collect(),
+                                    },
+                                )),
+                            );
+                        }
+                        GetProvidersOk::FinishedWithNoAdditionalRecord { .. } => {
+                            warn!("[Kademlia] - GetProviders query didn't necessarily fail, but no additional records were found.");
+                            self.query_handler.respond(
+                                Query::Kad(qid),
+                                Ok(SuccessfulResponse::KadResponse(
+                                    KadSuccessfulResponse::GetProviders {
+                                        providers: Default::default(),
+                                    },
+                                )),
+                            );
                         }
                     };
                 }
@@ -163,6 +161,14 @@ impl<'a> KadHandler<'a> {
                             },
                         )),
                     )
+                }
+            },
+            QueryResult::RepublishProvider(result) => match result {
+                Ok(AddProviderOk { .. }) => {
+                    info!("[Kademlia] - Successfully republished the key");
+                }
+                Err(AddProviderError::Timeout { .. }) => {
+                    error!("[Kademlia] - Failed to republish the key due to timeout.")
                 }
             },
             _ => {}

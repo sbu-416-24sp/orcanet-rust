@@ -1,4 +1,5 @@
 use libp2p::{Multiaddr, PeerId};
+use proto::market::HoldersResponse;
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 
@@ -12,6 +13,7 @@ pub enum SuccessfulResponse {
     Listeners { listeners: Vec<Multiaddr> },
     ConnectedPeers { peers: Vec<PeerId> },
     ConnectedTo { connected: bool },
+    CheckHolders(HoldersResponse),
     KadResponse(KadSuccessfulResponse),
     LmmResponse(LmmSuccessfulResponse),
     ReqResResponse(ReqResSuccessfulResponse),
