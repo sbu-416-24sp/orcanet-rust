@@ -8,7 +8,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use proto::market::{FileInfoHash, User};
 
-use crate::transfer::files::{FileMap, LocalFileInfo};
+use crate::store::files::{FileMap, LocalFileInfo};
 
 pub async fn start_server(
     files: HashMap<FileInfoHash, LocalFileInfo>,

@@ -2,7 +2,6 @@ use crate::{
     consumer::encode::EncodedUser,
     peer::MarketClient,
     producer,
-    transfer::files::{get_file_info, LocalFileInfo},
 };
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
@@ -15,6 +14,9 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+
+pub mod files;
+use files::{get_file_info, LocalFileInfo};
 
 #[derive()]
 pub struct Configurations {
