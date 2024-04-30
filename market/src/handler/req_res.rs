@@ -1,9 +1,10 @@
 use libp2p::{request_response::Event, Swarm};
+use proto::market::FileInfoHash;
 
 use crate::{
     behaviour::Behaviour,
     command::QueryHandler,
-    lmm::{FileInfoHash, LocalMarketMap, SupplierInfo},
+    lmm::{LocalMarketMap, SupplierInfo},
 };
 
 use super::EventHandler;

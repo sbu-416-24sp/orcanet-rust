@@ -1,6 +1,8 @@
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::consumer;
+use crate::consumer::encode;
 use crate::producer;
 use crate::store;
 
@@ -8,6 +10,7 @@ use anyhow::{anyhow, Result};
 use clap::{arg, Command};
 use orcanet_market::BootNodes;
 use orcanet_market::Multiaddr;
+use proto::market::FileInfoHash;
 use store::Configurations;
 
 #[cfg(test)]
@@ -171,7 +174,7 @@ pub async fn handle_arg_matches(
         Some(("producer", producer_matches)) => {
             match producer_matches.subcommand() {
                 Some(("register", register_matches)) => {
-                    let prices = config.get_prices();
+                    let files = config.get_files();
                     // register files with the market service
                     let port = match register_matches.get_one::<String>("PORT") {
                         Some(port) => port.clone(),
@@ -182,7 +185,7 @@ pub async fn handle_arg_matches(
                         Some(ip) => Some(ip.clone()),
                         None => None,
                     };
-                    producer::register_files(prices, market_client, port.clone(), ip).await?;
+                    producer::register_files(files, market_client, port.clone(), ip).await?;
                     config.start_http_client(port).await;
                     Ok(())
                 }
@@ -220,9 +223,13 @@ pub async fn handle_arg_matches(
                             return Err(anyhow!("Invalid price"));
                         }
                     };
-                    config.add_file_path(file_name.to_string(), price);
+                    match config.add_file_path(&PathBuf::from(file_name), price).await {
+                        Ok(num_added) => {
+                            println!("{num_added} file(s) at {file_name} have been registered at price {price}")
+                        }
+                        Err(e) => println!("Failed to register file: {e}"),
+                    }
                     // print
-                    println!("File {} has been registered at price {}", file_name, price);
                     Ok(())
                 }
                 Some(("rm", rm_matches)) => {
@@ -233,17 +240,20 @@ pub async fn handle_arg_matches(
                         Some(file_name) => file_name,
                         _ => Err(anyhow!("Invalid file name"))?,
                     };
-                    config.remove_file(file_name.to_string());
+                    config.remove_file(file_name.to_string()).await?;
                     Ok(())
                 }
                 Some(("ls", _)) => {
                     let files = config.get_files();
                     let prices = config.get_prices();
 
-                    for (hash, path) in files {
+                    if files.is_empty() {
+                        println!("No files registered!");
+                    }
+                    for (hash, info) in files {
                         println!(
-                            "File: {}, Price: {}",
-                            path.to_string_lossy(),
+                            "File: {}, Price: {}, Hash: {hash}",
+                            info.path.to_string_lossy(),
                             *prices.get(&hash).unwrap_or(&0)
                         );
                     }
@@ -277,7 +287,8 @@ pub async fn handle_arg_matches(
                         None => Err(anyhow!("No file hash provided"))?,
                     };
                     let market_client = config.get_market_client().await?;
-                    consumer::list_producers(file_hash, market_client).await?;
+                    let file_info_hash = FileInfoHash(file_hash);
+                    consumer::list_producers(file_info_hash, market_client).await?;
                     Ok(())
                 }
                 // get file from producer
@@ -290,6 +301,12 @@ pub async fn handle_arg_matches(
                         Some(producer) => producer.clone(),
                         None => Err(anyhow!("No producer provided"))?,
                     };
+                    let producer_user = match encode::try_decode_user(&producer) {
+                        Ok(user) => user,
+                        Err(e) => Err(anyhow::anyhow!("Failed to decode producer: {e}"))?,
+                    };
+                    let producer = encode::verify_encoding(&producer)
+                        .expect("We just successfully decoded it.");
                     let chunk_num = match get_matches.get_one::<u64>("CHUNK_NUM") {
                         Some(chunk_num) => *chunk_num,
                         None => 0,
@@ -300,7 +317,7 @@ pub async fn handle_arg_matches(
                     };
                     let token = config.get_token(producer.clone());
                     let ret_token = match consumer::get_file(
-                        producer.clone(),
+                        producer_user,
                         file_hash,
                         token,
                         chunk_num,
@@ -312,11 +329,9 @@ pub async fn handle_arg_matches(
                         Err(e) => {
                             match e.to_string().as_str() {
                                 "Request failed with status code: 404" => {
-                                    println!("Consumer: File downloaded successfully");
+                                    println!("Consumer: File downloaded successfully (404 EOF)");
                                 }
-                                _ => {
-                                    eprintln!("Failed to download chunk {}: {}", chunk_num, e);
-                                }
+                                _ => eprintln!("{e}"),
                             };
                             return Ok(());
                         }

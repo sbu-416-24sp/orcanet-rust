@@ -1,22 +1,23 @@
 mod db;
 mod http;
+pub mod jobs;
 
 use crate::peer::MarketClient;
 use crate::transfer::files;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
+use proto::market::{FileInfoHash, User};
+
+use self::files::LocalFileInfo;
 
 pub async fn start_server(
-    files: HashMap<String, PathBuf>,
-    prices: HashMap<String, i64>,
-    file_names: HashMap<String, String>,
+    files: HashMap<FileInfoHash, LocalFileInfo>,
     port: String,
 ) -> tokio::task::JoinHandle<()> {
     // Launch the HTTP server in the background
-    let http_file_map = Arc::new(files::FileMap::new(files, prices, file_names));
+    let http_file_map = Arc::new(files::FileMap::new(files));
     tokio::spawn(async move {
         if let Err(e) = http::run(http_file_map, port).await {
             eprintln!("HTTP server error: {}", e);
@@ -31,7 +32,7 @@ pub async fn stop_server(join_handle: tokio::task::JoinHandle<()>) -> Result<()>
 }
 
 pub async fn register_files(
-    prices: HashMap<String, i64>,
+    files: HashMap<FileInfoHash, LocalFileInfo>,
     client: &mut MarketClient,
     port: String,
     ip: Option<String>,
@@ -66,25 +67,30 @@ pub async fn register_files(
     if cfg!(feature = "test_local_market") {
         ip = "0.0.0.0".to_owned();
     }
-
-    println!("Producer: IP address is {}", ip);
+    println!("Producer: IP address is {ip}");
 
     // Generate a random Producer ID
     let producer_id = uuid::Uuid::new_v4().to_string();
 
-    for (hash, price) in prices {
-        println!(
-            "Producer: Registering file with hash {} and price {}",
-            hash, price
-        );
+    for (
+        hash,
+        LocalFileInfo {
+            file_info, price, ..
+        },
+    ) in files
+    {
+        println!("Producer: Registering file with hash {hash} and price {price}",);
         client
             .register_file(
-                producer_id.clone(),
-                "producer".to_string(),
-                ip.clone(),
-                port,
-                price,
+                User {
+                    id: producer_id.clone(),
+                    name: "producer".into(),
+                    ip: ip.clone(),
+                    port,
+                    price,
+                },
                 hash,
+                file_info,
             )
             .await?;
     }

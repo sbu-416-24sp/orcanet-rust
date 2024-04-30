@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use proto::market::{FileInfo, User};
+use proto::market::{FileInfo, FileInfoHash, User};
 use serde::{Deserialize, Serialize};
 
 pub(crate) const FILE_DEFAULT_TTL: Duration = Duration::from_secs(60 * 60);
@@ -59,10 +59,6 @@ impl Default for LocalMarketMap {
 pub(crate) type LocalMarketEntry = (Instant, SupplierInfo);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[repr(transparent)]
-pub(crate) struct FileInfoHash(pub(crate) String);
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) struct SupplierInfo {
     pub(crate) file_info: FileInfo,
     pub(crate) user: User,
@@ -90,7 +86,7 @@ mod tests {
             file_size: 8000,
             file_name: "a_file".to_string(),
         };
-        let file_hash = FileInfoHash(file_info.hash_to_string());
+        let file_hash = file_info.get_hash();
         let supplier_info = SupplierInfo { file_info, user };
         lmm.insert(file_hash.clone(), supplier_info.clone());
         assert_eq!(lmm.get_if_not_expired(&file_hash), Some(supplier_info));
@@ -105,7 +101,7 @@ mod tests {
             file_size: 8000,
             file_name: "a_file".to_string(),
         };
-        let file_hash = FileInfoHash(file_info.hash_to_string());
+        let file_hash = file_info.get_hash();
         let user = User {
             ip: Ipv4Addr::new(127, 0, 0, 1).to_string(),
             port: 8080,

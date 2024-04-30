@@ -1,12 +1,21 @@
-use crate::peer::MarketClient;
-use crate::producer;
+use crate::{
+    consumer::encode::EncodedUser,
+    peer::MarketClient,
+    producer::{
+        self,
+        files::{get_file_info, FileHash, FileMap, LocalFileInfo},
+        jobs::Jobs,
+    },
+};
 use crate::transfer::files;
 use crate::transfer::jobs::Jobs;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use async_recursion::async_recursion;
 use config::{Config, File, FileFormat};
 use orcanet_market::{BootNodes, Multiaddr};
+use proto::market::{FileInfoHash, User};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::{Path, PathBuf}};
 
 #[derive()]
 pub struct Configurations {
@@ -14,7 +23,10 @@ pub struct Configurations {
     props: Properties,
     http_client: Option<tokio::task::JoinHandle<()>>,
     market_client: Option<MarketClient>,
-    jobs_state: Jobs,
+    // and shared state apparently
+    // {Peer Id -> Peer Info}
+    discovered_peers: HashMap<String, PeerInfo>,
+    jobs: Jobs,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -22,15 +34,29 @@ pub struct Properties {
     // must be a separate serializable struct so can read from config.json file
     name: String,
     market: String,
-    files: HashMap<String, PathBuf>,
-    prices: HashMap<String, i64>,
-    file_names: HashMap<String, String>,
-    tokens: HashMap<String, String>,
+    files: HashMap<FileInfoHash, LocalFileInfo>,
+    tokens: HashMap<EncodedUser, String>,
     port: String,
     // market config
     boot_nodes: Option<BootNodes>,
     public_address: Option<Multiaddr>,
     // wallet: String, // not sure about implementation details, will revisit later
+    theme: Theme,
+}
+
+// ok whatever just add it
+#[allow(non_camel_case_types)]
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Theme {
+    #[default]
+    dark,
+    light,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerInfo {
+    pub id: String,
+    pub user: User,
 }
 
 // TODO: Put prices and path attached to the same hash in config file, and then construct the hashmaps from that
@@ -58,7 +84,8 @@ impl Configurations {
             props,
             http_client: None,
             market_client: None,
-            jobs_state: Jobs::new(),
+            jobs: Jobs::new(),
+            discovered_peers: HashMap::new(),
         }
     }
 
@@ -70,18 +97,19 @@ impl Configurations {
                 market: "localhost:50051".to_string(),
                 file_names: HashMap::new(),
                 files: HashMap::new(),
-                prices: HashMap::new(),
                 tokens: HashMap::new(),
                 port: "8080".to_string(),
                 boot_nodes: None,
                 public_address: None,
+                theme: Theme::dark,
             },
             http_client: None,
             market_client: None,
-            jobs_state: Jobs::new(),
+            jobs: Jobs::new(),
+            discovered_peers: HashMap::new(),
         };
         default.write();
-        return default;
+        default
     }
 
     // write to config.json
@@ -105,15 +133,21 @@ impl Configurations {
         }
     }
 
-    pub fn get_hash(&self, file_path: String) -> Result<String> {
-        // open the file
-        let mut file = std::fs::File::open(file_path)?;
-        // hash the file
-        let hash = files::hash_file(&mut file)?;
-        Ok(hash)
+    pub async fn get_hash(&self, file_path: String) -> Result<FileInfoHash> {
+        Ok(producer::files::get_file_info(&PathBuf::from(file_path))
+            .await?
+            .get_hash())
     }
 
-    pub fn get_files(&self) -> HashMap<String, PathBuf> {
+    pub fn jobs(&self) -> &Jobs {
+        &self.jobs
+    }
+
+    pub fn jobs_mut(&mut self) -> &mut Jobs {
+        &mut self.jobs
+    }
+
+    pub fn get_files(&self) -> HashMap<FileInfoHash, LocalFileInfo> {
         self.props.files.clone()
     }
 
@@ -121,8 +155,25 @@ impl Configurations {
         self.props.file_names.clone()
     }
 
-    pub fn get_prices(&self) -> HashMap<String, i64> {
-        self.props.prices.clone()
+    pub fn get_file_names(&self) -> HashMap<String, String> {
+        self.props.file_names.clone()
+    }
+
+    pub fn get_prices(&self) -> HashMap<FileInfoHash, i64> {
+        self.props
+            .files
+            .iter()
+            .map(|(hash, file_info)| (hash.clone(), file_info.price))
+            .collect()
+    }
+
+    pub fn get_file_size(&self, file_path: String) -> u64 {
+        let metadata = fs::metadata(file_path).unwrap();
+        metadata.len()
+    }
+
+    pub fn get_jobs_state(&self) -> Jobs {
+        self.jobs_state.clone()
     }
 
     pub fn get_file_size(&self, file_path: String) -> u64 {
@@ -146,7 +197,11 @@ impl Configurations {
         self.props.public_address.clone()
     }
 
-    pub fn get_token(&mut self, producer_id: String) -> String {
+    pub fn get_theme(&self) -> Theme {
+        self.props.theme
+    }
+
+    pub fn get_token(&mut self, producer_id: EncodedUser) -> String {
         match self.props.tokens.get(&producer_id).cloned() {
             Some(token) => token,
             None => {
@@ -158,7 +213,7 @@ impl Configurations {
         }
     }
 
-    pub fn set_token(&mut self, producer_id: String, token: String) {
+    pub fn set_token(&mut self, producer_id: EncodedUser, token: String) {
         self.props.tokens.insert(producer_id, token);
         self.write();
     }
@@ -175,89 +230,80 @@ impl Configurations {
 
     pub fn set_public_address(&mut self, public_address: Option<Multiaddr>) {
         self.props.public_address = public_address;
+        self.write();
+    }
+
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.props.theme = theme;
+        self.write();
     }
 
     // add every file in the directory to the list
-    pub fn add_dir(&mut self, file_path: String, price: i64) -> Result<()> {
+    #[async_recursion]
+    pub async fn add_dir(&mut self, file_path: &Path, price: i64) -> Result<usize> {
         // assume that the file_path is a directory
+        let mut num_added = 0;
         for entry in fs::read_dir(file_path)? {
-            let path = entry?.path();
-            // convert the path to a string
-            let path_string = match path.to_str() {
-                Some(path) => path,
-                None => {
-                    panic!("Failed to convert path to string");
-                }
-            };
+            let path = &entry?.path();
             // check if this is a file or a directory
             if path.is_dir() {
-                self.add_dir(path_string.to_owned(), price)?;
+                num_added += self.add_dir(path, price).await?;
             }
             if path.is_file() {
-                self.add_file(path_string.to_owned(), price);
+                self.add_file(path, price).await?;
+                num_added += 1;
             }
         }
-        Ok(())
+        Ok(num_added)
     }
 
     // add a single file to the list
-    // returns the hash
-    pub fn add_file(&mut self, file: String, price: i64) -> String {
-        // hash the file
-        let hash = match self.get_hash(file.clone()) {
-            Ok(hash) => hash,
-            Err(_) => {
-                panic!("Failed to hash file");
-            }
-        };
+    pub async fn add_file(&mut self, file_path: &PathBuf, price: i64) -> Result<FileInfoHash> {
+        let file_info = get_file_info(file_path).await?;
+        let file_info_hash = file_info.get_hash();
+        self.props.files.insert(
+            file_info_hash.clone(),
+            LocalFileInfo {
+                file_info,
+                path: file_path.to_owned(),
+                price,
+            },
+        );
 
-        self.props.file_names.insert(hash.clone(), file.clone());
-        self.props.files.insert(hash.clone(), PathBuf::from(file));
-        self.props.prices.insert(hash.clone(), price);
-
-        hash
+        Ok(file_info_hash)
     }
 
     // cli command to add a file/dir to the list
-    pub fn add_file_path(&mut self, file: String, price: i64) {
+    pub async fn add_file_path(&mut self, file_path: &PathBuf, price: i64) -> Result<usize> {
         // check if this is a file or a directory
-        match std::fs::metadata(&file) {
+        let mut num_added = 0;
+        match std::fs::metadata(file_path) {
             Ok(metadata) => {
                 if metadata.is_file() {
-                    self.add_file(file.clone(), price);
+                    self.add_file(file_path, price).await?;
+                    num_added += 1;
                 }
                 if metadata.is_dir() {
-                    match self.add_dir(file.clone(), price) {
-                        Ok(_) => {}
-                        Err(_) => {
-                            eprintln!("Failed to add directory {}", file);
-                        }
-                    };
+                    num_added += self.add_dir(file_path, price).await?
                 }
             }
-            Err(_) => {
-                eprintln!("Failed to open file {:?}", file);
-            }
+            Err(e) => Err(anyhow!("Failed to open file {file_path:?}: {e}"))?,
         }
         self.write();
+        Ok(num_added)
     }
 
-    pub fn remove_file(&mut self, file_path: String) {
+    pub async fn remove_file(&mut self, file_path: String) -> Result<()> {
         // get the hash of the file
-        let hash = match self.get_hash(file_path.clone()) {
-            Ok(hash) => hash,
-            Err(_) => {
-                panic!("Failed to hash file");
-            }
-        };
+        let file_info = get_file_info(&PathBuf::from(file_path.clone())).await?;
+        let hash = file_info.get_hash();
 
-        // if file is not in the list, panic
-        if !self.props.files.contains_key(&hash) || !self.props.prices.contains_key(&hash) {
+        if !self.props.files.contains_key(&hash) {
             panic!("File [{}] not found", file_path);
         }
         self.props.files.remove(&hash);
-        self.props.prices.remove(&hash);
         self.write();
+        Ok(())
     }
 
     pub fn set_http_client(&mut self, http_client: tokio::task::JoinHandle<()>) {
@@ -283,7 +329,7 @@ impl Configurations {
         self.set_port(port.clone());
 
         let join = // must run in separate thread so does not block cli inputs
-            producer::start_server(self.props.files.clone(), self.props.prices.clone(), self.props.file_names.clone(), port).await;
+            producer::start_server(self.props.files.clone(), port).await;
         self.set_http_client(join);
     }
 
@@ -314,5 +360,15 @@ impl Configurations {
         }
         let market_client = self.market_client.as_mut().unwrap(); // safe to unwrap because we just set it
         Ok(market_client)
+    }
+
+    pub fn get_peer(&self, peer_id: &str) -> Option<&PeerInfo> {
+        self.discovered_peers.get(peer_id)
+    }
+    pub fn get_peers(&self) -> Vec<PeerInfo> {
+        self.discovered_peers.values().cloned().collect()
+    }
+    pub fn remove_peer(&mut self, peer_id: &str) -> Option<PeerInfo> {
+        self.discovered_peers.remove(peer_id)
     }
 }
