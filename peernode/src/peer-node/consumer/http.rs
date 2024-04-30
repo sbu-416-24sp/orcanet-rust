@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
+use proto::market::User;
 
-use crate::grpc::orcanet::User;
 use std::time::Instant;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;

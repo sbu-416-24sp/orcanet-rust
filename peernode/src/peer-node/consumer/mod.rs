@@ -1,8 +1,9 @@
 pub mod encode;
 pub mod http;
 
-use crate::grpc::{orcanet::User, MarketClient};
+use crate::peer::MarketClient;
 use anyhow::Result;
+use proto::market::User;
 use std::fmt::Write;
 
 use self::http::GetFileResponse;

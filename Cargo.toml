@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+  "examples/market_server",
+  "examples/market_test_client",
+  "market",
+  "peernode",
+]

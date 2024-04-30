@@ -1,7 +1,7 @@
 mod db;
 mod http;
 
-use crate::grpc::MarketClient;
+use crate::peer::MarketClient;
 use crate::transfer::files;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -46,7 +46,7 @@ pub async fn register_files(
     };
 
     // Get the public IP address
-    let ip = match ip {
+    let mut ip = match ip {
         Some(ip) => ip,
         // Use the AWS checkip service to get the public IP address
         None => match reqwest::get("http://checkip.amazonaws.com").await {
@@ -61,6 +61,12 @@ pub async fn register_files(
             }
         },
     };
+
+    // for testing on local network
+    if cfg!(feature = "test_local_market") {
+        ip = "0.0.0.0".to_owned();
+    }
+
     println!("Producer: IP address is {}", ip);
 
     // Generate a random Producer ID

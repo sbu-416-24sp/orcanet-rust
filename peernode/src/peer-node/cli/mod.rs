@@ -1,9 +1,13 @@
+use std::str::FromStr;
+
 use crate::consumer;
 use crate::producer;
 use crate::store;
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
+use orcanet_market::BootNodes;
+use orcanet_market::Multiaddr;
 use store::Configurations;
 
 #[cfg(test)]
@@ -66,11 +70,6 @@ pub fn cli() -> Command {
                         .arg(arg!(<PORT> "The port to run the HTTP server on").required(true)),
                 )
                 .subcommand(
-                    Command::new("market")
-                        .about("Sets the market")
-                        .arg(arg!(<MARKET> "The market").required(true)),
-                )
-                .subcommand(
                     Command::new("ls").about("Lists all files registered with the market server"),
                 ),
         )
@@ -128,8 +127,34 @@ pub fn cli() -> Command {
                 // .ignore_errors(true)
                 .subcommand(
                     Command::new("set")
-                        .about("Sets the market to connect to")
-                        .arg(arg!(<MARKET> "The market to connect to").required(true)),
+                        .about("Set the options for the market connection")
+                        .arg_required_else_help(true)
+                        .arg(
+                            clap::Arg::new("BOOT_NODES")
+                                .short('b')
+                                .long("boot-nodes")
+                                .value_name("BOOT_NODES")
+                                .help("The bootstrap nodes to connect to")
+                                .long_help(
+"A space-separated list of Multiaddr for bootstrap nodes to connect to
+e.g. -b /ip4/192.168.0.0.1/tcp/6881/peer_id_hash1 /ip4/127.0.0.2/tcp/6881/peer_id_hash2"
+                                )
+                                // optional
+                                .num_args(0..)
+                        )
+                        .arg(
+                            clap::Arg::new("PUBLIC_ADDRESS")
+                                .short('p')
+                                .long("public-address")
+                                .value_name("PUBLIC_ADDRESS")
+                                .num_args(0..=1)
+                                .help("The optional public address to run a market server on")
+                                .long_help(
+"If this is provided, the market server will connect to the Kademlia network and serve data.
+Otherwise, it will run in client mode and only retrieve data from the network.
+The address must be provided as a Multiaddr,
+e.g. /ip4/0.0.0.0/tcp/6881")
+                    )
                 ),
         )
         .subcommand(Command::new("exit").about("Exits the CLI"))
@@ -152,10 +177,7 @@ pub async fn handle_arg_matches(
                         Some(port) => port.clone(),
                         None => config.get_port(),
                     };
-                    let market_client = match register_matches.get_one::<String>("MARKET") {
-                        Some(market) => config.set_market_client(market.to_owned()).await?,
-                        None => config.get_market_client().await?,
-                    };
+                    let market_client = config.get_market_client().await?;
                     let ip = match register_matches.get_one::<String>("IP") {
                         Some(ip) => Some(ip.clone()),
                         None => None,
@@ -307,11 +329,61 @@ pub async fn handle_arg_matches(
         }
         Some(("market", market_matches)) => match market_matches.subcommand() {
             Some(("set", set_matches)) => {
-                let market = match set_matches.get_one::<String>("MARKET") {
-                    Some(market) => market.clone(),
-                    None => Err(anyhow!("No market provided"))?,
+                let boot_nodes = match set_matches.get_many::<String>("BOOT_NODES") {
+                    Some(boot_nodes) => {
+                        let parsed_addrs: Vec<_> = boot_nodes
+                            .filter_map(|x| match Multiaddr::from_str(x) {
+                                Ok(x) => Some(x),
+                                Err(e) => {
+                                    println!("Failed to parse multiaddr {x}: {e}");
+                                    None
+                                }
+                            })
+                            .collect();
+                        println!("Boot nodes parsed: {parsed_addrs:?}");
+                        if parsed_addrs.is_empty() {
+                            None
+                        } else {
+                            Some(BootNodes::with_nodes(parsed_addrs))
+                        }
+                    }
+                    None => {
+                        let boot_nodes = config.get_boot_nodes();
+                        println!("Using existing boot nodes {boot_nodes:?}");
+                        boot_nodes
+                    }
                 };
-                config.set_market_client(market).await?;
+                let public_address = match set_matches.get_many::<String>("PUBLIC_ADDRESS") {
+                    Some(public_addr) => {
+                        match public_addr
+                            .filter_map(|x| match Multiaddr::from_str(x) {
+                                Ok(x) => Some(x),
+                                Err(e) => {
+                                    println!("Failed to parse multiaddr {x}: {e}");
+                                    None
+                                }
+                            })
+                            .next()
+                        {
+                            Some(parsed_addr) => {
+                                println!("Public address parsed: {:?}", parsed_addr);
+                                Some(parsed_addr)
+                            }
+                            None => {
+                                println!("Setting public address to None");
+                                None
+                            }
+                        }
+                    }
+                    None => {
+                        let public_address = config.get_public_address();
+                        println!("Using existing public address {public_address:?}");
+                        public_address
+                    }
+                };
+                config.set_boot_nodes(boot_nodes);
+                config.set_public_address(public_address);
+                config.get_market_client().await?;
                 Ok(())
             }
             _ => Err(anyhow!("Invalid subcommand")),

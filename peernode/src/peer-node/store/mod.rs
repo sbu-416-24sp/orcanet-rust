@@ -1,9 +1,10 @@
-use crate::grpc::MarketClient;
+use crate::peer::MarketClient;
 use crate::producer;
 use crate::transfer::files;
 use crate::transfer::jobs::Jobs;
 use anyhow::Result;
 use config::{Config, File, FileFormat};
+use orcanet_market::{BootNodes, Multiaddr};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -26,6 +27,9 @@ pub struct Properties {
     file_names: HashMap<String, String>,
     tokens: HashMap<String, String>,
     port: String,
+    // market config
+    boot_nodes: Option<BootNodes>,
+    public_address: Option<Multiaddr>,
     // wallet: String, // not sure about implementation details, will revisit later
 }
 
@@ -69,6 +73,8 @@ impl Configurations {
                 prices: HashMap::new(),
                 tokens: HashMap::new(),
                 port: "8080".to_string(),
+                boot_nodes: None,
+                public_address: None,
             },
             http_client: None,
             market_client: None,
@@ -107,10 +113,6 @@ impl Configurations {
         Ok(hash)
     }
 
-    pub fn get_market(&self) -> String {
-        self.props.market.clone()
-    }
-
     pub fn get_files(&self) -> HashMap<String, PathBuf> {
         self.props.files.clone()
     }
@@ -136,6 +138,14 @@ impl Configurations {
         self.props.port.clone()
     }
 
+    pub fn get_boot_nodes(&self) -> Option<BootNodes> {
+        self.props.boot_nodes.clone()
+    }
+
+    pub fn get_public_address(&self) -> Option<Multiaddr> {
+        self.props.public_address.clone()
+    }
+
     pub fn get_token(&mut self, producer_id: String) -> String {
         match self.props.tokens.get(&producer_id).cloned() {
             Some(token) => token,
@@ -158,10 +168,13 @@ impl Configurations {
         self.write();
     }
 
-    pub fn set_market(&mut self, market: String) -> String {
-        self.props.market = market.clone();
+    pub fn set_boot_nodes(&mut self, boot_nodes: Option<BootNodes>) {
+        self.props.boot_nodes = boot_nodes;
         self.write();
-        market
+    }
+
+    pub fn set_public_address(&mut self, public_address: Option<Multiaddr>) {
+        self.props.public_address = public_address;
     }
 
     // add every file in the directory to the list
@@ -252,10 +265,7 @@ impl Configurations {
     }
 
     pub fn is_http_running(&self) -> bool {
-        if self.http_client.is_some() {
-            return true;
-        }
-        return false;
+        self.http_client.is_some()
     }
 
     pub async fn start_http_client(&mut self, port: String) {
@@ -290,17 +300,19 @@ impl Configurations {
 
     pub async fn get_market_client(&mut self) -> Result<&mut MarketClient> {
         if self.market_client.is_none() {
-            let market_client = MarketClient::new(self.get_market()).await?;
+            let mut config = orcanet_market::Config::builder();
+            if let Some(boot_nodes) = self.props.boot_nodes.clone() {
+                if !boot_nodes.is_empty() {
+                    config = config.set_boot_nodes(boot_nodes);
+                }
+            }
+            if let Some(public_address) = self.props.public_address.clone() {
+                config = config.set_public_address(public_address.clone());
+            }
+            let market_client = MarketClient::new(config.build()).await?;
             self.market_client = Some(market_client);
         }
         let market_client = self.market_client.as_mut().unwrap(); // safe to unwrap because we just set it
         Ok(market_client)
-    }
-
-    pub async fn set_market_client(&mut self, market: String) -> Result<&mut MarketClient> {
-        let market_client = MarketClient::new(market.clone()).await?;
-        self.market_client = Some(market_client);
-        self.set_market(market);
-        Ok(self.market_client.as_mut().unwrap()) // safe to unwrap because we just set it
     }
 }

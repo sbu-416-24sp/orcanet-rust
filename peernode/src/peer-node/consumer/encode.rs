@@ -1,6 +1,6 @@
-use crate::grpc::orcanet::User;
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
+use proto::market::User;
 
 // Encode a user struct to a base64 string
 pub fn encode_user(user: &User) -> String {
