@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use proto::market::User;
 
+use std::path::PathBuf;
 use std::time::Instant;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
@@ -19,16 +20,16 @@ pub async fn get_file_chunk(
     let start = Instant::now();
     // Get the link to the file
     let link = format!(
-        "http://{}:{}/file/{}?chunk={}",
-        producer.ip, producer.port, file_hash, chunk
+        "http://{}:{}/file/{file_hash}?chunk={chunk}",
+        producer.ip, producer.port
     );
-    println!("HTTP: Fetching file chunk from {}", link);
+    println!("HTTP: Fetching file chunk from {link}");
 
     // Fetch the file from the producer
     let client = reqwest::Client::new();
     let res = client
         .get(&link)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .send()
         .await?;
 
@@ -60,7 +61,11 @@ pub async fn get_file_chunk(
 
     // Save the file to disk
     let file = res.bytes().await?;
-    let file_path = format!("download/{}", file_name);
+    // for now, add customization option?
+    if !PathBuf::from("download").exists() {
+        return Err(anyhow!("download folder does not exist, cannot proceed"));
+    }
+    let file_path: PathBuf = ["download", file_name].iter().collect();
     let mut download = OpenOptions::new()
         .create(true)
         .append(true)
@@ -68,12 +73,7 @@ pub async fn get_file_chunk(
         .await?;
 
     download.write_all(&file).await?;
-    let duration = start.elapsed();
-    println!(
-        "HTTP: Chunk [{}] saved to {} [{} ms]",
-        chunk,
-        file_name,
-        duration.as_millis()
-    );
+    let duration = start.elapsed().as_millis();
+    println!("HTTP: Chunk [{chunk}] saved to {file_name} [{duration} ms]");
     Ok(GetFileResponse::Token(auth_token.to_string()))
 }

@@ -8,8 +8,9 @@ use libp2p::{
     request_response::cbor::Behaviour as CborReqResBehaviour,
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour},
 };
+use proto::market::FileInfoHash;
 
-use crate::lmm::{FileInfoHash, SupplierInfo};
+use crate::lmm::SupplierInfo;
 
 // TODO: maybe do somethign with toggle in future?
 

@@ -1,31 +1,37 @@
 pub mod encode;
 pub mod http;
 
-use crate::peer::MarketClient;
-use anyhow::Result;
-use proto::market::User;
 use std::fmt::Write;
 
+use anyhow::{anyhow, Result};
+use proto::market::{FileInfoHash, User};
+
 use self::http::GetFileResponse;
+use crate::peer::MarketClient;
 
 // list every producer who holds the file hash I want
-pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Result<String> {
-    let producers = client.check_holders(file_hash).await?;
+pub async fn list_producers(
+    file_info_hash: FileInfoHash,
+    client: &mut MarketClient,
+) -> Result<String> {
+    let response = client.check_holders(file_info_hash).await?;
     let mut producer_list = String::new();
-    for producer in producers.holders {
+    for producer in response.holders {
         // serialize the producer struct to a string
         let encoded_producer = encode::encode_user(&producer);
         if let Err(e) = writeln!(
             &mut producer_list,
             "Producer:\n  id: {}\n  Price: {}\n",
-            encoded_producer, producer.price
+            encoded_producer.as_str(),
+            producer.price
         ) {
-            eprintln!("Failed to write producer: {}", e);
-            return Err(anyhow::anyhow!("Failed to write producer"));
+            eprintln!("Failed to write producer: {e}");
+            return Err(anyhow!("Failed to write producer"));
         }
         println!(
             "Producer:\n  id: {}\n  Price: {}",
-            encoded_producer, producer.price
+            encoded_producer.as_str(),
+            producer.price
         );
     }
     Ok(producer_list)
@@ -33,24 +39,17 @@ pub async fn list_producers(file_hash: String, client: &mut MarketClient) -> Res
 
 // get file I want by hash from producer
 pub async fn get_file(
-    producer: String,
+    user: User,
     file_hash: String,
     token: String,
     chunk: u64,
     continue_download: bool,
 ) -> Result<String> {
-    let producer_user = match encode::decode_user(producer.clone()) {
-        Ok(user) => user,
-        Err(e) => {
-            eprintln!("Failed to decode producer: {}", e);
-            return Err(anyhow::anyhow!("Failed to decode producer"));
-        }
-    };
     let mut chunk_num = chunk;
     let mut return_token = String::from(token);
     loop {
         match get_file_chunk(
-            producer_user.clone(),
+            user.clone(),
             file_hash.clone(),
             return_token.clone(),
             chunk_num,
@@ -69,10 +68,7 @@ pub async fn get_file(
                 }
                 chunk_num += 1;
             }
-            Err(e) => {
-                eprintln!("Failed to download chunk {}: {}", chunk_num, e);
-                return Err(anyhow::anyhow!("Failed to download chunk"));
-            }
+            Err(e) => Err(anyhow::anyhow!("Failed to download chunk {chunk_num}: {e}"))?,
         }
         if continue_download == false {
             return Ok(return_token);
