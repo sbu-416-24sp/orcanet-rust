@@ -30,7 +30,7 @@ async fn test_register_file() {
 }
 
 #[tokio::test]
-async fn test_register_and_get_providers() {
+async fn test_register_and_get_providers_for_one() {
     let config = Config::builder().set_peer_tcp_port(14000).build();
     let peer = spawn(config).unwrap();
     let peer_id = peer.peer_id();

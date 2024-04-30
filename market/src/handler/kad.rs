@@ -163,6 +163,14 @@ impl<'a> KadHandler<'a> {
                     )
                 }
             },
+            QueryResult::RepublishProvider(result) => match result {
+                Ok(AddProviderOk { .. }) => {
+                    info!("[Kademlia] - Successfully republished the key");
+                }
+                Err(AddProviderError::Timeout { .. }) => {
+                    error!("[Kademlia] - Failed to republish the key due to timeout.")
+                }
+            },
             _ => {}
         }
     }

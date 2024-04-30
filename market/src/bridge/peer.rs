@@ -112,10 +112,20 @@ impl Peer {
     }
 
     pub async fn get_providers(&self, file_info_hash: impl Into<FileInfoHash>) -> Response {
-        self.send(Request::Kad(KadRequest::GetProviders {
-            file_info_hash: file_info_hash.into(),
-        }))
-        .await
+        let file_info_hash: FileInfoHash = file_info_hash.into();
+        let is_local_file_owner = self.is_local_file_owner(file_info_hash.clone()).await;
+        let mut res = self
+            .send(Request::Kad(KadRequest::GetProviders { file_info_hash }))
+            .await;
+        if let Ok(SuccessfulResponse::KadResponse(KadSuccessfulResponse::GetProviders {
+            ref mut providers,
+        })) = res
+        {
+            if is_local_file_owner && !providers.contains(self.peer_id()) {
+                providers.push(*self.peer_id());
+            }
+        }
+        res
     }
 
     #[inline(always)]

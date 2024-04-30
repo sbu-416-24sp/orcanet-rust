@@ -79,8 +79,8 @@ impl<'a> EventHandler for Handler<'a> {
                     ping_handler.handle_event(event);
                 }
                 BehaviourEvent::Autonat(event) => {
-                    // let mut autonat_handler = AutoNatHandler::new(self.boot_nodes);
-                    // autonat_handler.handle_event(event);
+                    let mut autonat_handler = AutoNatHandler::new(self.boot_nodes);
+                    autonat_handler.handle_event(event);
                 }
                 BehaviourEvent::RelayServer(event) => {
                     let mut relay_server_handler = RelayServerHandler {};

@@ -1,4 +1,4 @@
-use std::{net::Ipv4Addr, time::Duration};
+use std::net::Ipv4Addr;
 
 use libp2p::Multiaddr;
 use orcanet_market::{
@@ -75,6 +75,9 @@ async fn test_register_file_and_check_holders_basic() {
 
 #[tokio::test]
 async fn test_check_holders_from_other_peer() {
+    let mut public_addr = Multiaddr::empty();
+    public_addr.push(Protocol::Ip4(Ipv4Addr::LOCALHOST));
+    public_addr.push(Protocol::Tcp(3392));
     let config = Config::builder().set_peer_tcp_port(3392).build();
     let peer1 = spawn(config).unwrap();
     let mut addr = Multiaddr::empty();
@@ -88,8 +91,6 @@ async fn test_check_holders_from_other_peer() {
         .set_boot_nodes(boot_nodes)
         .build();
     let peer2 = spawn(config).unwrap();
-    // give it a bit to connect
-    tokio::time::sleep(Duration::from_secs(1)).await;
 
     let user = User {
         id: "abc".to_string(),
@@ -113,7 +114,6 @@ async fn test_check_holders_from_other_peer() {
     let _ = peer1
         .register_file(user, file_info_hash.clone(), file_info)
         .await;
-    tokio::time::sleep(Duration::from_secs(1)).await;
     let res = peer2.check_holders(file_info_hash).await;
     assert_eq!(res, Ok(SuccessfulResponse::CheckHolders(expected_holders)))
 }
