@@ -5,4 +5,6 @@ members = [
   "examples/market_test_client",
   "market",
   "peernode",
+  "cli",
+  "server",
 ]

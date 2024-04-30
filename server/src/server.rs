@@ -1,8 +1,3 @@
-pub mod consumer;
-pub mod peer;
-pub mod producer;
-pub mod store;
-
 pub mod jobs;
 
 mod routes {
@@ -15,6 +10,7 @@ use axum::Router;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use peernode::store;
 // shared server state
 #[derive(Clone)]
 pub struct ServerState {

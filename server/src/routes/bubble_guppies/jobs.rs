@@ -10,12 +10,10 @@ use axum::{
 use proto::market::FileInfoHash;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    consumer::encode::{encode_user, try_decode_user},
-    ServerState,
-};
+use peernode::consumer::encode::{encode_user, try_decode_user};
 
-use crate::jobs;
+
+use crate::{ServerState, jobs};
 
 ///
 /// JOBS ENDPOINTS

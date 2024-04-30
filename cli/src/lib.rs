@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::consumer;
-use crate::consumer::encode;
-use crate::producer;
-use crate::store;
+use peernode::consumer;
+use peernode::consumer::encode;
+use peernode::producer;
+use peernode::store;
 
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
