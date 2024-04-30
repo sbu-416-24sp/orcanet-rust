@@ -75,9 +75,6 @@ async fn test_register_file_and_check_holders_basic() {
 
 #[tokio::test]
 async fn test_check_holders_from_other_peer() {
-    let mut public_addr = Multiaddr::empty();
-    public_addr.push(Protocol::Ip4(Ipv4Addr::LOCALHOST));
-    public_addr.push(Protocol::Tcp(3392));
     let config = Config::builder().set_peer_tcp_port(3392).build();
     let peer1 = spawn(config).unwrap();
     let mut addr = Multiaddr::empty();
