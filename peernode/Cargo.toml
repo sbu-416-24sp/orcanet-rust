@@ -5,12 +5,12 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]] # Bin to run the gRPC client
-name = "peer-node"
-path = "src/peer-node/client.rs"
+name = "peernode"
+path = "src/client.rs"
 
 [[bin]] # Bin to run the http server
 name = "peer-node-server"
-path = "src/peer-node/server.rs"
+path = "src/server.rs"
 
 [features]
 test_local_market = []
