@@ -4,6 +4,8 @@ pub mod producer;
 pub mod store;
 pub mod transfer;
 
+pub mod jobs;
+
 mod routes {
     pub mod bubble_guppies;
     pub mod manta;
@@ -18,12 +20,14 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct ServerState {
     pub config: Arc<Mutex<store::Configurations>>,
+    pub jobs: Arc<Mutex<jobs::Jobs>>,
 }
 
 // Main function to setup and run the server
 #[tokio::main]
 async fn main() {
     let mut config = store::Configurations::new().await;
+    let mut jobs = jobs::Jobs::new();
 
     // Run http client
     config.start_http_client(config.get_port()).await;
@@ -32,6 +36,7 @@ async fn main() {
 
     let state = ServerState {
         config: Arc::new(Mutex::new(config)),
+        jobs: Arc::new(Mutex::new(jobs)),
     };
 
     let app = Router::new()

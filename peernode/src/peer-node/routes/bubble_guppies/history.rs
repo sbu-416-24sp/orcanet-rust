@@ -16,8 +16,8 @@ use crate::ServerState;
 ///
 
 async fn get_history(State(state): State<ServerState>) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
-    let history = config.jobs_mut().get_job_history().await;
+    let jobs = state.jobs.lock().await;
+    let history = jobs.get_job_history().await;
 
     let history_json = serde_json::to_string(&history).unwrap();
     Response::builder()
@@ -36,9 +36,9 @@ async fn remove_from_history(
     State(state): State<ServerState>,
     Json(job): Json<RemoveFromHistory>,
 ) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
+    let jobs = state.jobs.lock().await;
 
-    let successful = config.jobs_mut().remove_job_from_history(&job.jobID).await;
+    let successful = jobs.remove_job_from_history(&job.jobID).await;
 
     if !successful {
         return (StatusCode::NOT_FOUND, "Job not found").into_response();
@@ -51,8 +51,8 @@ async fn remove_from_history(
 }
 
 async fn clear_history(State(state): State<ServerState>) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
-    config.jobs_mut().clear_job_history().await;
+    let jobs = state.jobs.lock().await;
+    jobs.clear_job_history().await;
 
     Response::builder()
         .status(StatusCode::OK)

@@ -11,14 +11,11 @@ use proto::market::FileInfoHash;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    consumer::encode::{self, encode_user, try_decode_user, EncodedUser},
-    producer,
-    transfer::{
-        self,
-        jobs::{JobListItem, JobStatus},
-    },
+    consumer::encode::{encode_user, try_decode_user},
     ServerState,
 };
+
+use crate::jobs;
 
 ///
 /// JOBS ENDPOINTS
@@ -31,6 +28,7 @@ struct AddJob {
 }
 async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> impl IntoResponse {
     let mut config = state.config.lock().await;
+    let jobs = state.jobs.lock().await;
 
     let file_info_hash = FileInfoHash(job.fileHash);
     let peer_id = job.peerId;
@@ -61,22 +59,20 @@ async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> i
         }
     };
 
-    let job_id = config
-        .jobs_mut()
-        .add_job(
-            file_info_hash,
-            file_info.file_size as u64,
-            file_info.file_name,
-            user.price,
-            peer_id.clone(),
-            encode_user(&user),
-        )
-        .await;
+    let job_id = jobs.add_job(
+        file_info_hash,
+        file_info.file_size as u64,
+        file_info.file_name,
+        user.price,
+        peer_id.clone(),
+        encode_user(&user),
+    )
+    .await;
 
     // start job after adding
-    let job = config.jobs().get_job(&job_id).await.unwrap();
+    let job = jobs.get_job(&job_id).await.unwrap();
     let token = config.get_token(job.lock().await.encoded_producer.clone());
-    transfer::jobs::start(job, token).await;
+    jobs::start(job, token).await;
 
     Response::builder()
         .status(StatusCode::OK)
@@ -138,8 +134,8 @@ async fn find_peer(
 }
 
 async fn get_job_list(State(state): State<ServerState>) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
-    let jobs_list = config.jobs_mut().get_jobs_list().await;
+    let jobs = state.jobs.lock().await;
+    let jobs_list = jobs.get_jobs_list().await;
 
     let jobs_json = serde_json::to_string(&jobs_list).expect("to serialize");
     Response::builder()
@@ -152,9 +148,9 @@ async fn get_job_info(
     State(state): State<ServerState>,
     Path(jobID): Path<String>,
 ) -> impl IntoResponse {
-    let mut config = state.config.lock().await;
+    let jobs = state.jobs.lock().await;
 
-    let job_info = match config.jobs_mut().get_job_info(&jobID).await {
+    let job_info = match jobs.get_job_info(&jobID).await {
         Some(job_info) => job_info,
         None => return (StatusCode::NOT_FOUND, "Job not found").into_response(),
     };
@@ -178,9 +174,9 @@ async fn job_peer_info(
     State(state): State<ServerState>,
     Path(jobID): Path<String>,
 ) -> impl IntoResponse {
-    let config = state.config.lock().await;
+    let jobs = state.jobs.lock().await;
 
-    let user = match config.jobs().get_job(&jobID).await {
+    let user = match jobs.get_job(&jobID).await {
         Some(job) => {
             let lock = job.lock().await;
             match try_decode_user(lock.encoded_producer.as_str()) {
@@ -216,10 +212,12 @@ async fn start_jobs(
 ) -> impl IntoResponse {
     for job_id in arg.jobIDs {
         let mut config = state.config.lock().await;
-        match config.jobs().get_job(&job_id).await {
+        let jobs = state.jobs.lock().await;
+
+        match jobs.get_job(&job_id).await {
             Some(job) => {
                 let token = config.get_token(job.lock().await.encoded_producer.clone());
-                transfer::jobs::start(job, token).await;
+                jobs::start(job, token).await;
             }
             None => return (StatusCode::NOT_FOUND, "Job not found").into_response(),
         }
@@ -231,10 +229,11 @@ async fn pause_jobs(
     State(state): State<ServerState>,
     Json(arg): Json<JobIds>,
 ) -> impl IntoResponse {
+    let jobs = state.jobs.lock().await;
     let mut num_failed = 0;
+
     for job_id in arg.jobIDs {
-        let config = state.config.lock().await;
-        match config.jobs().get_job(&job_id).await {
+        match jobs.get_job(&job_id).await {
             Some(job) => {
                 let mut lock = job.lock().await;
                 lock.pause();
@@ -257,10 +256,11 @@ async fn terminate_jobs(
     State(state): State<ServerState>,
     Json(arg): Json<JobIds>,
 ) -> impl IntoResponse {
+    let jobs = state.jobs.lock().await;
     let mut num_failed = 0;
+    
     for job_id in arg.jobIDs {
-        let config = state.config.lock().await;
-        match config.jobs().get_job(&job_id).await {
+        match jobs.get_job(&job_id).await {
             Some(job) => {
                 let mut lock = job.lock().await;
                 lock.terminate();

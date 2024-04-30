@@ -2,10 +2,7 @@ use crate::{
     consumer::encode::EncodedUser,
     peer::MarketClient,
     producer,
-    transfer::{
-        files::{get_file_info, LocalFileInfo},
-        jobs::Jobs,
-    },
+    transfer::files::{get_file_info, LocalFileInfo},
 };
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
@@ -27,8 +24,7 @@ pub struct Configurations {
     market_client: Option<MarketClient>,
     // and shared state apparently
     // {Peer Id -> Peer Info}
-    discovered_peers: HashMap<String, PeerInfo>,
-    jobs: Jobs,
+    discovered_peers: HashMap<String, PeerInfo>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -76,7 +72,6 @@ impl Configurations {
             props,
             http_client: None,
             market_client: None,
-            jobs: Jobs::new(),
             discovered_peers: HashMap::new(),
         }
     }
@@ -95,7 +90,6 @@ impl Configurations {
             },
             http_client: None,
             market_client: None,
-            jobs: Jobs::new(),
             discovered_peers: HashMap::new(),
         };
         default.write();
@@ -125,14 +119,6 @@ impl Configurations {
 
     pub async fn get_hash(&self, file_path: String) -> Result<FileInfoHash> {
         Ok(get_file_info(&PathBuf::from(file_path)).await?.get_hash())
-    }
-
-    pub fn jobs(&self) -> &Jobs {
-        &self.jobs
-    }
-
-    pub fn jobs_mut(&mut self) -> &mut Jobs {
-        &mut self.jobs
     }
 
     pub fn get_files(&self) -> HashMap<FileInfoHash, LocalFileInfo> {
