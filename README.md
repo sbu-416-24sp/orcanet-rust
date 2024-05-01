@@ -10,26 +10,10 @@
    (May require more a [more recent version](https://grpc.io/docs/protoc-installation/#install-pre-compiled-binaries-any-os))
 
 ## API
-Detailed gRPC endpoints are in `proto/market.proto`
 
-- Holders of a file can register the file using the RegisterFile RPC.
-  - Provide a User with 5 fields: 
-    - `id`: some string to identify the user.
-    - `name`: a human-readable string to identify the user
-    - `ip`: a string of the public ip address
-    - `port`: an int32 of the port
-    - `price`: an int64 that details the price per mb of outgoing files
-  - Provide a fileHash string that is the hash of the file
-  - Returns nothing
-
-- Then, clients can search for holders using the CheckHolders RPC
-  - Provide a fileHash to identify the file to search for
-  - Returns a list of Users that hold the file.
-
-
+See [server/SERVER.md](server/SERVER.md) for the API documentation.
 
 ## Running
-
 
 ### Market Server
 ```Shell
