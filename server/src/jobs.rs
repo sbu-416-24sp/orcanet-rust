@@ -42,19 +42,29 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn pause(&mut self) {
+    pub fn pause(&mut self) -> bool {
         if let JobStatus::Active(_) = self.status {
             self.status = JobStatus::Stop;
+
+            return true;
         }
+
+        false
     }
-    pub fn terminate(&mut self) {
+    pub fn terminate(&mut self) -> bool {
         match &mut self.status {
             JobStatus::Active(handle) => {
                 handle.abort();
                 self.status = JobStatus::Failed;
+                return true;
             }
-            JobStatus::Completed => {}
-            _ => self.status = JobStatus::Failed,
+            JobStatus::Completed => {
+                return false;
+            }
+            _ => {
+                self.status = JobStatus::Failed;
+                return true;
+            }
         }
     }
 }
@@ -80,8 +90,16 @@ impl fmt::Display for JobStatus {
     }
 }
 
-pub async fn start(job: AsyncJob, jobs: Arc<Mutex<Jobs>>, token: String) {
+pub async fn start(job: AsyncJob, jobs: Arc<Mutex<Jobs>>, token: String) -> bool {
     let mut lock = job.lock().await;
+
+    match lock.status {
+        JobStatus::Completed | JobStatus::Failed => {
+            return false;
+        }
+        _ => {}
+    }
+
     println!("Starting job with token {token}");
     if let JobStatus::Paused(next_chunk) = lock.status {
         let job = job.clone();
@@ -91,7 +109,7 @@ pub async fn start(job: AsyncJob, jobs: Arc<Mutex<Jobs>>, token: String) {
             Err(e) => {
                 eprintln!("Failed to decode producer: {e}");
                 lock.status = JobStatus::Failed;
-                return;
+                return false;
             }
         };
         lock.status = JobStatus::Active(tokio::spawn(async move {
@@ -149,6 +167,8 @@ pub async fn start(job: AsyncJob, jobs: Arc<Mutex<Jobs>>, token: String) {
             }
         }));
     }
+
+    true
 }
 
 #[derive(Serialize)]

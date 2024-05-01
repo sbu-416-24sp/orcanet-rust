@@ -218,7 +218,9 @@ async fn start_jobs(
             Some(job) => {
                 let token = config.get_token(job.lock().await.encoded_producer.clone());
 
-                jobs::start(job, state.jobs.clone(), token).await;
+                if !jobs::start(job, state.jobs.clone(), token).await {
+                    num_failed += 1;
+                }
             }
             None => num_failed += 1,
         }
@@ -245,7 +247,9 @@ async fn pause_jobs(
         match jobs.get_job(&job_id).await {
             Some(job) => {
                 let mut lock = job.lock().await;
-                lock.pause();
+                if !lock.pause() {
+                    num_failed += 1;
+                }
             }
             None => num_failed += 1,
         }
@@ -272,7 +276,9 @@ async fn terminate_jobs(
         match jobs.get_job(&job_id).await {
             Some(job) => {
                 let mut lock = job.lock().await;
-                lock.terminate();
+                if !lock.terminate() {
+                    num_failed += 1;
+                }
             }
             None => num_failed += 1,
         }
