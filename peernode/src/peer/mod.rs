@@ -1,4 +1,4 @@
-use orcanet_market::{bridge::spawn, Config, Peer};
+use orcanet_market::{bridge::spawn, Config, Peer, SuccessfulResponse};
 
 use proto::market::{FileInfo, FileInfoHash, HoldersResponse, User};
 
@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 // test market
 #[cfg(feature = "test_local_market")]
+#[derive(Debug)]
 pub struct MarketClient {
     local: HashMap<FileInfoHash, HoldersResponse>,
 }
@@ -17,7 +18,7 @@ impl MarketClient {
             local: Default::default(),
         })
     }
-    pub async fn check_holders(&mut self, file_info_hash: FileInfoHash) -> Result<HoldersResponse> {
+    pub async fn check_holders(&self, file_info_hash: FileInfoHash) -> Result<HoldersResponse> {
         match self.local.get(&file_info_hash) {
             Some(res) => Ok(res.clone()),
             None => Err(anyhow!("not found!")),
@@ -50,6 +51,7 @@ impl MarketClient {
 }
 
 #[cfg(not(feature = "test_local_market"))]
+#[derive(Debug)]
 pub struct MarketClient {
     inner: Peer,
 }
@@ -66,29 +68,12 @@ impl MarketClient {
     }
 
     // Get a list of producers for a given file hash
-    pub async fn check_holders(&mut self, file_info_hash: FileInfoHash) -> Result<HoldersResponse> {
-        return Ok(HoldersResponse {
-            file_info: Some(FileInfo {
-                file_hash: "x".into(),
-                chunk_hashes: vec!["y".into()],
-                file_size: 3,
-                file_name: "z".into(),
-            }),
-            holders: vec![User {
-                id: "a".into(),
-                name: "user".into(),
-                ip: "0.0.0.0".into(),
-                port: 80,
-                price: 9999,
-            }],
-        });
-        todo!()
-        // println!("gRPC: Checking holders for file hash {}", file_hash);
-        // let request = CheckHoldersRequest { file_hash };
-
-        // let response = self.client.check_holders(request).await?.into_inner();
-
-        // Ok(response)
+    pub async fn check_holders(&self, file_info_hash: FileInfoHash) -> Result<HoldersResponse> {
+        match self.inner.check_holders(file_info_hash).await {
+            Ok(SuccessfulResponse::CheckHolders(res)) => Ok(res),
+            Ok(_) => unreachable!(),
+            Err(e) => Err(anyhow!("{e}")),
+        }
     }
 
     // Register a new producer
@@ -98,22 +83,9 @@ impl MarketClient {
         file_info_hash: FileInfoHash,
         file_info: FileInfo,
     ) -> Result<()> {
-        todo!()
-        // let user = User {
-        //     id,
-        //     name,
-        //     ip,
-        //     port,
-        //     price,
-        // };
-        // let file = RegisterFileRequest {
-        //     user: Some(user),
-        //     file_hash: file_hash.clone(),
-        // };
-
-        // self.client.register_file(file).await?;
-        // println!("gRPC: Registered producer for file hash {}", file_hash);
-
-        // Ok(())
+        match self.inner.register_file(user, file_info_hash, file_info).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow!("{e}")),
+        }
     }
 }
