@@ -9,46 +9,26 @@
 
    (May require more a [more recent version](https://grpc.io/docs/protoc-installation/#install-pre-compiled-binaries-any-os))
 
-## API
-
-See [server/README.md](server/README.md) for the API documentation.
-
 ## Running
 
-### Market Server
-```Shell
-cd market
-cargo run
-```
+### Server
 
-To run a test client:
-
-```Shell
-cd market
-cargo run --bin test_client
-```
-
-(currently the Go test client is interoperable)
-
-### Peer Node
-
-To run the producer:
+To run the server:
 ```bash
-cd peernode
-cargo run producer add <FILE_PATH> <PRICE>
-cargo run producer register
+cargo run --bin server -- [-p port]
 ```
 
-To run the consumer:
+You can provide a port using the -p flag. The default value is 3000. See [server/README.md](server/README.md) for the API documentation.
+
+### Peer Node CLI
+
+To run the peer node CLI:
 ```bash
-cd peernode
-cargo run consumer ls <FILE_HASH>
-cargo run consumer get <FILE_HASH> <CHOSEN_PRODUCER>
+cargo run --bin peernode
 ```
+Run the help command within the CLI for possible commands.
 
-Additional commands can be listed with the help command.
-
-## CLI Interface
+### CLI Interface
 
 To set up a market connection, set the `boot_nodes` configuration:
 

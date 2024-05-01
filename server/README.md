@@ -1,6 +1,6 @@
 # API
 
-Send requests to http://localhost:3000
+Send requests to http://localhost:{port}. The default port is 3000, unless specied with the -p flag.
 
 ## History
 ### GET /get-history
