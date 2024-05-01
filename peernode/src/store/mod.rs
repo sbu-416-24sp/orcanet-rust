@@ -14,7 +14,6 @@ use std::{
 pub mod files;
 use files::{get_file_info, LocalFileInfo};
 
-#[derive()]
 pub struct Configurations {
     // this is the struct that will be used to store the configurations
     props: Properties,
@@ -257,11 +256,7 @@ impl Configurations {
     }
 
     pub fn is_http_running(&self) -> bool {
-        // git blame this
-        if self.http_client.is_some() {
-            return true;
-        }
-        return false;
+        self.http_client.is_some()
     }
 
     pub async fn start_http_client(&mut self, port: String) {
