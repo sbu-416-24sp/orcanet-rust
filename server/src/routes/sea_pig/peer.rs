@@ -6,7 +6,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Router,
+    Json, Router,
 };
 use orcanet_market::Peer;
 use proto::market::User;
@@ -74,13 +74,17 @@ async fn get_peers(State(state): State<ServerState>) -> impl IntoResponse {
         .unwrap()
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct PeerBody {
+    peer_id: String,
+}
 async fn remove_peer(
     State(state): State<ServerState>,
-    Path(peer_id): Path<String>,
+    Json(peer): Json<PeerBody>,
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
 
-    match config.remove_peer(&peer_id) {
+    match config.remove_peer(&peer.peer_id) {
         Some(_) => StatusCode::OK.into_response(),
         None => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove peer").into_response(),
     }
@@ -89,6 +93,6 @@ async fn remove_peer(
 pub fn routes() -> Router<ServerState> {
     Router::new()
         .route("/get-peer/:peer_id", get(get_peer))
-        .route("/get-peers/", get(get_peers))
-        .route("/remove-peer/:peer_id", post(remove_peer))
+        .route("/get-peers", get(get_peers))
+        .route("/remove-peer", post(remove_peer))
 }

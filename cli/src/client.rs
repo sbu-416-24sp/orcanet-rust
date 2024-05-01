@@ -1,7 +1,6 @@
-
-use std::io::{self, Write};
 use peernode::store;
 use peernode::store::Configurations;
+use std::io::{self, Write};
 
 use cli::{cli, handle_arg_matches};
 
