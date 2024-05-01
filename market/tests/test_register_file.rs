@@ -1,6 +1,4 @@
-use orcanet_market::{
-    bridge::spawn, Config, KadSuccessfulResponse, SuccessfulResponse,
-};
+use orcanet_market::{bridge::spawn, Config, KadSuccessfulResponse, SuccessfulResponse};
 use proto::market::{FileInfo, FileInfoHash, User};
 
 #[tokio::test]

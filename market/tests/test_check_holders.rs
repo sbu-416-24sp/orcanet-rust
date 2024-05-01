@@ -2,8 +2,8 @@ use std::net::Ipv4Addr;
 
 use libp2p::Multiaddr;
 use orcanet_market::{
-    bridge::spawn, BootNodes, Config, FileResponse, Protocol,
-    ReqResSuccessfulResponse, SuccessfulResponse, SupplierInfo,
+    bridge::spawn, BootNodes, Config, FileResponse, Protocol, ReqResSuccessfulResponse,
+    SuccessfulResponse, SupplierInfo,
 };
 use proto::market::{FileInfo, FileInfoHash, HoldersResponse, User};
 
