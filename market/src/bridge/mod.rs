@@ -9,7 +9,7 @@ use crate::{
 use libp2p::{
     autonat, dcutr, identify,
     identity::{ed25519, Keypair},
-    kad::{self, store::MemoryStore, NoKnownPeers},
+    kad::{self, store::MemoryStore, Mode, NoKnownPeers},
     noise, ping, relay,
     request_response::{self, ProtocolSupport},
     swarm::behaviour::toggle::Toggle,
@@ -18,6 +18,7 @@ use libp2p::{
 use thiserror::Error;
 use tokio::{runtime::Runtime, sync::mpsc};
 
+const PROVIDER_REPUBLICATION: Duration = Duration::from_secs(60 * 5);
 pub(crate) const IDENTIFY_PROTOCOL_VERSION: &str = "/orcanet/id/1.0.0";
 pub(crate) const KAD_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/orcanet/kad/1.0.0");
 pub(crate) const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 10);
@@ -57,13 +58,24 @@ pub fn spawn(config: Config) -> Result<Peer, BridgeError> {
         .map_err(|err| BridgeError::RelayClient(err.to_string()))?
         .with_behaviour(|key, relay_client| {
             let peer_id = key.public().to_peer_id();
-            let kad = {
+
+            let mut kad = {
                 let mut kad_config = kad::Config::default();
                 kad_config
                     .set_protocol_names(vec![KAD_PROTOCOL_NAME])
-                    .set_provider_record_ttl(Some(file_ttl));
+                    .set_provider_record_ttl(Some(file_ttl))
+                    .set_provider_publication_interval(Some(PROVIDER_REPUBLICATION));
+
                 kad::Behaviour::with_config(peer_id, MemoryStore::new(peer_id), kad_config)
             };
+            // NOTE: either we set this public_addr here or by default always set the kademlia to server
+            // mode. Perhaps we may want to keep it autoamtic? so if a node wants to be a server we'll just
+            // have it be a public_address.
+            // if user doesn't provide a public_address (even if is ofre example some local_addr),
+            // then they'll always be in kademlia client mode and advertising a file won't do much
+            // for that peer? maybe will just use this small hack for now until we figure something
+            // out better. iirc this deosn't affect relay/nat stuff
+            kad.set_mode(Some(Mode::Server));
             let identify = {
                 let config =
                     identify::Config::new(IDENTIFY_PROTOCOL_VERSION.to_owned(), key.public());

@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    net::Ipv4Addr,
     time::{Duration, Instant},
 };
 
@@ -59,16 +58,22 @@ impl Default for LocalMarketMap {
 pub(crate) type LocalMarketEntry = (Instant, SupplierInfo);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) struct SupplierInfo {
-    pub(crate) file_info: FileInfo,
-    pub(crate) user: User,
+pub struct SupplierInfo {
+    pub file_info: FileInfo,
+    pub user: User,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FileResponse {
+    HasFile(SupplierInfo),
+    NoFile,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use std::thread::sleep;
+    use std::{net::Ipv4Addr, thread::sleep};
 
     #[test]
     fn test_insert_and_get_if_not_expired() {
