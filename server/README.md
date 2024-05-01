@@ -1,6 +1,6 @@
 # API
 
-Send requests to http://localhost:{port}. The default port is 3000, unless specied with the -p flag.
+Send requests to http://localhost:{port}. The default port is 3000, unless specified with the -p flag.
 
 ## History
 ### GET /get-history
@@ -46,18 +46,17 @@ Send requests to http://localhost:{port}. The default port is 3000, unless speci
 ### PUT /start-jobs
 - Body: { jobIDs: String[] }
 - Starts the jobs provided
-- Returns with status 404 if any of the jobs are not found, or status 200 if successful.
-- Warning: If one of the jobIDs is not found, the request will prematurely return and remaining jobs, even if valid, will not be started. The return message will be `Job {job_id} not found` if you want to make another request with jobs after this.
+- Returns with status 404 if any of the jobs are not found (valid jobs will have started), or status 200 if all jobs were found and started.
 
 ### PUT /pause-jobs
 - Body: { jobIDs: String[] }
 - Pauses the jobs provided
-- Returns with status 404 if any of the jobs are not found, or status 200 if successful.
+- Returns with status 404 if any of the jobs are not found (valid jobs will have paused), or status 200 if all jobs were found and paused.
 
 ### PUT /terminate-jobs
 - Body: { jobIDs: String[] }
 - Terminates the jobs provided
-- Returns with status 404 if any of the jobs are not found, or status 200 if successful.
+- Returns with status 404 if any of the jobs are not found (valid jobs will have terminated), or status 200 if all jobs were found and terminated.
 
 
 ## Files
