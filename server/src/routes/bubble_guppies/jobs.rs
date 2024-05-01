@@ -27,7 +27,7 @@ async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> i
     let mut config = state.config.lock().await;
     let jobs = state.jobs.lock().await;
 
-    let file_info_hash = FileInfoHash(job.fileHash);
+    let file_info_hash = FileInfoHash::new(job.fileHash);
     let peer_id = job.peerId;
     let mut user = None;
     let file_info = match config.get_market_client().await {
@@ -100,7 +100,7 @@ async fn find_peer(
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
     let response = match config.get_market_client().await {
-        Ok(market) => match market.check_holders(FileInfoHash(fileHash)).await {
+        Ok(market) => match market.check_holders(FileInfoHash::new(fileHash)).await {
             Ok(holders) => holders,
             Err(_) => {
                 return (StatusCode::SERVICE_UNAVAILABLE, "Could not check holders").into_response()

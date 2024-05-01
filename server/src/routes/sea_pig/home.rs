@@ -31,7 +31,7 @@ async fn get_file_info(
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
     let response = match config.get_market_client().await {
-        Ok(market) => match market.check_holders(FileInfoHash(hash)).await {
+        Ok(market) => match market.check_holders(FileInfoHash::new(hash)).await {
             Ok(holders) => holders,
             Err(e) => {
                 return (
@@ -104,7 +104,7 @@ async fn delete_file(
     Path(hash): Path<String>,
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
-    match config.remove_file_by_hash(FileInfoHash(hash.clone())).await {
+    match config.remove_file_by_hash(FileInfoHash::new(hash.clone())).await {
         Ok(_) => Response::builder()
             .status(StatusCode::OK)
             .body(Body::from(format!(r#"{{"hash": "{hash}"}}"#)))

@@ -1,7 +1,5 @@
 use libp2p::{kad::QueryId, request_response::OutboundRequestId, PeerId};
-use proto::market::{FileInfo, User};
-
-use crate::FileInfoHash;
+use proto::market::{FileInfo, FileInfoHash, User};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) enum Query {

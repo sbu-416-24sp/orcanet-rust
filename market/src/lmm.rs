@@ -58,34 +58,6 @@ impl Default for LocalMarketMap {
 pub(crate) type LocalMarketEntry = (Instant, SupplierInfo);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[repr(transparent)]
-pub struct FileInfoHash(String);
-
-impl FileInfoHash {
-    #[inline(always)]
-    pub const fn new(s: String) -> Self {
-        Self(s)
-    }
-
-    #[inline(always)]
-    pub(crate) fn into_bytes(self) -> Vec<u8> {
-        self.into()
-    }
-}
-
-impl From<String> for FileInfoHash {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-impl From<FileInfoHash> for Vec<u8> {
-    fn from(value: FileInfoHash) -> Self {
-        value.0.into_bytes()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SupplierInfo {
     pub file_info: FileInfo,
     pub user: User,

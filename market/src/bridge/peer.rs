@@ -1,6 +1,7 @@
 use libp2p::identity::Keypair;
 use libp2p::PeerId;
 use proto::market::FileInfo;
+use proto::market::FileInfoHash;
 use proto::market::HoldersResponse;
 use proto::market::User;
 use tokio::sync::mpsc;
@@ -11,7 +12,6 @@ use crate::command::request::LmmRequest;
 use crate::command::request::ReqResRequest;
 use crate::command::Message;
 use crate::FailureResponse;
-use crate::FileInfoHash;
 use crate::FileResponse;
 use crate::KadSuccessfulResponse;
 use crate::LmmSuccessfulResponse;

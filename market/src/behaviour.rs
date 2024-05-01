@@ -10,8 +10,7 @@ use libp2p::{
 };
 use proto::market::FileInfoHash;
 
-use crate::lmm::SupplierInfo;
-use crate::lmm::{FileInfoHash, FileResponse};
+use crate::lmm::{FileResponse, SupplierInfo};
 
 // TODO: maybe do somethign with toggle in future?
 

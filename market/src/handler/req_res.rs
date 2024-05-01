@@ -3,8 +3,8 @@ use libp2p::{
     Swarm,
 };
 use log::{error, info, warn};
-use tokio::sync::oneshot::Sender;
 use proto::market::FileInfoHash;
+use tokio::sync::oneshot::Sender;
 
 use crate::{
     behaviour::Behaviour,
@@ -13,7 +13,7 @@ use crate::{
         QueryHandler,
     },
     handler::send_ok,
-    lmm::{FileInfoHash, FileResponse, LocalMarketMap},
+    lmm::{FileResponse, LocalMarketMap},
     FailureResponse, ReqResFailureResponse, ReqResSuccessfulResponse, Response, SuccessfulResponse,
 };
 

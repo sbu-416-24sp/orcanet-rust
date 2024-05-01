@@ -6,7 +6,6 @@ pub mod market {
     use sha2::{Digest, Sha256};
     use std::hash::{Hash, Hasher};
 
-    // this is unnecessary I think
     impl Hash for FileInfo {
         fn hash<H: Hasher>(&self, state: &mut H) {
             let mut input = self.file_hash.clone();
@@ -20,19 +19,6 @@ pub mod market {
     }
 
     impl FileInfo {
-        // from doc
-        //pub fn hash_to_string(&self) -> String {
-        //    let mut sha256 = Sha256::new();
-        //    let mut input = self.file_hash.clone();
-        //    for chunk_hash in &self.chunk_hashes {
-        //        input += chunk_hash;
-        //    }
-        //    input += self.file_size.to_string().as_str();
-        //    input += self.file_name.as_str();
-        //    sha256.update(input);
-        //    format!("{:x}", sha256.finalize())
-        //}
-
         pub fn get_hash(&self) -> FileInfoHash {
             let mut sha256 = Sha256::new();
             let mut input = self.file_hash.clone();
@@ -46,13 +32,36 @@ pub mod market {
         }
     }
 
-    #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     #[repr(transparent)]
-    pub struct FileInfoHash(pub String);
+    pub struct FileInfoHash(String);
 
     impl FileInfoHash {
+        #[inline(always)]
+        pub const fn new(s: String) -> Self {
+            Self(s)
+        }
+
+        #[inline(always)]
+        pub fn into_bytes(self) -> Vec<u8> {
+            self.into()
+        }
+
+        #[inline(always)]
         pub fn as_str(&self) -> &str {
-            self.0.as_str()
+            &self.0
+        }
+    }
+
+    impl From<String> for FileInfoHash {
+        fn from(s: String) -> Self {
+            Self(s)
+        }
+    }
+
+    impl From<FileInfoHash> for Vec<u8> {
+        fn from(value: FileInfoHash) -> Self {
+            value.0.into_bytes()
         }
     }
 

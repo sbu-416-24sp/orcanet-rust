@@ -96,7 +96,7 @@ async fn handle_file_request(
     }
 
     // Get the file path from the file map
-    let file_path = match state.files.get_file_path(&FileInfoHash(hash)).await {
+    let file_path = match state.files.get_file_path(&FileInfoHash::new(hash)).await {
         Some(path) => path,
         None => {
             return (StatusCode::NOT_FOUND, "File not found").into_response();

@@ -287,7 +287,7 @@ pub async fn handle_arg_matches(
                         None => Err(anyhow!("No file hash provided"))?,
                     };
                     let market_client = config.get_market_client().await?;
-                    let file_info_hash = FileInfoHash(file_hash);
+                    let file_info_hash = FileInfoHash::new(file_hash);
                     consumer::list_producers(file_info_hash, market_client).await?;
                     Ok(())
                 }
@@ -297,7 +297,7 @@ pub async fn handle_arg_matches(
                         Some(file_hash) => file_hash.clone(),
                         None => Err(anyhow!("No file hash provided"))?,
                     };
-                    let file_info_hash = FileInfoHash(file_hash);
+                    let file_info_hash = FileInfoHash::new(file_hash);
                     let producer = match get_matches.get_one::<String>("PRODUCER") {
                         Some(producer) => producer.clone(),
                         None => Err(anyhow!("No producer provided"))?,
