@@ -11,6 +11,7 @@ use libp2p::{
 use proto::market::FileInfoHash;
 
 use crate::lmm::SupplierInfo;
+use crate::lmm::{FileInfoHash, FileResponse};
 
 // TODO: maybe do somethign with toggle in future?
 
@@ -23,5 +24,5 @@ pub(crate) struct Behaviour {
     pub(crate) relay_server: Toggle<RelayServerBehaviour>,
     pub(crate) dcutr: Toggle<DcutrBehaviour>,
     pub(crate) relay_client: Toggle<RelayClientBehaviour>,
-    pub(crate) req_res: CborReqResBehaviour<FileInfoHash, SupplierInfo>,
+    pub(crate) req_res: CborReqResBehaviour<FileInfoHash, FileResponse>,
 }

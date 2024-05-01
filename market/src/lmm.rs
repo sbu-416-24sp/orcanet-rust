@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    net::Ipv4Addr,
     time::{Duration, Instant},
 };
 
@@ -59,16 +58,50 @@ impl Default for LocalMarketMap {
 pub(crate) type LocalMarketEntry = (Instant, SupplierInfo);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) struct SupplierInfo {
-    pub(crate) file_info: FileInfo,
-    pub(crate) user: User,
+#[repr(transparent)]
+pub struct FileInfoHash(String);
+
+impl FileInfoHash {
+    #[inline(always)]
+    pub const fn new(s: String) -> Self {
+        Self(s)
+    }
+
+    #[inline(always)]
+    pub(crate) fn into_bytes(self) -> Vec<u8> {
+        self.into()
+    }
+}
+
+impl From<String> for FileInfoHash {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<FileInfoHash> for Vec<u8> {
+    fn from(value: FileInfoHash) -> Self {
+        value.0.into_bytes()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SupplierInfo {
+    pub file_info: FileInfo,
+    pub user: User,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FileResponse {
+    HasFile(SupplierInfo),
+    NoFile,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use std::thread::sleep;
+    use std::{net::Ipv4Addr, thread::sleep};
 
     #[test]
     fn test_insert_and_get_if_not_expired() {
