@@ -2,10 +2,10 @@ use std::net::Ipv4Addr;
 
 use libp2p::Multiaddr;
 use orcanet_market::{
-    bridge::spawn, BootNodes, Config, FileInfoHash, FileResponse, Protocol,
+    bridge::spawn, BootNodes, Config, FileResponse, Protocol,
     ReqResSuccessfulResponse, SuccessfulResponse, SupplierInfo,
 };
-use proto::market::{FileInfo, HoldersResponse, User};
+use proto::market::{FileInfo, FileInfoHash, HoldersResponse, User};
 
 #[tokio::test]
 async fn test_register_file_and_get_self_holder() {
@@ -29,7 +29,7 @@ async fn test_register_file_and_get_self_holder() {
         file_info: file_info.clone(),
         user: user.clone(),
     };
-    let file_info_hash = FileInfoHash::new(file_info.hash_to_string());
+    let file_info_hash = file_info.get_hash();
     let _ = peer
         .register_file(user, file_info_hash.clone(), file_info)
         .await;
@@ -65,7 +65,7 @@ async fn test_register_file_and_check_holders_basic() {
         file_info: Some(file_info.clone()),
         holders: vec![user.clone()],
     };
-    let file_info_hash = FileInfoHash::new(file_info.hash_to_string());
+    let file_info_hash = file_info.get_hash();
     let _ = peer
         .register_file(user, file_info_hash.clone(), file_info)
         .await;
@@ -107,7 +107,7 @@ async fn test_check_holders_from_other_peer() {
         holders: vec![user.clone()],
     };
 
-    let file_info_hash = FileInfoHash::new(file_info.hash_to_string());
+    let file_info_hash = file_info.get_hash();
     let _ = peer1
         .register_file(user, file_info_hash.clone(), file_info)
         .await;

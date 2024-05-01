@@ -1,7 +1,7 @@
 use orcanet_market::{
-    bridge::spawn, Config, FileInfoHash, KadSuccessfulResponse, SuccessfulResponse,
+    bridge::spawn, Config, KadSuccessfulResponse, SuccessfulResponse,
 };
-use proto::market::{FileInfo, User};
+use proto::market::{FileInfo, FileInfoHash, User};
 
 #[tokio::test]
 async fn test_register_file() {
@@ -19,7 +19,7 @@ async fn test_register_file() {
         file_size: 3212321,
         file_name: "fooobar.mp4".to_owned(),
     };
-    let file_info_hash = FileInfoHash::new(file_info.hash_to_string());
+    let file_info_hash = file_info.get_hash();
     let res = peer.register_file(user, file_info_hash, file_info).await;
     assert_eq!(
         res,
@@ -47,7 +47,7 @@ async fn test_register_and_get_providers_for_one() {
         file_size: 3212321,
         file_name: "fooobar.mp4".to_owned(),
     };
-    let file_info_hash = FileInfoHash::new(file_info.hash_to_string());
+    let file_info_hash = file_info.get_hash();
     let _ = peer
         .register_file(user, file_info_hash.clone(), file_info)
         .await;
