@@ -9,6 +9,7 @@ mod routes {
 use axum::Router;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use clap::Parser;
 
 use peernode::store;
 // shared server state
@@ -17,12 +18,22 @@ pub struct ServerState {
     pub config: Arc<Mutex<store::Configurations>>,
     pub jobs: Arc<Mutex<jobs::Jobs>>,
 }
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    // Port for the server
+    #[arg(short, long, default_value_t = 3000)]
+    port: i32,
+}
 
 // Main function to setup and run the server
 #[tokio::main]
 async fn main() {
+    let args = Args::parse();
+    let port = args.port;
+
     let mut config = store::Configurations::new().await;
-    let mut jobs = jobs::Jobs::new();
+    let jobs = jobs::Jobs::new();
 
     // Run http client
     config.start_http_client(config.get_port()).await;
@@ -41,7 +52,10 @@ async fn main() {
         .with_state(state);
 
     // Start the server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let addr = format!("0.0.0.0:{}", port);
+    println!("Server listening on {}", addr);
+
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app.into_make_service())
         .await
         .unwrap();

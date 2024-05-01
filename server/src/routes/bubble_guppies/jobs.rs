@@ -209,22 +209,29 @@ async fn start_jobs(
     State(state): State<ServerState>,
     Json(arg): Json<JobIds>,
 ) -> impl IntoResponse {
-    for job_id in arg.jobIDs {
-        let mut config = state.config.lock().await;
-        let jobs = state.jobs.lock().await;
+    let mut config = state.config.lock().await;
+    let jobs = state.jobs.lock().await;
+    let mut num_failed = 0;
 
+    for job_id in arg.jobIDs {
         match jobs.get_job(&job_id).await {
             Some(job) => {
                 let token = config.get_token(job.lock().await.encoded_producer.clone());
 
                 jobs::start(job, state.jobs.clone(), token).await;
             }
-            None => {
-                return (StatusCode::NOT_FOUND, format!("Job {job_id} not found")).into_response()
-            }
+            None => num_failed += 1,
         }
     }
-    StatusCode::OK.into_response()
+    if num_failed > 0 {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Failed to find {num_failed} jobs"),
+        )
+            .into_response()
+    } else {
+        (StatusCode::OK, Body::empty()).into_response()
+    }
 }
 
 async fn pause_jobs(

@@ -1,6 +1,6 @@
 # API
 
-Send requests to http://localhost:3000
+Send requests to http://localhost:{port}. The default port is 3000, unless specified with the -p flag.
 
 ## History
 ### GET /get-history
@@ -10,12 +10,13 @@ Send requests to http://localhost:3000
 ### PUT /remove-from-history
 - Body: { jobID: String }
 - Removes the job with jobID from the history.
-- Returns with status 404 if no job is found, or status 200 if successful.
+- Returns with status 404 if the job is not found, or status 200 if successful.
 
 ### PUT /clear-history
 - Body: none
 - Clears the history of completed jobs.
 - Returns with status 200 if successful.
+
 
 ## Jobs
 ### PUT /add-job
@@ -45,22 +46,20 @@ Send requests to http://localhost:3000
 ### PUT /start-jobs
 - Body: { jobIDs: String[] }
 - Starts the jobs provided
-- Returns with status 404 if any of the jobs are not found, or status 200 if successful.
-- Warning: If one of the jobIDs is not found, the request will prematurely return and remaining jobs, even if valid, will not be started. The return message will be `Job {job_id} not found` if you want to make another request with jobs after this.
+- Returns with status 404 if any of the jobs are not found (valid jobs will have started), or status 200 if all jobs were found and started.
 
 ### PUT /pause-jobs
 - Body: { jobIDs: String[] }
 - Pauses the jobs provided
-- Returns with status 404 if any of the jobs are not found, or status 200 if successful.
+- Returns with status 404 if any of the jobs are not found (valid jobs will have paused), or status 200 if all jobs were found and paused.
 
 ### PUT /terminate-jobs
 - Body: { jobIDs: String[] }
 - Terminates the jobs provided
-- Returns with status 404 if any of the jobs are not found, or status 200 if successful.
+- Returns with status 404 if any of the jobs are not found (valid jobs will have terminated), or status 200 if all jobs were found and terminated.
 
 
 ## Files
-
 ### GET /file/:hash/info
 - Params: hash
 - Gets info about the file with hash.
@@ -69,7 +68,7 @@ Send requests to http://localhost:3000
 ### POST /upload
 - Body: { filePath: String, price: i64 }
 - Uploads a file to the server
-- Returns with status 500 a problem occurs, or status 200 with the file's hash if successful.
+- Returns status 500 if a problem occurs, or status 200 with the file's hash if successful.
 
 
 ### DELETE /file/:hash
@@ -79,7 +78,6 @@ Send requests to http://localhost:3000
 
 
 ## Peers
-
 ### GET /get-peer/:peer_id
 - Params: peer_id
 - Gets info about a peer
@@ -92,5 +90,4 @@ Send requests to http://localhost:3000
 ### POST /remove-peer
 - Body: { peer_id: String }
 - Removes a peer
-- Returns with status 500 a problem occurs, or status 200 if successful
-
+- Returns with status 500 if a problem occurs, or status 200 if successful

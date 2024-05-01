@@ -3710,6 +3710,7 @@ dependencies = [
  "axum 0.7.5",
  "base64 0.22.0",
  "chrono",
+ "clap",
  "config",
  "glob",
  "mime_guess",

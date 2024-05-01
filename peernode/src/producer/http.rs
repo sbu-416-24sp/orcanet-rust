@@ -36,6 +36,7 @@ async fn handle_file_request(
     headers: HeaderMap,
 ) -> Response {
     // Obtain file hash, chunk, and consumer address
+
     let hash = params.0;
     let chunk = query.chunk.unwrap_or(0);
     let address = connect_info.0.ip().to_string();
@@ -168,7 +169,7 @@ async fn handle_file_request(
 pub async fn run(files: AsyncFileMap, port: String) -> Result<()> {
     let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    println!("HTTP: Listening on {}", listener.local_addr()?);
+    //println!("HTTP: Listening on {}", listener.local_addr()?);
 
     let app = Router::new()
         .route("/file/:file_hash", get(handle_file_request))
