@@ -80,7 +80,7 @@ impl fmt::Display for JobStatus {
     }
 }
 
-pub async fn start(job: AsyncJob, token: String) {
+pub async fn start(job: AsyncJob, jobs: Arc<Mutex<Jobs>>, token: String) {
     let mut lock = job.lock().await;
     println!("Starting job with token {token}");
     if let JobStatus::Paused(next_chunk) = lock.status {
@@ -118,6 +118,17 @@ pub async fn start(job: AsyncJob, token: String) {
                                 println!("Consumer: File downloaded successfully");
                                 lock = job.lock().await;
                                 lock.status = JobStatus::Completed;
+
+                                let history_entry = HistoryEntry {
+                                    fileName: lock.file_name.clone(),
+                                    timeCompleted: current_time_secs(),
+                                };
+
+                                jobs.lock()
+                                    .await
+                                    .add_job_to_history(&lock.job_id, history_entry)
+                                    .await;
+
                                 return;
                             }
                         }
@@ -271,31 +282,11 @@ impl Jobs {
         jobs_list
     }
 
-    pub async fn finish_job(&self, job_id: &str) -> bool {
-        let mut jobs = self.jobs.write().await;
-
-        // get the job, returning false if it doesn't exist
-        let job = match jobs.get_mut(job_id) {
-            Some(job) => job.clone(),
-            None => return false,
-        };
-
-        let mut job = job.lock().await;
-
-        if let JobStatus::Completed = job.status {
-            return false;
-        }
-
-        // mark the job as completed
-        job.status = JobStatus::Completed;
-
+    pub async fn add_job_to_history(&self, job_id: &str, entry: HistoryEntry) -> bool {
         // add the completed job to history
         let mut history = self.history.write().await;
-        let history_entry = HistoryEntry {
-            fileName: job.file_name.clone(),
-            timeCompleted: 0,
-        };
-        history.insert(job_id.to_string(), history_entry);
+
+        history.insert(job_id.to_owned(), entry);
 
         true
     }

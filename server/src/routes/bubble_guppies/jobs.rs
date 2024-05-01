@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use peernode::consumer::encode::{encode_user, try_decode_user};
 
-
-use crate::{ServerState, jobs};
+use crate::{jobs, ServerState};
 
 ///
 /// JOBS ENDPOINTS
@@ -57,20 +56,23 @@ async fn add_job(State(state): State<ServerState>, Json(job): Json<AddJob>) -> i
         }
     };
 
-    let job_id = jobs.add_job(
-        file_info_hash,
-        file_info.file_size as u64,
-        file_info.file_name,
-        user.price,
-        peer_id.clone(),
-        encode_user(&user),
-    )
-    .await;
+    let job_id = jobs
+        .add_job(
+            file_info_hash,
+            file_info.file_size as u64,
+            file_info.file_name,
+            user.price,
+            peer_id.clone(),
+            encode_user(&user),
+        )
+        .await;
 
     // start job after adding
     let job = jobs.get_job(&job_id).await.unwrap();
     let token = config.get_token(job.lock().await.encoded_producer.clone());
-    jobs::start(job, token).await;
+
+    drop(jobs);
+    jobs::start(job, state.jobs, token).await;
 
     Response::builder()
         .status(StatusCode::OK)
@@ -215,7 +217,8 @@ async fn start_jobs(
         match jobs.get_job(&job_id).await {
             Some(job) => {
                 let token = config.get_token(job.lock().await.encoded_producer.clone());
-                jobs::start(job, token).await;
+
+                jobs::start(job, state.jobs.clone(), token).await;
             }
             None => return (StatusCode::NOT_FOUND, "Job not found").into_response(),
         }
@@ -256,7 +259,7 @@ async fn terminate_jobs(
 ) -> impl IntoResponse {
     let jobs = state.jobs.lock().await;
     let mut num_failed = 0;
-    
+
     for job_id in arg.jobIDs {
         match jobs.get_job(&job_id).await {
             Some(job) => {
