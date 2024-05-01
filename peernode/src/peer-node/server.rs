@@ -5,8 +5,9 @@ pub mod store;
 mod transfer;
 
 mod routes {
-    pub mod file_routes;
-    pub mod job_routes;
+    pub mod bubble_guppies;
+    pub mod manta;
+    pub mod sea_pig;
 }
 
 use axum::Router;
@@ -22,14 +23,19 @@ pub struct ServerState {
 // Main function to setup and run the server
 #[tokio::main]
 async fn main() {
-    let config = store::Configurations::new().await;
+    let mut config = store::Configurations::new().await;
+
+    // Run market client if it was previously configured
+    let _ = config.get_market_client().await;
+
     let state = ServerState {
         config: Arc::new(Mutex::new(config)),
     };
 
     let app = Router::new()
-        .merge(routes::file_routes::routes())
-        .merge(routes::job_routes::routes())
+        .merge(routes::bubble_guppies::routes())
+        .merge(routes::manta::routes())
+        .merge(routes::sea_pig::routes())
         .with_state(state);
 
     // Start the server
