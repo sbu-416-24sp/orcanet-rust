@@ -11,7 +11,7 @@
 
 ## API
 
-See [server/SERVER.md](server/SERVER.md) for the API documentation.
+See [server/README.md](server/README.md) for the API documentation.
 
 ## Running
 

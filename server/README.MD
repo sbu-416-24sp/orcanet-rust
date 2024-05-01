@@ -10,12 +10,13 @@ Send requests to http://localhost:3000
 ### PUT /remove-from-history
 - Body: { jobID: String }
 - Removes the job with jobID from the history.
-- Returns with status 404 if no job is found, or status 200 if successful.
+- Returns with status 404 if the job is not found, or status 200 if successful.
 
 ### PUT /clear-history
 - Body: none
 - Clears the history of completed jobs.
 - Returns with status 200 if successful.
+
 
 ## Jobs
 ### PUT /add-job
@@ -60,7 +61,6 @@ Send requests to http://localhost:3000
 
 
 ## Files
-
 ### GET /file/:hash/info
 - Params: hash
 - Gets info about the file with hash.
@@ -69,7 +69,7 @@ Send requests to http://localhost:3000
 ### POST /upload
 - Body: { filePath: String, price: i64 }
 - Uploads a file to the server
-- Returns with status 500 a problem occurs, or status 200 with the file's hash if successful.
+- Returns status 500 if a problem occurs, or status 200 with the file's hash if successful.
 
 
 ### DELETE /file/:hash
@@ -79,7 +79,6 @@ Send requests to http://localhost:3000
 
 
 ## Peers
-
 ### GET /get-peer/:peer_id
 - Params: peer_id
 - Gets info about a peer
@@ -92,5 +91,4 @@ Send requests to http://localhost:3000
 ### POST /remove-peer
 - Body: { peer_id: String }
 - Removes a peer
-- Returns with status 500 a problem occurs, or status 200 if successful
-
+- Returns with status 500 if a problem occurs, or status 200 if successful
