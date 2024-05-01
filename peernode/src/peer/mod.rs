@@ -83,7 +83,11 @@ impl MarketClient {
         file_info_hash: FileInfoHash,
         file_info: FileInfo,
     ) -> Result<()> {
-        match self.inner.register_file(user, file_info_hash, file_info).await {
+        match self
+            .inner
+            .register_file(user, file_info_hash, file_info)
+            .await
+        {
             Ok(_) => Ok(()),
             Err(e) => Err(anyhow!("{e}")),
         }
