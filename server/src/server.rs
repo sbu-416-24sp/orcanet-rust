@@ -7,9 +7,9 @@ mod routes {
 }
 
 use axum::Router;
+use clap::Parser;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use clap::Parser;
 
 use peernode::store;
 // shared server state

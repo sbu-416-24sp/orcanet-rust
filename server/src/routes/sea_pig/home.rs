@@ -104,7 +104,10 @@ async fn delete_file(
     Path(hash): Path<String>,
 ) -> impl IntoResponse {
     let mut config = state.config.lock().await;
-    match config.remove_file_by_hash(FileInfoHash::new(hash.clone())).await {
+    match config
+        .remove_file_by_hash(FileInfoHash::new(hash.clone()))
+        .await
+    {
         Ok(_) => Response::builder()
             .status(StatusCode::OK)
             .body(Body::from(format!(r#"{{"hash": "{hash}"}}"#)))
