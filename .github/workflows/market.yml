@@ -30,7 +30,7 @@ jobs:
           ~/market/.cargo/registry/index/
           ~/market/.cargo/registry/cache/
           ~/market/.cargo/git/db/
-          market/target/            
+          market/target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: ${{ runner.os }}-cargo-
     - name: Build
