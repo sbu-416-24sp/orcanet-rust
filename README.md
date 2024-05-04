@@ -1,14 +1,14 @@
 # Orcanet Rust
 
-Orcanet is a distributed file network which allows users to buy and sell files based on the hash of their data, with built in checksums per chunk to prevent scams or data corruption. Payment is managed through the Orcacoin fork of the Bitcoin network
+Orcanet is a distributed file network which allows users to buy and sell files based on the hash of their data, with built in checksums per chunk to prevent scams or data corruption. Payment is managed through the Orcacoin fork of the Bitcoin network.
 
-## Todos
-- Implement KAD network to production
-- Combine peers and market to the same cargo package
-- Complete rest of routes as specified by [API Docs](https://docs.google.com/document/d/10wHEIvt0l4B_zKzHb0WI2yd87cnjuSQNuwaLOdUai40/)
+This repository contains the Rust implementation of the peernode-market and provides a CLI and http server.
+
+## Todo (for future semesters?)
+- Implement the coin
+- Implement the wallet and replace wallet routes placeholders
 
 ## Setup
-
 1. Install [Rust](https://www.rust-lang.org/tools/install)
 2. Install protoc:
 
